@@ -3,7 +3,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.ViewMeme;
+import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -15,8 +17,13 @@ import org.springframework.context.annotation.Configuration;
 class MemesConfig {
 
     @Bean
-    WebImageOptimizer webImageOptimizer() {
-        return new WebImageOptimizer();
+    ImageLimits imageLimits(@Value("${memes.image.max-dimension:1024}") int maxDimension) {
+        return new ImageLimits(maxDimension);
+    }
+
+    @Bean
+    WebImageOptimizer webImageOptimizer(ImageLimits imageLimits) {
+        return new WebImageOptimizer(imageLimits);
     }
 
     @Bean

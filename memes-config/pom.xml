@@ -8,15 +8,10 @@
         <artifactId>microservice-memes</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>memes-image</artifactId>
+    <artifactId>memes-config</artifactId>
 
-    <!-- Image optimisation using only the JDK's ImageIO (java.desktop). No framework. -->
+    <!-- Typed, validated configuration values. Pure Java, no framework. -->
     <dependencies>
-        <dependency>
-            <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-config</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

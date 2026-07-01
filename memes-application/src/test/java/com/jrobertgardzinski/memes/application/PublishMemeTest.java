@@ -1,7 +1,10 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
@@ -14,6 +17,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Epic("Use case")
+@Feature("Publish meme")
 class PublishMemeTest {
 
     private final Map<String, Meme> store = new HashMap<>();
@@ -28,7 +33,8 @@ class PublishMemeTest {
             return Optional.ofNullable(store.get(id));
         }
     };
-    private final PublishMeme publishMeme = new PublishMeme(new WebImageOptimizer(), repository);
+    private final PublishMeme publishMeme =
+            new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), repository);
 
     @Test
     void publishes_an_optimized_meme() throws Exception {
