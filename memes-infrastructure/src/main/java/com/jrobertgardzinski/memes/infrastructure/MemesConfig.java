@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.memes.application.AddComment;
+import com.jrobertgardzinski.memes.application.CommentRepository;
+import com.jrobertgardzinski.memes.application.ListComments;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.ViewMeme;
@@ -35,4 +38,15 @@ class MemesConfig {
     ViewMeme viewMeme(MemeRepository repository) {
         return new ViewMeme(repository);
     }
+
+    @Bean
+    AddComment addComment(MemeRepository memeRepository, CommentRepository commentRepository) {
+        return new AddComment(memeRepository, commentRepository);
+    }
+
+    @Bean
+    ListComments listComments(CommentRepository commentRepository) {
+        return new ListComments(commentRepository);
+    }
 }
+
