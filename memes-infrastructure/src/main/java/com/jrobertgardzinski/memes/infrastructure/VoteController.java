@@ -1,0 +1,51 @@
+package com.jrobertgardzinski.memes.infrastructure;
+
+import com.jrobertgardzinski.memes.application.CastVote;
+import com.jrobertgardzinski.memes.application.RankMemes;
+import com.jrobertgardzinski.memes.domain.VoteDirection;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Web boundary for voting: cast a vote on a meme, and list the hottest memes.
+ */
+@RestController
+@RequestMapping("/memes")
+class VoteController {
+
+    private final CastVote castVote;
+    private final RankMemes rankMemes;
+
+    VoteController(CastVote castVote, RankMemes rankMemes) {
+        this.castVote = castVote;
+        this.rankMemes = rankMemes;
+    }
+
+    @PostMapping("/{memeId}/votes")
+    ResponseEntity<?> vote(@PathVariable("memeId") String memeId, @RequestBody Map<String, Object> body) {
+        VoteDirection direction;
+        try {
+            direction = VoteDirection.valueOf(String.valueOf(body.get("direction")).trim().toUpperCase());
+        } catch (RuntimeException invalid) {
+            return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
+        }
+        return castVote.execute(memeId, direction)
+                .<ResponseEntity<?>>map(score -> ResponseEntity.ok(Map.of("score", score)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/hot")
+    List<Map<String, Object>> hot() {
+        return rankMemes.execute().stream()
+                .map(ranked -> Map.<String, Object>of("memeId", ranked.memeId(), "score", ranked.score()))
+                .toList();
+    }
+}

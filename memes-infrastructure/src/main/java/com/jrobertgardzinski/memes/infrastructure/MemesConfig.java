@@ -1,11 +1,14 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.AddComment;
+import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.CommentRepository;
 import com.jrobertgardzinski.memes.application.ListComments;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
+import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.ViewMeme;
+import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +50,16 @@ class MemesConfig {
     @Bean
     ListComments listComments(CommentRepository commentRepository) {
         return new ListComments(commentRepository);
+    }
+
+    @Bean
+    CastVote castVote(MemeRepository memeRepository, VoteRepository voteRepository) {
+        return new CastVote(memeRepository, voteRepository);
+    }
+
+    @Bean
+    RankMemes rankMemes(VoteRepository voteRepository) {
+        return new RankMemes(voteRepository);
     }
 }
 
