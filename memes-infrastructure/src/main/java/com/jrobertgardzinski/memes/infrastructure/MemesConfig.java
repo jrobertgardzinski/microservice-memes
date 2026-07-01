@@ -4,6 +4,7 @@ import com.jrobertgardzinski.memes.application.AddComment;
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.CommentRepository;
 import com.jrobertgardzinski.memes.application.ListComments;
+import com.jrobertgardzinski.memes.application.MemeContentIndex;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.RankMemes;
@@ -33,8 +34,8 @@ class MemesConfig {
     }
 
     @Bean
-    PublishMeme publishMeme(WebImageOptimizer optimizer, MemeRepository repository) {
-        return new PublishMeme(optimizer, repository);
+    PublishMeme publishMeme(WebImageOptimizer optimizer, MemeRepository repository, MemeContentIndex contentIndex) {
+        return new PublishMeme(optimizer, repository, contentIndex);
     }
 
     @Bean

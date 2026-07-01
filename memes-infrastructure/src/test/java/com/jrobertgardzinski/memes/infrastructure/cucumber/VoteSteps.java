@@ -28,8 +28,9 @@ public class VoteSteps {
 
     @Given("two uploaded memes A and B")
     public void two_uploaded_memes() throws Exception {
-        memeA = upload();
-        memeB = upload();
+        // distinct sizes -> distinct content, so deduplication keeps them as two memes
+        memeA = upload(6, 4);
+        memeB = upload(8, 5);
     }
 
     @When("meme {word} gets {int} up-vote(s)")
@@ -56,8 +57,8 @@ public class VoteSteps {
         return which.equals("A") ? memeA : memeB;
     }
 
-    private String upload() throws Exception {
-        BufferedImage image = new BufferedImage(6, 4, BufferedImage.TYPE_INT_RGB);
+    private String upload(int width, int height) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "bmp", out);
         return RestAssured.given().port(port)

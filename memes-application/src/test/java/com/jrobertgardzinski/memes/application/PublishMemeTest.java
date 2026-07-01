@@ -5,11 +5,13 @@ import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -22,21 +24,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PublishMemeTest {
 
     private final Map<String, Meme> store = new HashMap<>();
+    private final Map<String, String> idByContent = new HashMap<>();
+
     private final MemeRepository repository = new MemeRepository() {
-        @Override
         public void save(Meme meme) {
             store.put(meme.id(), meme);
         }
 
-        @Override
         public Optional<Meme> find(String id) {
             return Optional.ofNullable(store.get(id));
         }
     };
+    private final MemeContentIndex contentIndex = new MemeContentIndex() {
+        public Optional<String> findIdByContent(byte[] data) {
+            return Optional.ofNullable(idByContent.get(key(data)));
+        }
+
+        public void index(byte[] data, String memeId) {
+            idByContent.put(key(data), memeId);
+        }
+
+        private String key(byte[] data) {
+            return Base64.getEncoder().encodeToString(data);
+        }
+    };
     private final PublishMeme publishMeme =
-            new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), repository);
+            new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), repository, contentIndex);
 
     @Test
+    @DisplayName("publishes an optimized meme")
     void publishes_an_optimized_meme() throws Exception {
         String id = publishMeme.execute(bmp());
 
@@ -44,6 +60,18 @@ class PublishMemeTest {
         assertEquals("png", stored.format());
         assertTrue(stored.data().length > 8);
         assertEquals((byte) 0x89, stored.data()[0]); // PNG magic
+    }
+
+    @Test
+    @DisplayName("publishing the same image twice reuses the meme (dedup)")
+    void deduplicates_identical_uploads() throws Exception {
+        byte[] image = bmp();
+
+        String first = publishMeme.execute(image);
+        String second = publishMeme.execute(image);
+
+        assertEquals(first, second);
+        assertEquals(1, store.size());
     }
 
     private static byte[] bmp() throws Exception {
