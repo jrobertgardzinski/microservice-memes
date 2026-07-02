@@ -41,6 +41,14 @@ class CastVoteTest {
             votes.computeIfAbsent(memeId, id -> new HashMap<>()).put(voter, direction);
         }
 
+        public void retractVote(String memeId, String voter) {
+            votes.getOrDefault(memeId, Map.of()).remove(voter);
+        }
+
+        public Optional<VoteDirection> voteOf(String memeId, String voter) {
+            return Optional.ofNullable(votes.getOrDefault(memeId, Map.of()).get(voter));
+        }
+
         public int scoreOf(String memeId) {
             return votes.getOrDefault(memeId, Map.of()).values().stream()
                     .mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
@@ -53,25 +61,28 @@ class CastVoteTest {
     private final CastVote castVote = new CastVote(memeRepository, voteRepository);
 
     @Test
-    @DisplayName("distinct voters raise an existing meme's score; a voter can change their mind")
+    @DisplayName("distinct voters raise the score; the opposite direction switches a voter's mind")
     void distinct_voters_raise_the_score() {
         memes.put("m1", new Meme("m1", "png", new byte[]{1}));
 
-        assertEquals(Optional.of(1), castVote.execute("m1", "alice", VoteDirection.UP));
-        assertEquals(Optional.of(2), castVote.execute("m1", "bob", VoteDirection.UP));
-        assertEquals(Optional.of(0), castVote.execute("m1", "bob", VoteDirection.DOWN)); // changed mind
+        assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
+        assertEquals(tally(2, VoteDirection.UP), castVote.execute("m1", "bob", VoteDirection.UP));
+        assertEquals(tally(0, VoteDirection.DOWN), castVote.execute("m1", "bob", VoteDirection.DOWN));
     }
 
     @Test
-    @DisplayName("re-voting the same way does not stack")
-    void revoting_does_not_stack() {
+    @DisplayName("repeating the same vote retracts it (a toggle, never stacking)")
+    void repeating_the_same_vote_retracts_it() {
         memes.put("m1", new Meme("m1", "png", new byte[]{1}));
 
-        castVote.execute("m1", "alice", VoteDirection.UP);
-        castVote.execute("m1", "alice", VoteDirection.UP);
-        castVote.execute("m1", "alice", VoteDirection.UP);
+        assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
+        assertEquals(Optional.of(new VoteTally(0, Optional.empty())),
+                castVote.execute("m1", "alice", VoteDirection.UP)); // retracted
+        assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
+    }
 
-        assertEquals(Optional.of(1), castVote.execute("m1", "alice", VoteDirection.UP));
+    private static Optional<VoteTally> tally(int score, VoteDirection mine) {
+        return Optional.of(new VoteTally(score, Optional.of(mine)));
     }
 
     @Test

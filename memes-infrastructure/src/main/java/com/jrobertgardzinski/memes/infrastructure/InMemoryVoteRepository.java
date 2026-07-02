@@ -7,12 +7,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * In-memory {@link VoteRepository}: remembers each voter's current vote per meme, so re-voting
- * replaces instead of stacking. Score = up-voters minus down-voters.
- */
+/** In-memory {@link VoteRepository}: each voter's current vote per meme. */
 @Component
 class InMemoryVoteRepository implements VoteRepository {
 
@@ -21,6 +19,16 @@ class InMemoryVoteRepository implements VoteRepository {
     @Override
     public void castVote(String memeId, String voter, VoteDirection direction) {
         votesByMeme.computeIfAbsent(memeId, id -> new ConcurrentHashMap<>()).put(voter, direction);
+    }
+
+    @Override
+    public void retractVote(String memeId, String voter) {
+        votesByMeme.getOrDefault(memeId, Map.of()).remove(voter);
+    }
+
+    @Override
+    public Optional<VoteDirection> voteOf(String memeId, String voter) {
+        return Optional.ofNullable(votesByMeme.getOrDefault(memeId, Map.of()).get(voter));
     }
 
     @Override

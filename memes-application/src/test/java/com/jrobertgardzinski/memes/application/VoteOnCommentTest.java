@@ -41,6 +41,14 @@ class VoteOnCommentTest {
             votes.computeIfAbsent(commentId, id -> new HashMap<>()).put(voter, direction);
         }
 
+        public void retractVote(String commentId, String voter) {
+            votes.getOrDefault(commentId, Map.of()).remove(voter);
+        }
+
+        public Optional<VoteDirection> voteOf(String commentId, String voter) {
+            return Optional.ofNullable(votes.getOrDefault(commentId, Map.of()).get(voter));
+        }
+
         public int scoreOf(String commentId) {
             return votes.getOrDefault(commentId, Map.of()).values().stream()
                     .mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
@@ -49,13 +57,16 @@ class VoteOnCommentTest {
     private final VoteOnComment voteOnComment = new VoteOnComment(commentRepository, commentVoteRepository);
 
     @Test
-    @DisplayName("votes on a comment, one vote per voter")
+    @DisplayName("votes on a comment: toggle retracts, the opposite direction switches")
     void votes_on_a_comment() {
         comments.add(new Comment("c1", "m1", "alice", "great"));
 
-        assertEquals(Optional.of(1), voteOnComment.execute("m1", "c1", "bob", VoteDirection.UP));
-        assertEquals(Optional.of(1), voteOnComment.execute("m1", "c1", "bob", VoteDirection.UP)); // no stacking
-        assertEquals(Optional.of(-1), voteOnComment.execute("m1", "c1", "bob", VoteDirection.DOWN));
+        assertEquals(Optional.of(new VoteTally(1, Optional.of(VoteDirection.UP))),
+                voteOnComment.execute("m1", "c1", "bob", VoteDirection.UP));
+        assertEquals(Optional.of(new VoteTally(0, Optional.empty())),
+                voteOnComment.execute("m1", "c1", "bob", VoteDirection.UP)); // retracted
+        assertEquals(Optional.of(new VoteTally(-1, Optional.of(VoteDirection.DOWN))),
+                voteOnComment.execute("m1", "c1", "bob", VoteDirection.DOWN));
     }
 
     @Test

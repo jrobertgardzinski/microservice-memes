@@ -22,6 +22,13 @@ class RankMemesTest {
             public void castVote(String memeId, String voter, VoteDirection direction) {
             }
 
+            public void retractVote(String memeId, String voter) {
+            }
+
+            public java.util.Optional<VoteDirection> voteOf(String memeId, String voter) {
+                return java.util.Optional.empty();
+            }
+
             public int scoreOf(String memeId) {
                 return 0;
             }

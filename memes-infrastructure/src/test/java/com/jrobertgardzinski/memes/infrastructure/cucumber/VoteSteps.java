@@ -76,6 +76,16 @@ public class VoteSteps {
         assertEquals(score, lastReportedScore, "score reported by the last vote");
     }
 
+    @Then("meme {word}'s score is {int} and the user's vote is gone")
+    public void memeScoreIsAndVoteGone(String which, int score) {
+        assertEquals(score, lastReportedScore, "score reported by the last vote");
+        Response tally = RestAssured.given().port(port)
+                .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN)
+                .get("/memes/" + idOf(which) + "/votes");
+        tally.then().statusCode(200);
+        assertEquals(null, tally.jsonPath().getString("myVote"), "expected the vote to be retracted");
+    }
+
     private void vote(String memeId, String token) {
         Response response = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + token)

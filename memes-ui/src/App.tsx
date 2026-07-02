@@ -97,7 +97,7 @@ export default function App() {
       </Container>
 
       {selected && (
-        <MemeDialog memeId={selected} token={token} score={scores[selected] ?? 0}
+        <MemeDialog memeId={selected} token={token}
                     onVoted={refresh} onRequireSignIn={requireSignIn}
                     onClose={() => setSelected(null)} />
       )}

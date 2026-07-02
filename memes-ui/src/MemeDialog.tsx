@@ -11,57 +11,72 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { authHeader, jsonHeaders, listComments, MemeComment } from './api';
+import {
+  authHeader, jsonHeaders, listComments, memeTally, MemeComment, VoteDirection, VoteTally,
+} from './api';
 
 interface Props {
   memeId: string;
   token: string | null;
-  score: number;
   onVoted: () => void;
   onRequireSignIn: () => void;
   onClose: () => void;
 }
 
-function VoteButtons({ disabled, onVote }: { disabled: boolean; onVote: (d: 'UP' | 'DOWN') => void }) {
+/** Arrows with the caller's current vote pressed; clicking the pressed one retracts (the API toggles). */
+function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote: (d: VoteDirection) => void }) {
   return (
     <>
-      <IconButton size="small" color="primary" disabled={disabled} onClick={() => onVote('UP')}>
+      <IconButton size="small" onClick={() => onVote('UP')}
+                  color={myVote === 'UP' ? 'primary' : 'default'}
+                  sx={myVote === 'UP' ? { bgcolor: 'primary.dark' } : undefined}>
         <ArrowUpwardIcon fontSize="inherit" />
       </IconButton>
-      <IconButton size="small" disabled={disabled} onClick={() => onVote('DOWN')}>
+      <IconButton size="small" onClick={() => onVote('DOWN')}
+                  color={myVote === 'DOWN' ? 'error' : 'default'}
+                  sx={myVote === 'DOWN' ? { bgcolor: 'error.dark' } : undefined}>
         <ArrowDownwardIcon fontSize="inherit" />
       </IconButton>
     </>
   );
 }
 
-export default function MemeDialog({ memeId, token, score, onVoted, onRequireSignIn, onClose }: Props) {
+export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, onClose }: Props) {
+  const [tally, setTally] = useState<VoteTally>({ score: 0, myVote: null });
   const [comments, setComments] = useState<MemeComment[]>([]);
   const [text, setText] = useState('');
 
-  const load = useCallback(() => void listComments(memeId).then(setComments), [memeId]);
+  const load = useCallback(() => {
+    void memeTally(memeId, token).then(setTally);
+    void listComments(memeId, token).then(setComments);
+  }, [memeId, token]);
   useEffect(load, [load]);
 
   const guard = (action: () => void) => (token ? action() : onRequireSignIn());
 
-  const voteMeme = (direction: 'UP' | 'DOWN') =>
+  const voteMeme = (direction: VoteDirection) =>
     guard(async () => {
-      await fetch(`/memes/${memeId}/votes`, {
+      const r = await fetch(`/memes/${memeId}/votes`, {
         method: 'POST',
         headers: { ...jsonHeaders, ...authHeader(token) },
         body: JSON.stringify({ direction }),
       });
+      if (r.ok) setTally(await r.json());
       onVoted();
     });
 
-  const voteComment = (commentId: string, direction: 'UP' | 'DOWN') =>
+  const voteComment = (commentId: string, direction: VoteDirection) =>
     guard(async () => {
-      await fetch(`/memes/${memeId}/comments/${commentId}/votes`, {
+      const r = await fetch(`/memes/${memeId}/comments/${commentId}/votes`, {
         method: 'POST',
         headers: { ...jsonHeaders, ...authHeader(token) },
         body: JSON.stringify({ direction }),
       });
-      load();
+      if (r.ok) {
+        const updated: VoteTally = await r.json();
+        setComments((current) => current.map((c) =>
+          c.id === commentId ? { ...c, score: updated.score, myVote: updated.myVote } : c));
+      }
     });
 
   const postComment = () =>
@@ -84,8 +99,8 @@ export default function MemeDialog({ memeId, token, score, onVoted, onRequireSig
         <Box component="img" src={`/memes/${memeId}`} alt="meme"
              sx={{ width: '100%', borderRadius: 2 }} />
         <Stack direction="row" spacing={1} alignItems="center" sx={{ my: 1 }}>
-          <VoteButtons disabled={false} onVote={voteMeme} />
-          <Chip label={score} size="small" />
+          <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
+          <Chip label={tally.score} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
         </Stack>
         <Divider />
@@ -95,7 +110,7 @@ export default function MemeDialog({ memeId, token, score, onVoted, onRequireSig
               <Box component="b" sx={{ color: 'primary.light' }}>{c.author}</Box> {c.text}
             </Typography>
             <Chip label={c.score} size="small" variant="outlined" />
-            <VoteButtons disabled={false} onVote={(d) => voteComment(c.id, d)} />
+            <VoteButtons myVote={c.myVote} onVote={(d) => voteComment(c.id, d)} />
           </Stack>
         ))}
         <Stack component="form" direction="row" spacing={1} sx={{ mt: 1.5 }}

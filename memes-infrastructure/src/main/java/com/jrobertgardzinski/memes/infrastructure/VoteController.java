@@ -2,7 +2,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.RankMemes;
+import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.VoteOnComment;
+import com.jrobertgardzinski.memes.application.VoteTally;
 import com.jrobertgardzinski.memes.domain.VoteDirection;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,14 +15,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Web boundary for voting: signed-in users vote on memes and comments (one vote per user — the
- * voter is the identity published by {@link RequireSignInFilter}, so votes cannot stack); the hot
- * list is public. The boundary parses raw input into domain types (bad direction → 400).
+ * Web boundary for voting, Reddit-style toggle: a vote counts once per user, repeating it retracts
+ * it, the opposite direction switches it (the voter is the identity published by
+ * {@link RequireSignInFilter}). Responses carry the new score AND the caller's resulting choice
+ * ({@code myVote}), so the UI can render the pressed arrow; the tally GET serves the same for a
+ * viewer opening a meme. The hot list is public.
  */
 @RestController
 @RequestMapping("/memes")
@@ -31,11 +36,13 @@ class VoteController {
 
     private final CastVote castVote;
     private final VoteOnComment voteOnComment;
+    private final ShowMemeVote showMemeVote;
     private final RankMemes rankMemes;
 
-    VoteController(CastVote castVote, VoteOnComment voteOnComment, RankMemes rankMemes) {
+    VoteController(CastVote castVote, VoteOnComment voteOnComment, ShowMemeVote showMemeVote, RankMemes rankMemes) {
         this.castVote = castVote;
         this.voteOnComment = voteOnComment;
+        this.showMemeVote = showMemeVote;
         this.rankMemes = rankMemes;
     }
 
@@ -62,6 +69,13 @@ class VoteController {
         return toResponse(voteOnComment.execute(memeId, commentId, voter, direction.get()));
     }
 
+    @GetMapping("/{memeId}/votes")
+    ResponseEntity<?> memeTally(@PathVariable("memeId") String memeId,
+                                @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER, required = false)
+                                String viewer) {
+        return toResponse(showMemeVote.execute(memeId, Optional.ofNullable(viewer)));
+    }
+
     @GetMapping("/hot")
     List<Map<String, Object>> hot() {
         return rankMemes.execute().stream()
@@ -77,8 +91,13 @@ class VoteController {
         }
     }
 
-    private static ResponseEntity<?> toResponse(Optional<Integer> score) {
-        return score.<ResponseEntity<?>>map(s -> ResponseEntity.ok(Map.of("score", s)))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    private static ResponseEntity<?> toResponse(Optional<VoteTally> tally) {
+        if (tally.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("score", tally.get().score());
+        body.put("myVote", tally.get().voterChoice().map(Enum::name).orElse(null));
+        return ResponseEntity.ok(body);
     }
 }

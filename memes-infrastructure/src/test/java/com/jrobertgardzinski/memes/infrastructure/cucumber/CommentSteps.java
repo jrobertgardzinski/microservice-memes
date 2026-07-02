@@ -51,16 +51,23 @@ public class CommentSteps {
         commentId = response.jsonPath().getString("id");
     }
 
-    @When("another user up-votes that comment twice")
-    public void anotherUserUpVotesThatCommentTwice() {
-        for (int i = 0; i < 2; i++) {
-            RestAssured.given().port(port)
-                    .header("Authorization", "Bearer " + TestAuthConfig.SECOND_TOKEN)
-                    .contentType("application/json")
-                    .body("{\"direction\":\"UP\"}")
-                    .post("/memes/" + memeId + "/comments/" + commentId + "/votes")
-                    .then().statusCode(200);
-        }
+    @When("another user up-votes that comment")
+    public void anotherUserUpVotesThatComment() {
+        upVoteComment();
+    }
+
+    @When("the other user up-votes that comment again")
+    public void theOtherUserUpVotesThatCommentAgain() {
+        upVoteComment();
+    }
+
+    private void upVoteComment() {
+        RestAssured.given().port(port)
+                .header("Authorization", "Bearer " + TestAuthConfig.SECOND_TOKEN)
+                .contentType("application/json")
+                .body("{\"direction\":\"UP\"}")
+                .post("/memes/" + memeId + "/comments/" + commentId + "/votes")
+                .then().statusCode(200);
     }
 
     @Then("the comment's score is {int}")

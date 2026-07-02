@@ -5,9 +5,10 @@ import com.jrobertgardzinski.memes.domain.VoteDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** In-memory {@link CommentVoteRepository}: one remembered vote per voter per comment. */
+/** In-memory {@link CommentVoteRepository}: each voter's current vote per comment. */
 @Component
 class InMemoryCommentVoteRepository implements CommentVoteRepository {
 
@@ -16,6 +17,16 @@ class InMemoryCommentVoteRepository implements CommentVoteRepository {
     @Override
     public void castVote(String commentId, String voter, VoteDirection direction) {
         votesByComment.computeIfAbsent(commentId, id -> new ConcurrentHashMap<>()).put(voter, direction);
+    }
+
+    @Override
+    public void retractVote(String commentId, String voter) {
+        votesByComment.getOrDefault(commentId, Map.of()).remove(voter);
+    }
+
+    @Override
+    public Optional<VoteDirection> voteOf(String commentId, String voter) {
+        return Optional.ofNullable(votesByComment.getOrDefault(commentId, Map.of()).get(voter));
     }
 
     @Override

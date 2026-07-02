@@ -17,6 +17,15 @@ export interface MemeComment {
   author: string;
   text: string;
   score: number;
+  myVote: VoteDirection | null;
+}
+
+export type VoteDirection = 'UP' | 'DOWN';
+
+/** A target's score plus the caller's own current vote (null = not voted). */
+export interface VoteTally {
+  score: number;
+  myVote: VoteDirection | null;
 }
 
 /** A user-facing outcome message; `items` carries policy violations from a 422. */
@@ -37,5 +46,8 @@ export const listMemes = async (): Promise<MemeRef[]> =>
 export const hotMemes = async (): Promise<HotEntry[]> =>
   (await fetch('/memes/hot')).json();
 
-export const listComments = async (memeId: string): Promise<MemeComment[]> =>
-  (await fetch(`/memes/${memeId}/comments`)).json();
+export const listComments = async (memeId: string, token: string | null): Promise<MemeComment[]> =>
+  (await fetch(`/memes/${memeId}/comments`, { headers: authHeader(token) })).json();
+
+export const memeTally = async (memeId: string, token: string | null): Promise<VoteTally> =>
+  (await fetch(`/memes/${memeId}/votes`, { headers: authHeader(token) })).json();

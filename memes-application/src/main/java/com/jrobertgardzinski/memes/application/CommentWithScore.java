@@ -1,7 +1,10 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.Comment;
+import com.jrobertgardzinski.memes.domain.VoteDirection;
 
-/** A comment together with its current vote score — what the listing shows. */
-public record CommentWithScore(Comment comment, int score) {
+import java.util.Optional;
+
+/** A comment with its current score and — for a signed-in viewer — that viewer's own vote. */
+public record CommentWithScore(Comment comment, int score, Optional<VoteDirection> viewerVote) {
 }

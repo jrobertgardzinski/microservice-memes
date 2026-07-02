@@ -30,18 +30,20 @@ class RequireSignInFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (!"POST".equals(request.getMethod()) || !request.getRequestURI().startsWith("/memes")) {
+        if (!request.getRequestURI().startsWith("/memes")) {
             chain.doFilter(request, response);
             return;
         }
+        // resolve the identity whenever a token is presented (reads use it to show "your vote");
+        // only writes REQUIRE it
         Optional<String> user = bearerToken(request).flatMap(gate::emailFor);
-        if (user.isEmpty()) {
+        user.ifPresent(email -> request.setAttribute(AUTHENTICATED_USER, email));
+        if ("POST".equals(request.getMethod()) && user.isEmpty()) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"status\":\"SIGN_IN_REQUIRED\"}");
             return;
         }
-        request.setAttribute(AUTHENTICATED_USER, user.get());
         chain.doFilter(request, response);
     }
 

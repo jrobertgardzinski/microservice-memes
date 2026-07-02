@@ -11,6 +11,7 @@ import com.jrobertgardzinski.memes.application.MemeContentIndex;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.RankMemes;
+import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
 import com.jrobertgardzinski.memes.application.VoteOnComment;
 import com.jrobertgardzinski.memes.application.VoteRepository;
@@ -81,6 +82,11 @@ class MemesConfig {
     @Bean
     CastVote castVote(MemeRepository memeRepository, VoteRepository voteRepository) {
         return new CastVote(memeRepository, voteRepository);
+    }
+
+    @Bean
+    ShowMemeVote showMemeVote(MemeRepository memeRepository, VoteRepository voteRepository) {
+        return new ShowMemeVote(memeRepository, voteRepository);
     }
 
     @Bean

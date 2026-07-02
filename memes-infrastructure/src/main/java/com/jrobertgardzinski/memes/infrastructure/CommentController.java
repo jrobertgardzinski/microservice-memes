@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Web boundary for comments on a meme: post a comment (signed-in users only — the author is the
@@ -50,11 +52,19 @@ class CommentController {
     }
 
     @GetMapping
-    List<Map<String, Object>> list(@PathVariable("memeId") String memeId) {
-        return listComments.execute(memeId).stream()
-                .map(entry -> Map.<String, Object>of(
-                        "id", entry.comment().id(), "author", entry.comment().author(),
-                        "text", entry.comment().text(), "score", entry.score()))
+    List<Map<String, Object>> list(@PathVariable("memeId") String memeId,
+                                   @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER, required = false)
+                                   String viewer) {
+        return listComments.execute(memeId, Optional.ofNullable(viewer)).stream()
+                .map(entry -> {
+                    Map<String, Object> body = new HashMap<>();
+                    body.put("id", entry.comment().id());
+                    body.put("author", entry.comment().author());
+                    body.put("text", entry.comment().text());
+                    body.put("score", entry.score());
+                    body.put("myVote", entry.viewerVote().map(Enum::name).orElse(null));
+                    return body;
+                })
                 .toList();
     }
 
