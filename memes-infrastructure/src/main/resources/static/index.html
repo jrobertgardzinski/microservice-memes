@@ -20,18 +20,24 @@
   .card { background: #1e2027; border-radius: 10px; overflow: hidden; cursor: pointer; border: 1px solid #2a2d36; }
   .card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
   .card .score { padding: .3rem .6rem; font-size: .85rem; color: #9aa0ae; }
-  .panel { background: #1e2027; border: 1px solid #2a2d36; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
-  input, button, textarea { font: inherit; border-radius: 7px; border: 1px solid #3a3e4a; background: #14151a; color: inherit; padding: .45rem .7rem; }
+  .panel { background: #1e2027; border: 1px solid #2a2d36; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; max-width: 430px; }
+  .tabs { display: flex; gap: .4rem; margin-bottom: .8rem; }
+  .tabs button { background: #2a2d36; }
+  .tabs button.active { background: #3d5afe; }
+  input, button, label.upload { font: inherit; border-radius: 7px; border: 1px solid #3a3e4a; background: #14151a; color: inherit; padding: .45rem .7rem; }
   button, label.upload { background: #3d5afe; border: none; cursor: pointer; }
-  label.upload { border-radius: 7px; padding: .45rem .7rem; }
   button.ghost { background: #2a2d36; }
   button:disabled { opacity: .5; cursor: default; }
-  form { display: flex; gap: .5rem; flex-wrap: wrap; }
-  .msg { color: #ffd166; font-size: .9rem; margin-top: .5rem; }
+  form.stack { display: flex; flex-direction: column; gap: .5rem; }
+  form.row { display: flex; gap: .5rem; }
+  .msg { border-radius: 7px; padding: .5rem .7rem; margin: .6rem 0 0; font-size: .92rem; }
+  .msg.info { background: #1d3a2f; color: #7ee2a8; }
+  .msg.warn { background: #3a2d1d; color: #ffd166; }
+  .msg li { margin-left: 1rem; }
   .detail img { max-width: 100%; border-radius: 10px; }
   .comment { border-top: 1px solid #2a2d36; padding: .5rem 0; }
   .comment b { color: #8ab4f8; font-weight: 600; }
-  .who { color: #8ab4f8; font-size: .9rem; }
+  .who { color: #8ab4f8; font-size: .9rem; display: flex; gap: .6rem; align-items: center; }
 </style>
 </head>
 <body>
@@ -43,15 +49,25 @@
 const html = htm.bind(React.createElement);
 const { useState, useEffect, useCallback } = React;
 const SECURITY = 'http://localhost:8080';
-
 const authHeader = token => token ? { 'Authorization': 'Bearer ' + token } : {};
 const json = { 'Content-Type': 'application/json' };
 
+const prettify = code => String(code).toLowerCase().replaceAll('_', ' ');
+
+function Msg({ msg }) {
+  if (!msg) return null;
+  return html`<div class=${'msg ' + (msg.tone || 'warn')}>
+    ${msg.text}
+    ${msg.items && html`<ul>${msg.items.map(i => html`<li key=${i}>${prettify(i)}</li>`)}</ul>`}
+  </div>`;
+}
+
 function AuthPanel({ token, user, onToken, onLogout }) {
+  const [mode, setMode] = useState('signin');            // signin | signup | inbox
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [verifyToken, setVerifyToken] = useState('');
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   // the verification link in the mail points here (?verify=<token>); confirm it on arrival
   useEffect(() => {
@@ -59,37 +75,59 @@ function AuthPanel({ token, user, onToken, onLogout }) {
     if (!mailedToken) return;
     history.replaceState(null, '', location.pathname);
     fetch(SECURITY + '/verify-email', { method: 'POST', headers: json, body: JSON.stringify({ token: mailedToken }) })
-      .then(r => setMsg(r.ok ? 'E-mail verified — sign in below.' : 'Verification link rejected (already used?).'));
+      .then(r => setMsg(r.ok
+        ? { tone: 'info', text: 'E-mail verified — sign in below.' }
+        : { tone: 'warn', text: 'This verification link was already used or has been replaced by a newer one.' }));
   }, []);
 
-  if (token) return html`<div class="who">${user || '...'} <button class="ghost" onClick=${onLogout}>sign out</button></div>`;
+  if (token) return html`<div class="who">signed in as <b>${user || '…'}</b>
+    <button class="ghost" onClick=${onLogout}>sign out</button></div>`;
 
-  const register = async () => {
-    const r = await fetch(SECURITY + '/register', { method: 'POST', headers: json, body: JSON.stringify({ email, password }) });
-    setMsg(r.status === 201
-      ? 'Registered! Now click the verification link in the inbox (Mailpit → http://localhost:8025) — it brings you back here.'
-      : 'Registration refused (' + r.status + ') — taken email or weak password.');
+  const submit = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      if (mode === 'signup') {
+        const r = await fetch(SECURITY + '/register', { method: 'POST', headers: json, body: JSON.stringify({ email, password }) });
+        if (r.status === 201) { setMode('inbox'); return; }
+        if (r.status === 409) { setMsg({ text: 'This e-mail is already registered — sign in instead.' }); setMode('signin'); return; }
+        if (r.status === 422) {
+          const errors = await r.json();
+          setMsg({ text: 'That will not do:', items: [...(errors.emailErrors || []), ...(errors.passwordErrors || [])] });
+          return;
+        }
+        setMsg({ text: 'Registration failed (' + r.status + ').' });
+      } else {
+        const r = await fetch(SECURITY + '/authenticate', { method: 'POST', headers: json, body: JSON.stringify({ email, password }) });
+        if (r.ok) { onToken((await r.json()).accessToken); return; }
+        setMsg(r.status === 403 ? { text: 'E-mail not verified yet — click the link in the mail (inbox: Mailpit, localhost:8025).' }
+          : r.status === 429 ? { text: 'Too many failed attempts from this machine — the source is blocked for a few minutes.' }
+          : { text: 'Wrong e-mail or password.' });
+      }
+    } finally { setBusy(false); }
   };
-  const verify = async () => {
-    const r = await fetch(SECURITY + '/verify-email', { method: 'POST', headers: json, body: JSON.stringify({ token: verifyToken }) });
-    setMsg(r.ok ? 'E-mail verified — you can sign in now.' : 'Token rejected.');
-  };
-  const login = async () => {
-    const r = await fetch(SECURITY + '/authenticate', { method: 'POST', headers: json, body: JSON.stringify({ email, password }) });
-    if (r.ok) { onToken((await r.json()).accessToken); setMsg(''); }
-    else setMsg(r.status === 403 ? 'E-mail not verified yet — check the inbox and verify first.' : 'Sign-in refused (' + r.status + ').');
-  };
+
+  if (mode === 'inbox') return html`<div class="panel">
+    <p>📬 Almost there — we mailed a verification link to <b>${email}</b>.</p>
+    <p>Open the inbox (<a href="http://localhost:8025" target="_blank">Mailpit</a>), click the link,
+       and it will bring you back here ready to sign in.</p>
+    <button class="ghost" onClick=${() => setMode('signin')}>I clicked it — sign in</button>
+  </div>`;
 
   return html`<div class="panel">
-    <form onSubmit=${e => e.preventDefault()}>
-      <input placeholder="email" value=${email} onInput=${e => setEmail(e.target.value)} />
-      <input placeholder="password" type="password" value=${password} onInput=${e => setPassword(e.target.value)} />
-      <button onClick=${login}>Sign in</button>
-      <button class="ghost" onClick=${register}>Sign up</button>
-      <input placeholder="verification token (fallback: paste from the mail)" value=${verifyToken} onInput=${e => setVerifyToken(e.target.value)} />
-      <button class="ghost" onClick=${verify}>Verify</button>
+    <div class="tabs">
+      <button class=${mode === 'signin' ? 'active' : ''} onClick=${() => { setMode('signin'); setMsg(null); }}>Sign in</button>
+      <button class=${mode === 'signup' ? 'active' : ''} onClick=${() => { setMode('signup'); setMsg(null); }}>Create account</button>
+    </div>
+    <form class="stack" onSubmit=${e => { e.preventDefault(); submit(); }}>
+      <input placeholder="e-mail" type="email" autocomplete="email" value=${email} onInput=${e => setEmail(e.target.value)} />
+      <input placeholder="password" type="password"
+             autocomplete=${mode === 'signup' ? 'new-password' : 'current-password'}
+             value=${password} onInput=${e => setPassword(e.target.value)} />
+      <button disabled=${busy || !email || !password}>
+        ${mode === 'signup' ? 'Create account' : 'Sign in'}
+      </button>
     </form>
-    ${msg && html`<div class="msg">${msg}</div>`}
+    <${Msg} msg=${msg} />
   </div>`;
 }
 
@@ -111,7 +149,7 @@ function MemeDetail({ id, token, score, onVoted, requireSignIn }) {
     if (r.ok) { setText(''); load(); }
   };
 
-  return html`<div class="panel detail">
+  return html`<div class="panel detail" style=${{ maxWidth: 'none' }}>
     <img src=${'/memes/' + id} alt="meme" />
     <p>
       <button onClick=${() => vote('UP')}>▲</button>
@@ -119,7 +157,7 @@ function MemeDetail({ id, token, score, onVoted, requireSignIn }) {
       <button class="ghost" onClick=${() => vote('DOWN')}>▼</button>
     </p>
     ${comments.map(c => html`<div class="comment" key=${c.id}><b>${c.author}</b> ${c.text}</div>`)}
-    <form onSubmit=${e => { e.preventDefault(); comment(); }}>
+    <form class="row" onSubmit=${e => { e.preventDefault(); comment(); }}>
       <input style=${{ flex: 1 }} placeholder=${token ? 'add a comment…' : 'sign in to comment'} value=${text} onInput=${e => setText(e.target.value)} />
       <button disabled=${!token}>Post</button>
     </form>
@@ -132,7 +170,7 @@ function App() {
   const [memes, setMemes] = useState([]);
   const [scores, setScores] = useState({});
   const [selected, setSelected] = useState(null);
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState(null);
 
   const refresh = useCallback(async () => {
     setMemes(await (await fetch('/memes')).json());
@@ -150,13 +188,13 @@ function App() {
       .catch(() => { setToken(''); localStorage.removeItem('accessToken'); });
   }, [token]);
 
-  const requireSignIn = () => setMsg('Sign in first — browsing is public, contributing is not.');
+  const requireSignIn = () => setMsg({ text: 'Sign in first — browsing is public, contributing is not.' });
   const upload = async file => {
     if (!token) return requireSignIn();
     const body = new FormData();
     body.append('file', file);
     const r = await fetch('/memes', { method: 'POST', headers: authHeader(token), body });
-    setMsg(r.status === 201 ? '' : 'Upload refused (' + r.status + ').');
+    setMsg(r.status === 201 ? null : { text: 'Upload refused (' + r.status + ').' });
     refresh();
   };
 
@@ -170,9 +208,9 @@ function App() {
       </label>
     </header>
     <main>
-      <${AuthPanel} token=${token} user=${user} onToken=${setToken}
+      <${AuthPanel} token=${token} user=${user} onToken=${t => { setToken(t); setMsg(null); }}
                     onLogout=${() => { setToken(''); localStorage.removeItem('accessToken'); }} />
-      ${msg && html`<div class="msg">${msg}</div>`}
+      <${Msg} msg=${msg} />
       ${selected && html`<p><button class="ghost" onClick=${() => setSelected(null)}>← back to the gallery</button></p>
         <${MemeDetail} id=${selected} token=${token} score=${scores[selected]}
                        onVoted=${refresh} requireSignIn=${requireSignIn} key=${selected} />`}
