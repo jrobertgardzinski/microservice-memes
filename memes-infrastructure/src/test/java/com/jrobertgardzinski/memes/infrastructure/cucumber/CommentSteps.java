@@ -13,8 +13,10 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * HTTP glue for {@code comment-meme.feature}: a signed-in user uploads a meme and comments on it;
@@ -27,6 +29,7 @@ public class CommentSteps {
     int port;
 
     private String memeId;
+    private String commentId;
 
     @Given("an uploaded meme")
     public void anUploadedMeme() throws Exception {
@@ -39,12 +42,37 @@ public class CommentSteps {
 
     @When("the user comments {string}")
     public void theUserComments(String text) {
-        RestAssured.given().port(port)
+        Response response = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN)
                 .contentType("application/json")
                 .body("{\"text\":\"" + text + "\"}")
-                .post("/memes/" + memeId + "/comments")
-                .then().statusCode(201);
+                .post("/memes/" + memeId + "/comments");
+        response.then().statusCode(201);
+        commentId = response.jsonPath().getString("id");
+    }
+
+    @When("another user up-votes that comment twice")
+    public void anotherUserUpVotesThatCommentTwice() {
+        for (int i = 0; i < 2; i++) {
+            RestAssured.given().port(port)
+                    .header("Authorization", "Bearer " + TestAuthConfig.SECOND_TOKEN)
+                    .contentType("application/json")
+                    .body("{\"direction\":\"UP\"}")
+                    .post("/memes/" + memeId + "/comments/" + commentId + "/votes")
+                    .then().statusCode(200);
+        }
+    }
+
+    @Then("the comment's score is {int}")
+    public void theCommentsScoreIs(int score) {
+        Response listed = RestAssured.given().port(port).get("/memes/" + memeId + "/comments");
+        listed.then().statusCode(200);
+        Map<String, Object> comment = listed.jsonPath().getList("$", Map.class).stream()
+                .filter(c -> commentId.equals(((Map<String, Object>) c).get("id")))
+                .map(c -> (Map<String, Object>) c)
+                .findFirst().orElse(null);
+        assertNotNull(comment, "voted comment not listed");
+        assertEquals(score, comment.get("score"));
     }
 
     @When("an anonymous user tries to comment {string}")
@@ -76,6 +104,7 @@ public class CommentSteps {
 
     private static byte[] bmp() throws Exception {
         BufferedImage image = new BufferedImage(6, 4, BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, ThreadLocalRandom.current().nextInt()); // unique content -> no dedup across scenarios
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "bmp", out);
         return out.toByteArray();

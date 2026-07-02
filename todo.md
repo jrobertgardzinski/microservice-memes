@@ -15,13 +15,16 @@ Only open items. History = git log.
 - **Autoryzacja przez microservice-security** — odczyty publiczne, POST-y pod `/memes` wymagają
   Bearer tokena potwierdzanego przez `GET /me` security (`RequireSignInFilter` + brama HTTP;
   w testach stub). Autor komentarza = potwierdzona tożsamość, nie pole z requesta.
-- **UI galerii** — jednoplikowy React (htm + CDN, bez builda) serwowany ze `static/` pod `/`;
-  logowanie/rejestracja/weryfikacja przez security (CORS), upload/komentarze/głosy po zalogowaniu.
+- **UI galerii** — moduł `memes-ui`: React + TypeScript + Material UI (Vite przez
+  frontend-maven-plugin, dist w jarze jako `META-INF/resources`); logowanie/rejestracja/
+  weryfikacja przez security (CORS), upload/komentarze/głosy po zalogowaniu.
+- **Jeden głos na użytkownika** (mem i komentarz) — ponowny głos zastępuje poprzedni, nie
+  kumuluje się; **głosowanie na komentarze** (`POST .../comments/{id}/votes`), listing komentarzy
+  niesie score.
 
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - **Tagi + wyszukiwanie** — moduł `memes-tags`.
-- **Głosowanie na komentarze** — dziś głosuje się tylko na memy; ranking "hot" z czasem
-  (Reddit-like decay) zamiast czystego score.
+- Ranking "hot" z czasem (Reddit-like decay) zamiast czystego score.
 - **EXIF** — re-enkodowanie do PNG już zrzuca EXIF; udokumentować/przetestować jawnie.
 - **Rate-limit uploadu**, **flaga NSFW / moderacja** (moderator = rola po stronie security — czeka
   na RBAC tam).

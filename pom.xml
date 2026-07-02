@@ -29,6 +29,7 @@
         <module>memes-config</module>
         <module>memes-image</module>
         <module>memes-application</module>
+        <module>memes-ui</module>
         <module>memes-infrastructure</module>
     </modules>
 

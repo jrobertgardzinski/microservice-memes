@@ -44,6 +44,10 @@ class AddCommentTest {
         public List<Comment> findByMeme(String memeId) {
             return comments.stream().filter(c -> c.memeId().equals(memeId)).toList();
         }
+
+        public Optional<Comment> find(String commentId) {
+            return comments.stream().filter(c -> c.id().equals(commentId)).findFirst();
+        }
     };
     private final AddComment addComment = new AddComment(memeRepository, commentRepository);
 

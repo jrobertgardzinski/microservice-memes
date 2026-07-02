@@ -1,0 +1,70 @@
+package com.jrobertgardzinski.memes.application;
+
+import com.jrobertgardzinski.memes.domain.Comment;
+import com.jrobertgardzinski.memes.domain.VoteDirection;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@Epic("Use case")
+@Feature("Vote on comment")
+class VoteOnCommentTest {
+
+    private final List<Comment> comments = new ArrayList<>();
+    private final Map<String, Map<String, VoteDirection>> votes = new HashMap<>();
+
+    private final CommentRepository commentRepository = new CommentRepository() {
+        public void save(Comment comment) {
+            comments.add(comment);
+        }
+
+        public List<Comment> findByMeme(String memeId) {
+            return comments.stream().filter(c -> c.memeId().equals(memeId)).toList();
+        }
+
+        public Optional<Comment> find(String commentId) {
+            return comments.stream().filter(c -> c.id().equals(commentId)).findFirst();
+        }
+    };
+    private final CommentVoteRepository commentVoteRepository = new CommentVoteRepository() {
+        public void castVote(String commentId, String voter, VoteDirection direction) {
+            votes.computeIfAbsent(commentId, id -> new HashMap<>()).put(voter, direction);
+        }
+
+        public int scoreOf(String commentId) {
+            return votes.getOrDefault(commentId, Map.of()).values().stream()
+                    .mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
+        }
+    };
+    private final VoteOnComment voteOnComment = new VoteOnComment(commentRepository, commentVoteRepository);
+
+    @Test
+    @DisplayName("votes on a comment, one vote per voter")
+    void votes_on_a_comment() {
+        comments.add(new Comment("c1", "m1", "alice", "great"));
+
+        assertEquals(Optional.of(1), voteOnComment.execute("m1", "c1", "bob", VoteDirection.UP));
+        assertEquals(Optional.of(1), voteOnComment.execute("m1", "c1", "bob", VoteDirection.UP)); // no stacking
+        assertEquals(Optional.of(-1), voteOnComment.execute("m1", "c1", "bob", VoteDirection.DOWN));
+    }
+
+    @Test
+    @DisplayName("refuses a vote on a missing comment or one under another meme")
+    void refuses_missing_or_misplaced_comment() {
+        comments.add(new Comment("c1", "m1", "alice", "great"));
+
+        assertTrue(voteOnComment.execute("m1", "nope", "bob", VoteDirection.UP).isEmpty());
+        assertTrue(voteOnComment.execute("other-meme", "c1", "bob", VoteDirection.UP).isEmpty());
+        assertTrue(votes.isEmpty());
+    }
+}

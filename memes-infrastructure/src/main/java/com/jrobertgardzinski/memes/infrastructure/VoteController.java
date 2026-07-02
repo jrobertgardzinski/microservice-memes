@@ -2,48 +2,64 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.RankMemes;
+import com.jrobertgardzinski.memes.application.VoteOnComment;
 import com.jrobertgardzinski.memes.domain.VoteDirection;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
- * Web boundary for voting: cast a vote on a meme, and list the hottest memes. The boundary parses
- * raw input into domain types (bad direction → 400), so the use case only sees valid votes.
+ * Web boundary for voting: signed-in users vote on memes and comments (one vote per user — the
+ * voter is the identity published by {@link RequireSignInFilter}, so votes cannot stack); the hot
+ * list is public. The boundary parses raw input into domain types (bad direction → 400).
  */
 @RestController
 @RequestMapping("/memes")
 class VoteController {
 
-    /** What a client posts to vote on a meme: {@code direction} is UP or DOWN (case-insensitive). */
+    /** What a client posts to vote: {@code direction} is UP or DOWN (case-insensitive). */
     record VoteRequest(String direction) {}
 
     private final CastVote castVote;
+    private final VoteOnComment voteOnComment;
     private final RankMemes rankMemes;
 
-    VoteController(CastVote castVote, RankMemes rankMemes) {
+    VoteController(CastVote castVote, VoteOnComment voteOnComment, RankMemes rankMemes) {
         this.castVote = castVote;
+        this.voteOnComment = voteOnComment;
         this.rankMemes = rankMemes;
     }
 
     @PostMapping("/{memeId}/votes")
-    ResponseEntity<?> vote(@PathVariable("memeId") String memeId, @RequestBody VoteRequest request) {
-        VoteDirection direction;
-        try {
-            direction = VoteDirection.valueOf(String.valueOf(request.direction()).trim().toUpperCase());
-        } catch (IllegalArgumentException invalid) {
+    ResponseEntity<?> voteOnMeme(@PathVariable("memeId") String memeId,
+                                 @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String voter,
+                                 @RequestBody VoteRequest request) {
+        Optional<VoteDirection> direction = parseDirection(request);
+        if (direction.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
         }
-        return castVote.execute(memeId, direction)
-                .<ResponseEntity<?>>map(score -> ResponseEntity.ok(Map.of("score", score)))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return toResponse(castVote.execute(memeId, voter, direction.get()));
+    }
+
+    @PostMapping("/{memeId}/comments/{commentId}/votes")
+    ResponseEntity<?> voteOnComment(@PathVariable("memeId") String memeId,
+                                    @PathVariable("commentId") String commentId,
+                                    @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String voter,
+                                    @RequestBody VoteRequest request) {
+        Optional<VoteDirection> direction = parseDirection(request);
+        if (direction.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
+        }
+        return toResponse(voteOnComment.execute(memeId, commentId, voter, direction.get()));
     }
 
     @GetMapping("/hot")
@@ -51,5 +67,18 @@ class VoteController {
         return rankMemes.execute().stream()
                 .map(ranked -> Map.<String, Object>of("memeId", ranked.memeId(), "score", ranked.score()))
                 .toList();
+    }
+
+    private static Optional<VoteDirection> parseDirection(VoteRequest request) {
+        try {
+            return Optional.of(VoteDirection.valueOf(String.valueOf(request.direction()).trim().toUpperCase()));
+        } catch (IllegalArgumentException invalid) {
+            return Optional.empty();
+        }
+    }
+
+    private static ResponseEntity<?> toResponse(Optional<Integer> score) {
+        return score.<ResponseEntity<?>>map(s -> ResponseEntity.ok(Map.of("score", s)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

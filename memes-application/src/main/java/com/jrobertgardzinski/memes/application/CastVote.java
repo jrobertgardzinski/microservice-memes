@@ -5,7 +5,8 @@ import com.jrobertgardzinski.memes.domain.VoteDirection;
 import java.util.Optional;
 
 /**
- * Casts a vote on a meme. Returns the meme's new score, or empty if there is no such meme.
+ * Casts a voter's vote on a meme — one vote per voter, re-voting replaces the previous one.
+ * Returns the meme's new score, or empty if there is no such meme.
  */
 public class CastVote {
 
@@ -17,11 +18,11 @@ public class CastVote {
         this.voteRepository = voteRepository;
     }
 
-    public Optional<Integer> execute(String memeId, VoteDirection direction) {
+    public Optional<Integer> execute(String memeId, String voter, VoteDirection direction) {
         if (memeRepository.find(memeId).isEmpty()) {
             return Optional.empty();
         }
-        voteRepository.castVote(memeId, direction);
+        voteRepository.castVote(memeId, voter, direction);
         return Optional.of(voteRepository.scoreOf(memeId));
     }
 }

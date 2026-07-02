@@ -17,11 +17,13 @@ and Quarkus (`microservice-email`, BCE).
 - **memes-application** — use cases (`PublishMeme`, `ViewMeme`, `MakeThumbnail`, `AddComment`,
   `ListComments`, `CastVote`, `RankMemes`) + the ports (`MemeRepository`, `CommentRepository`,
   `VoteRepository`, `MemeContentIndex`). No framework.
+- **memes-ui** — the gallery UI: React + TypeScript + Material UI, built by Vite through
+  frontend-maven-plugin (own pinned Node) and packed as `META-INF/resources`, so the service jar
+  serves it at `/`. UI development: `cd memes-ui && npm run dev` (proxies `/memes` to :8083).
 - **memes-infrastructure** — the Spring Boot app: web boundaries (`MemeController`,
   `CommentController`, `VoteController`), the sign-in gate (`RequireSignInFilter` +
   `HttpSecurityAuthenticationGate`, which confirms bearer tokens against
-  `microservice-security`'s `GET /me`), in-memory adapters, and the gallery UI (a single-file
-  React app served from `static/`). Cucumber features (`src/test/resources/features/`) document
+  `microservice-security`'s `GET /me`), in-memory adapters. Cucumber features (`src/test/resources/features/`) document
   the flows; results feed Allure.
 
 ## Security integration
@@ -51,6 +53,10 @@ POST /memes                     multipart/form-data, field "file"
 POST /memes/{id}/comments       { "text": "..." }               -> 201 { "id": "..." } | 400 | 404
                                    (author = the signed-in identity)
 POST /memes/{id}/votes          { "direction": "UP" | "DOWN" }  -> 200 { "score": n } | 400 | 404
+POST /memes/{id}/comments/{cid}/votes   same body/answers — votes on a comment
+
+One vote per user per meme/comment: voting again replaces your previous vote (never stacks);
+comment listings include each comment's current score.
 ```
 
 ## Run & test

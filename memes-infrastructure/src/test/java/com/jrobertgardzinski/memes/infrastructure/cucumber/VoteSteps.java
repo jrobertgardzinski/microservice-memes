@@ -12,39 +12,45 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * HTTP glue for {@code vote-meme.feature}: a signed-in user uploads two memes and up-votes them
- * differently; the public hot ranking orders the more up-voted one first, and anonymous votes are
- * refused.
+ * HTTP glue for {@code vote-meme.feature}: distinct signed-in users (the stub gate knows two) vote
+ * on freshly uploaded memes; one vote per user, so re-voting never stacks. Uploads use random
+ * pixels — distinct content keeps deduplication from linking scenarios together.
  */
 public class VoteSteps {
+
+    private static final List<String> USER_TOKENS =
+            List.of(TestAuthConfig.VALID_TOKEN, TestAuthConfig.SECOND_TOKEN);
 
     @LocalServerPort
     int port;
 
     private String memeA;
     private String memeB;
+    private int lastReportedScore;
 
     @Given("two uploaded memes A and B")
     public void twoUploadedMemes() throws Exception {
-        // distinct sizes -> distinct content, so deduplication keeps them as two memes
-        memeA = upload(6, 4);
-        memeB = upload(8, 5);
+        memeA = upload();
+        memeB = upload();
     }
 
-    @When("meme {word} gets {int} up-vote(s)")
-    public void memeGetsUpVotes(String which, int count) {
-        String id = idOf(which);
+    @When("^(\\d+) users? up-votes? meme (\\w+)$")
+    public void usersUpVoteMeme(int count, String which) {
         for (int i = 0; i < count; i++) {
-            RestAssured.given().port(port)
-                    .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN)
-                    .contentType("application/json")
-                    .body("{\"direction\":\"UP\"}")
-                    .post("/memes/" + id + "/votes")
-                    .then().statusCode(200);
+            vote(idOf(which), USER_TOKENS.get(i));
+        }
+    }
+
+    @When("the user up-votes meme {word} {int} times")
+    public void theUserUpVotesRepeatedly(String which, int times) {
+        for (int i = 0; i < times; i++) {
+            vote(idOf(which), TestAuthConfig.VALID_TOKEN);
         }
     }
 
@@ -65,12 +71,28 @@ public class VoteSteps {
                 "expected " + higher + " to rank above " + lower + ", order was " + order);
     }
 
+    @Then("meme {word}'s score is {int}")
+    public void memeScoreIs(String which, int score) {
+        assertEquals(score, lastReportedScore, "score reported by the last vote");
+    }
+
+    private void vote(String memeId, String token) {
+        Response response = RestAssured.given().port(port)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .body("{\"direction\":\"UP\"}")
+                .post("/memes/" + memeId + "/votes");
+        response.then().statusCode(200);
+        lastReportedScore = response.jsonPath().getInt("score");
+    }
+
     private String idOf(String which) {
         return which.equals("A") ? memeA : memeB;
     }
 
-    private String upload(int width, int height) throws Exception {
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+    private String upload() throws Exception {
+        BufferedImage image = new BufferedImage(6, 4, BufferedImage.TYPE_INT_RGB);
+        image.setRGB(0, 0, ThreadLocalRandom.current().nextInt()); // unique content -> no dedup
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "bmp", out);
         return RestAssured.given().port(port)

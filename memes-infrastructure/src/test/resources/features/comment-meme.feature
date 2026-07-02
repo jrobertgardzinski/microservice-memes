@@ -10,6 +10,13 @@ Feature: Commenting on a meme
     When the user comments "great meme"
     Then the comment appears in the meme's comments, signed by the user
 
+  Scenario: comments can be voted on, one vote per user
+    Given a signed-in user
+    And an uploaded meme
+    When the user comments "great meme"
+    And another user up-votes that comment twice
+    Then the comment's score is 1
+
   Scenario: an anonymous comment is refused, but reading stays public
     Given a signed-in user
     And an uploaded meme

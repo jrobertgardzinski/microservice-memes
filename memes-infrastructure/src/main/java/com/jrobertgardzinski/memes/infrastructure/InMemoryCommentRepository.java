@@ -5,6 +5,7 @@ import com.jrobertgardzinski.memes.domain.Comment;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** In-memory {@link CommentRepository}. A real store will replace it. */
@@ -21,5 +22,10 @@ class InMemoryCommentRepository implements CommentRepository {
     @Override
     public List<Comment> findByMeme(String memeId) {
         return comments.stream().filter(comment -> comment.memeId().equals(memeId)).toList();
+    }
+
+    @Override
+    public Optional<Comment> find(String commentId) {
+        return comments.stream().filter(comment -> comment.id().equals(commentId)).findFirst();
     }
 }

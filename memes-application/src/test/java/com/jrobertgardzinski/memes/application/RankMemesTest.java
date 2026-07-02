@@ -19,7 +19,7 @@ class RankMemesTest {
     @DisplayName("ranks memes by score, highest first")
     void ranks_by_score_desc() {
         VoteRepository voteRepository = new VoteRepository() {
-            public void castVote(String memeId, VoteDirection direction) {
+            public void castVote(String memeId, String voter, VoteDirection direction) {
             }
 
             public int scoreOf(String memeId) {

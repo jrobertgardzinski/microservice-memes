@@ -6,11 +6,13 @@ import com.jrobertgardzinski.memes.domain.VoteDirection;
 import java.util.List;
 
 /**
- * Port for tallying votes on memes. A score is up-votes minus down-votes.
+ * Port for tallying votes on memes. One vote per voter per meme: casting again replaces the
+ * voter's previous vote (voting UP twice is still one up-vote; switching direction changes their
+ * mind). A score is up-voters minus down-voters.
  */
 public interface VoteRepository {
 
-    void castVote(String memeId, VoteDirection direction);
+    void castVote(String memeId, String voter, VoteDirection direction);
 
     int scoreOf(String memeId);
 

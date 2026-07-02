@@ -3,6 +3,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.application.AddComment;
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.CommentRepository;
+import com.jrobertgardzinski.memes.application.CommentVoteRepository;
 import com.jrobertgardzinski.memes.application.ListComments;
 import com.jrobertgardzinski.memes.application.ListMemes;
 import com.jrobertgardzinski.memes.application.MakeThumbnail;
@@ -11,6 +12,7 @@ import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.ViewMeme;
+import com.jrobertgardzinski.memes.application.VoteOnComment;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.config.ThumbnailSize;
@@ -67,8 +69,13 @@ class MemesConfig {
     }
 
     @Bean
-    ListComments listComments(CommentRepository commentRepository) {
-        return new ListComments(commentRepository);
+    ListComments listComments(CommentRepository commentRepository, CommentVoteRepository commentVoteRepository) {
+        return new ListComments(commentRepository, commentVoteRepository);
+    }
+
+    @Bean
+    VoteOnComment voteOnComment(CommentRepository commentRepository, CommentVoteRepository commentVoteRepository) {
+        return new VoteOnComment(commentRepository, commentVoteRepository);
     }
 
     @Bean

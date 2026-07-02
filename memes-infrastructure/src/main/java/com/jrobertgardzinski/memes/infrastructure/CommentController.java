@@ -52,8 +52,9 @@ class CommentController {
     @GetMapping
     List<Map<String, Object>> list(@PathVariable("memeId") String memeId) {
         return listComments.execute(memeId).stream()
-                .map(comment -> Map.<String, Object>of(
-                        "id", comment.id(), "author", comment.author(), "text", comment.text()))
+                .map(entry -> Map.<String, Object>of(
+                        "id", entry.comment().id(), "author", entry.comment().author(),
+                        "text", entry.comment().text(), "score", entry.score()))
                 .toList();
     }
 

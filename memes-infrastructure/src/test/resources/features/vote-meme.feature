@@ -1,13 +1,20 @@
 Feature: Voting on memes
 
-  Signed-in users vote; up-voted memes rank higher in the hot list. The hot list itself is public.
+  Signed-in users vote; each user has ONE vote per meme (re-voting replaces it, never stacks).
+  Up-voted memes rank higher in the hot list, which itself is public.
 
-  Scenario: the more up-voted meme ranks higher
+  Scenario: the meme with more distinct up-voters ranks higher
     Given a signed-in user
     And two uploaded memes A and B
-    When meme A gets 2 up-votes
-    And meme B gets 1 up-vote
+    When 2 users up-vote meme A
+    And 1 user up-votes meme B
     Then meme A ranks above meme B in the hot list
+
+  Scenario: voting again does not stack
+    Given a signed-in user
+    And two uploaded memes A and B
+    When the user up-votes meme A 3 times
+    Then meme A's score is 1
 
   Scenario: an anonymous vote is refused
     Given a signed-in user
