@@ -40,6 +40,14 @@ class VoteOnCommentTest {
             comments.removeIf(c -> c.memeId().equals(memeId));
         }
 
+        public List<Comment> findByAuthor(String author) {
+            return comments.stream().filter(c -> c.author().equals(author)).toList();
+        }
+
+        public void deleteByAuthor(String author) {
+            comments.removeIf(c -> c.author().equals(author));
+        }
+
         public void anonymizeAuthor(String author, String replacement) {
             comments.replaceAll(c -> c.author().equals(author)
                     ? new Comment(c.id(), c.memeId(), replacement, c.text()) : c);

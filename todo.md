@@ -22,10 +22,12 @@ Only open items. History = git log.
   kumuluje się; **głosowanie na komentarze** (`POST .../comments/{id}/votes`), listing komentarzy
   niesie score.
 
-- **Saga usuwania konta** — `PurgeUserContent` na komendę `PURGE_USER_CONTENT` z Kafki
-  (memy usera znikają z całymi wątkami komentarzy i głosami; jego komentarze gdzie indziej
-  zostają jako „deleted account"; wszystkie jego głosy wycofane); potwierdzenie na
-  `memes-events`. Memy mają od teraz autora (tożsamość z security przy uploadzie).
+- **Saga usuwania konta, KONFIGUROWALNA** — `PurgeUserContent` na komendę `PURGE_USER_CONTENT`
+  z Kafki; los treści to polityka wdrożeniowa (`ContentPurgePolicy` w memes-config, env
+  `PURGE_MEMES_POLICY`/`PURGE_COMMENTS_POLICY`, osie DELETE|ANONYMIZE_AUTHOR). Domyślnie: memy
+  znikają z całymi wątkami i głosami, komentarze gdzie indziej zostają jako „deleted account";
+  głosy usera wycofywane zawsze. Potwierdzenie na `memes-events`. Memy mają autora (tożsamość
+  z security przy uploadzie).
 
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - **Tagi + wyszukiwanie** — moduł `memes-tags`.

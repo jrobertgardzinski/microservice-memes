@@ -35,6 +35,16 @@ class InMemoryCommentRepository implements CommentRepository {
     }
 
     @Override
+    public List<Comment> findByAuthor(String author) {
+        return comments.stream().filter(comment -> comment.author().equals(author)).toList();
+    }
+
+    @Override
+    public void deleteByAuthor(String author) {
+        comments.removeIf(comment -> comment.author().equals(author));
+    }
+
+    @Override
     public void anonymizeAuthor(String author, String replacement) {
         comments.replaceAll(comment -> comment.author().equals(author)
                 ? new Comment(comment.id(), comment.memeId(), replacement, comment.text())

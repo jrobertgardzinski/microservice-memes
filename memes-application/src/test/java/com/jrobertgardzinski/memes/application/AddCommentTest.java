@@ -43,6 +43,11 @@ class AddCommentTest {
         public void deleteById(String memeId) {
             memes.remove(memeId);
         }
+
+        public void anonymizeAuthor(String author, String replacement) {
+            memes.replaceAll((id, m) -> m.author().equals(author)
+                    ? new Meme(m.id(), replacement, m.format(), m.data()) : m);
+        }
     };
     private final CommentRepository commentRepository = new CommentRepository() {
         public void save(Comment comment) {
@@ -59,6 +64,14 @@ class AddCommentTest {
 
         public void deleteByMeme(String memeId) {
             comments.removeIf(c -> c.memeId().equals(memeId));
+        }
+
+        public List<Comment> findByAuthor(String author) {
+            return comments.stream().filter(c -> c.author().equals(author)).toList();
+        }
+
+        public void deleteByAuthor(String author) {
+            comments.removeIf(c -> c.author().equals(author));
         }
 
         public void anonymizeAuthor(String author, String replacement) {

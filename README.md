@@ -9,8 +9,8 @@ and Quarkus (`microservice-email`, BCE).
 ## Modules
 
 - **memes-domain** — the entities: `Meme`, `Comment`, `RankedMeme`, `VoteDirection`. Pure Java.
-- **memes-config** — typed, validated configuration values (`ImageLimits`, `ThumbnailSize`). Pure
-  Java.
+- **memes-config** — typed, validated configuration values (`ImageLimits`, `ThumbnailSize`,
+  `ContentPurgePolicy` — what an account deletion does to the leaver's content). Pure Java.
 - **memes-image** — `WebImageOptimizer`: re-encodes any ImageIO-readable image (BMP, JPEG, …) to a
   browser-friendly PNG (which also drops EXIF), bounded by the configured limits. Pure JDK
   (`java.desktop`).
@@ -33,6 +33,18 @@ Browsing is public; **contributing requires signing in**. Every `POST` under `/m
 `GET /me` (config: `security.url` / `SECURITY_URL`) and the confirmed identity becomes e.g. the
 comment's author — the request body cannot impersonate anyone. Anonymous writes get
 `401 {"status": "SIGN_IN_REQUIRED"}`.
+
+## Account deletion (the saga's memes side)
+
+`PURGE_USER_CONTENT` commands arrive over Kafka and the outcome is **deployment policy**
+(`PURGE_MEMES_POLICY` / `PURGE_COMMENTS_POLICY`, each `DELETE` or `ANONYMIZE_AUTHOR`):
+
+| axis | `DELETE` | `ANONYMIZE_AUTHOR` |
+|------|----------|--------------------|
+| memes (default: `DELETE`) | the leaver's memes disappear with their whole comment threads and votes | memes stay, authored by "deleted account" |
+| comments (default: `ANONYMIZE_AUTHOR`) | the leaver's comments disappear everywhere | texts stay, signed "deleted account" |
+
+Votes the leaver cast are always retracted — they are keyed by identity, no policy keeps them.
 
 ## Contract
 

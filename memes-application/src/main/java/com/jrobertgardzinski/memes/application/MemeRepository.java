@@ -21,4 +21,7 @@ public interface MemeRepository {
     List<String> findIdsByAuthor(String author);
 
     void deleteById(String memeId);
+
+    /** Replace this author's name on every meme (account deletion may keep memes, not identities). */
+    void anonymizeAuthor(String author, String replacement);
 }

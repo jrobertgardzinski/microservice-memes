@@ -1,6 +1,9 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.config.ContentPurgePolicy;
+import com.jrobertgardzinski.memes.config.PurgeFate;
 import com.jrobertgardzinski.memes.domain.Comment;
+import com.jrobertgardzinski.memes.domain.DeletedAccount;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.domain.RankedMeme;
 import com.jrobertgardzinski.memes.domain.VoteDirection;
@@ -48,6 +51,11 @@ class PurgeUserContentTest {
         public void deleteById(String memeId) {
             memes.remove(memeId);
         }
+
+        public void anonymizeAuthor(String author, String replacement) {
+            memes.replaceAll((id, m) -> m.author().equals(author)
+                    ? new Meme(m.id(), replacement, m.format(), m.data()) : m);
+        }
     };
     private final CommentRepository commentRepository = new CommentRepository() {
         public void save(Comment comment) {
@@ -64,6 +72,14 @@ class PurgeUserContentTest {
 
         public void deleteByMeme(String memeId) {
             comments.removeIf(c -> c.memeId().equals(memeId));
+        }
+
+        public List<Comment> findByAuthor(String author) {
+            return comments.stream().filter(c -> c.author().equals(author)).toList();
+        }
+
+        public void deleteByAuthor(String author) {
+            comments.removeIf(c -> c.author().equals(author));
         }
 
         public void anonymizeAuthor(String author, String replacement) {
@@ -140,7 +156,13 @@ class PurgeUserContentTest {
     };
 
     private final PurgeUserContent purge = new PurgeUserContent(
-            memeRepository, commentRepository, voteRepository, commentVoteRepository, index);
+            memeRepository, commentRepository, voteRepository, commentVoteRepository, index,
+            ContentPurgePolicy.defaults());
+
+    private PurgeUserContent purgeWith(PurgeFate memesFate, PurgeFate commentsFate) {
+        return new PurgeUserContent(memeRepository, commentRepository, voteRepository,
+                commentVoteRepository, index, new ContentPurgePolicy(memesFate, commentsFate));
+    }
 
     @Test
     @DisplayName("the leaver's memes disappear with their whole comment threads and votes")
@@ -169,9 +191,34 @@ class PurgeUserContentTest {
         purge.execute("leaver@example.com");
 
         assertEquals(1, comments.size());
-        assertEquals(Comment.DELETED_ACCOUNT_AUTHOR, comments.get(0).author());
+        assertEquals(DeletedAccount.AUTHOR, comments.get(0).author());
         assertEquals("Lorem ipsum", comments.get(0).text()); // the text survives, the identity does not
         assertTrue(memes.containsKey("other"));
+    }
+
+    @Test
+    @DisplayName("policy flip: memes can stay with the author anonymised instead of disappearing")
+    void anonymize_memes_policy_keeps_the_meme() {
+        memes.put("leavers-meme", new Meme("leavers-meme", "leaver@example.com", "png", new byte[]{1}));
+        comments.add(new Comment("c1", "leavers-meme", "somebody-else@example.com", "nice"));
+
+        purgeWith(PurgeFate.ANONYMIZE_AUTHOR, PurgeFate.ANONYMIZE_AUTHOR).execute("leaver@example.com");
+
+        assertEquals(DeletedAccount.AUTHOR, memes.get("leavers-meme").author());
+        assertEquals(1, comments.size()); // the thread survives with the meme
+    }
+
+    @Test
+    @DisplayName("policy flip: comments can disappear entirely instead of being anonymised")
+    void delete_comments_policy_removes_them_with_their_votes() {
+        memes.put("other", new Meme("other", "someone@example.com", "png", new byte[]{2}));
+        comments.add(new Comment("c2", "other", "leaver@example.com", "Lorem ipsum"));
+        commentVotes.put("c2", new HashMap<>(Map.of("third@example.com", VoteDirection.UP)));
+
+        purgeWith(PurgeFate.DELETE, PurgeFate.DELETE).execute("leaver@example.com");
+
+        assertTrue(comments.isEmpty());
+        assertTrue(commentVotes.isEmpty()); // votes on the removed comment go with it
     }
 
     @Test

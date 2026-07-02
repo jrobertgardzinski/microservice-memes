@@ -46,6 +46,11 @@ class MakeThumbnailTest {
         public void deleteById(String memeId) {
             memes.remove(memeId);
         }
+
+        public void anonymizeAuthor(String author, String replacement) {
+            memes.replaceAll((id, m) -> m.author().equals(author)
+                    ? new Meme(m.id(), replacement, m.format(), m.data()) : m);
+        }
     };
     private final MakeThumbnail makeThumbnail = new MakeThumbnail(
             memeRepository, new WebImageOptimizer(new ImageLimits(4096)), new ThumbnailSize(64));

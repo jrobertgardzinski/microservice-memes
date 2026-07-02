@@ -49,4 +49,11 @@ class InMemoryMemeRepository implements MemeRepository {
         byId.remove(memeId);
         insertionOrder.remove(memeId);
     }
+
+    @Override
+    public void anonymizeAuthor(String author, String replacement) {
+        byId.replaceAll((id, meme) -> meme.author().equals(author)
+                ? new Meme(meme.id(), replacement, meme.format(), meme.data())
+                : meme);
+    }
 }
