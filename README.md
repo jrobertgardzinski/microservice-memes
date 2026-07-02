@@ -18,22 +18,39 @@ and Quarkus (`microservice-email`, BCE).
   `ListComments`, `CastVote`, `RankMemes`) + the ports (`MemeRepository`, `CommentRepository`,
   `VoteRepository`, `MemeContentIndex`). No framework.
 - **memes-infrastructure** — the Spring Boot app: web boundaries (`MemeController`,
-  `CommentController`, `VoteController`) + in-memory adapters, wiring the framework-free use cases
-  as beans. Cucumber features (`src/test/resources/features/`) document the flows; results feed
-  Allure.
+  `CommentController`, `VoteController`), the sign-in gate (`RequireSignInFilter` +
+  `HttpSecurityAuthenticationGate`, which confirms bearer tokens against
+  `microservice-security`'s `GET /me`), in-memory adapters, and the gallery UI (a single-file
+  React app served from `static/`). Cucumber features (`src/test/resources/features/`) document
+  the flows; results feed Allure.
+
+## Security integration
+
+Browsing is public; **contributing requires signing in**. Every `POST` under `/memes` must carry
+`Authorization: Bearer <access token issued by microservice-security>`; the gate confirms it via
+`GET /me` (config: `security.url` / `SECURITY_URL`) and the confirmed identity becomes e.g. the
+comment's author — the request body cannot impersonate anyone. Anonymous writes get
+`401 {"status": "SIGN_IN_REQUIRED"}`.
 
 ## Contract
 
 ```
+GET  /                          the gallery UI (single-file React, no build step)
+
+# public reads
+GET  /memes                     -> 200 [ { "id" }, ... ]  (newest first)
+GET  /memes/{id}                -> 200 image/png (optimised bytes) | 404
+GET  /memes/{id}/thumbnail      -> 200 image/png (small preview) | 404
+GET  /memes/{id}/comments       -> 200 [ { "id", "author", "text" }, ... ]
+GET  /memes/hot                 -> 200 [ { "memeId", "score" }, ... ]  (highest score first)
+
+# writes: Authorization: Bearer <security access token>, else 401 SIGN_IN_REQUIRED
 POST /memes                     multipart/form-data, field "file"
                                 -> 201 { "id": "..." }, Location: /memes/{id}
                                    (uploading the same image twice returns the existing id)
-GET  /memes/{id}                -> 200 image/png (optimised bytes) | 404
-GET  /memes/{id}/thumbnail      -> 200 image/png (small preview) | 404
-POST /memes/{id}/comments       { "author": "...", "text": "..." }  -> 201 { "id": "..." } | 400 | 404
-GET  /memes/{id}/comments       -> 200 [ { "id", "author", "text" }, ... ]
-POST /memes/{id}/votes          { "direction": "UP" | "DOWN" }      -> 200 { "score": n } | 400 | 404
-GET  /memes/hot                 -> 200 [ { "memeId", "score" }, ... ]  (highest score first)
+POST /memes/{id}/comments       { "text": "..." }               -> 201 { "id": "..." } | 400 | 404
+                                   (author = the signed-in identity)
+POST /memes/{id}/votes          { "direction": "UP" | "DOWN" }  -> 200 { "score": n } | 400 | 404
 ```
 
 ## Run & test

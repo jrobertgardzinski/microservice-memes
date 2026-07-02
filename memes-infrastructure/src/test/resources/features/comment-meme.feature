@@ -1,8 +1,18 @@
 Feature: Commenting on a meme
 
-  A user comments on a meme and sees the comment listed under it.
+  Signed-in users comment on memes; the comment is signed by the identity that
+  microservice-security confirms for their token — the author is never taken from the request.
+  Reading comments is public.
 
-  Scenario: comment on an existing meme
-    Given an uploaded meme
-    When a user comments "great meme" as "alice"
-    Then the comment appears in the meme's comments
+  Scenario: a signed-in user comments on an existing meme
+    Given a signed-in user
+    And an uploaded meme
+    When the user comments "great meme"
+    Then the comment appears in the meme's comments, signed by the user
+
+  Scenario: an anonymous comment is refused, but reading stays public
+    Given a signed-in user
+    And an uploaded meme
+    When an anonymous user tries to comment "drive-by"
+    Then the request is refused as sign-in required
+    And the meme's comments can be read without signing in

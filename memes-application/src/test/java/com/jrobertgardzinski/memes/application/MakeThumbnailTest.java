@@ -14,6 +14,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -32,6 +33,10 @@ class MakeThumbnailTest {
 
         public Optional<Meme> find(String id) {
             return Optional.ofNullable(memes.get(id));
+        }
+
+        public List<String> allIds() {
+            return List.copyOf(memes.keySet());
         }
     };
     private final MakeThumbnail makeThumbnail = new MakeThumbnail(

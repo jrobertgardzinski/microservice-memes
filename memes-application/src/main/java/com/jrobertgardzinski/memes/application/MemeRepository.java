@@ -2,6 +2,7 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.Meme;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -13,4 +14,7 @@ public interface MemeRepository {
     void save(Meme meme);
 
     Optional<Meme> find(String id);
+
+    /** Ids of every stored meme, newest first. */
+    List<String> allIds();
 }

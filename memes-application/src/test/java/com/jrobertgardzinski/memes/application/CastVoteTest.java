@@ -31,6 +31,10 @@ class CastVoteTest {
         public Optional<Meme> find(String id) {
             return Optional.ofNullable(memes.get(id));
         }
+
+        public List<String> allIds() {
+            return List.copyOf(memes.keySet());
+        }
     };
     private final VoteRepository voteRepository = new VoteRepository() {
         public void castVote(String memeId, VoteDirection direction) {

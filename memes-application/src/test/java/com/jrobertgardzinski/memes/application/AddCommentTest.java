@@ -31,6 +31,10 @@ class AddCommentTest {
         public Optional<Meme> find(String id) {
             return Optional.ofNullable(memes.get(id));
         }
+
+        public List<String> allIds() {
+            return List.copyOf(memes.keySet());
+        }
     };
     private final CommentRepository commentRepository = new CommentRepository() {
         public void save(Comment comment) {

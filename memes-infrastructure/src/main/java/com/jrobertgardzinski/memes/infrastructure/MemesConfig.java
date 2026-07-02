@@ -4,6 +4,7 @@ import com.jrobertgardzinski.memes.application.AddComment;
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.CommentRepository;
 import com.jrobertgardzinski.memes.application.ListComments;
+import com.jrobertgardzinski.memes.application.ListMemes;
 import com.jrobertgardzinski.memes.application.MakeThumbnail;
 import com.jrobertgardzinski.memes.application.MemeContentIndex;
 import com.jrobertgardzinski.memes.application.MemeRepository;
@@ -53,6 +54,11 @@ class MemesConfig {
     @Bean
     ViewMeme viewMeme(MemeRepository repository) {
         return new ViewMeme(repository);
+    }
+
+    @Bean
+    ListMemes listMemes(MemeRepository repository) {
+        return new ListMemes(repository);
     }
 
     @Bean

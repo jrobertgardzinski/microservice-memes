@@ -13,6 +13,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -33,6 +34,10 @@ class PublishMemeTest {
 
         public Optional<Meme> find(String id) {
             return Optional.ofNullable(store.get(id));
+        }
+
+        public List<String> allIds() {
+            return List.copyOf(store.keySet());
         }
     };
     private final MemeContentIndex contentIndex = new MemeContentIndex() {

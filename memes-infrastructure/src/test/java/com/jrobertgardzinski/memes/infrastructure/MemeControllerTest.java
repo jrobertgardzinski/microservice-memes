@@ -20,9 +20,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Black-box web test: upload a BMP, then fetch the meme back and check it was served as PNG.
+ * Black-box web test: upload a BMP (signed in via the stubbed gate), then fetch the meme back
+ * anonymously and check it was served as PNG.
  */
-@SpringBootTest
+@SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 class MemeControllerTest {
 
@@ -36,7 +37,8 @@ class MemeControllerTest {
     void uploads_and_serves_an_optimized_meme() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "meme.bmp", "image/bmp", bmp());
 
-        String body = mockMvc.perform(multipart("/memes").file(file))
+        String body = mockMvc.perform(multipart("/memes").file(file)
+                        .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = objectMapper.readTree(body).get("id").asText();

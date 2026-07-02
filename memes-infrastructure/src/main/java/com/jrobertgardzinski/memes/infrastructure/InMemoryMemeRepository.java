@@ -4,9 +4,11 @@ import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * In-memory {@link MemeRepository}. A real store (object storage for the bytes + a database for
@@ -16,14 +18,21 @@ import java.util.concurrent.ConcurrentHashMap;
 class InMemoryMemeRepository implements MemeRepository {
 
     private final Map<String, Meme> byId = new ConcurrentHashMap<>();
+    private final List<String> insertionOrder = new CopyOnWriteArrayList<>();
 
     @Override
     public void save(Meme meme) {
         byId.put(meme.id(), meme);
+        insertionOrder.add(meme.id());
     }
 
     @Override
     public Optional<Meme> find(String id) {
         return Optional.ofNullable(byId.get(id));
+    }
+
+    @Override
+    public List<String> allIds() {
+        return List.copyOf(insertionOrder.reversed());
     }
 }
