@@ -3,6 +3,10 @@
 export const SECURITY: string =
   import.meta.env.VITE_SECURITY_URL ?? 'http://localhost:8080';
 
+/** Comments live in their own microservice. */
+export const COMMENTS: string =
+  import.meta.env.VITE_COMMENTS_URL ?? 'http://localhost:8085';
+
 export interface MemeRef {
   id: string;
 }
@@ -47,7 +51,7 @@ export const hotMemes = async (): Promise<HotEntry[]> =>
   (await fetch('/memes/hot')).json();
 
 export const listComments = async (memeId: string, token: string | null): Promise<MemeComment[]> =>
-  (await fetch(`/memes/${memeId}/comments`, { headers: authHeader(token) })).json();
+  (await fetch(`${COMMENTS}/memes/${memeId}/comments`, { headers: authHeader(token) })).json();
 
 export const memeTally = async (memeId: string, token: string | null): Promise<VoteTally> =>
   (await fetch(`/memes/${memeId}/votes`, { headers: authHeader(token) })).json();

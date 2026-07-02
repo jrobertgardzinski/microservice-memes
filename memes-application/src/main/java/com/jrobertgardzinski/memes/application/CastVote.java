@@ -1,33 +1,30 @@
 package com.jrobertgardzinski.memes.application;
 
-import com.jrobertgardzinski.memes.domain.VoteDirection;
+import com.jrobertgardzinski.voting.VoteDirection;
+import com.jrobertgardzinski.voting.VoteTally;
+import com.jrobertgardzinski.voting.Voting;
 
 import java.util.Optional;
 
 /**
- * Casts a voter's vote on a meme, Reddit-style toggle: a first vote counts, repeating the same
- * direction retracts it, the opposite direction switches it. Returns the meme's new tally
- * (score + the voter's resulting choice), or empty if there is no such meme.
+ * Casts a voter's vote on a meme — the toggle semantics come from the voting library; this use
+ * case only anchors them to an existing meme. Returns the meme's new tally, or empty if there is
+ * no such meme.
  */
 public class CastVote {
 
     private final MemeRepository memeRepository;
-    private final VoteRepository voteRepository;
+    private final Voting voting;
 
     public CastVote(MemeRepository memeRepository, VoteRepository voteRepository) {
         this.memeRepository = memeRepository;
-        this.voteRepository = voteRepository;
+        this.voting = new Voting(voteRepository);
     }
 
     public Optional<VoteTally> execute(String memeId, String voter, VoteDirection direction) {
         if (memeRepository.find(memeId).isEmpty()) {
             return Optional.empty();
         }
-        if (voteRepository.voteOf(memeId, voter).filter(direction::equals).isPresent()) {
-            voteRepository.retractVote(memeId, voter);
-        } else {
-            voteRepository.castVote(memeId, voter, direction);
-        }
-        return Optional.of(new VoteTally(voteRepository.scoreOf(memeId), voteRepository.voteOf(memeId, voter)));
+        return Optional.of(voting.toggle(memeId, voter, direction));
     }
 }

@@ -2,7 +2,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.domain.RankedMeme;
-import com.jrobertgardzinski.memes.domain.VoteDirection;
+import com.jrobertgardzinski.voting.VoteDirection;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,12 +17,12 @@ class InMemoryVoteRepository implements VoteRepository {
     private final Map<String, Map<String, VoteDirection>> votesByMeme = new ConcurrentHashMap<>();
 
     @Override
-    public void castVote(String memeId, String voter, VoteDirection direction) {
+    public void cast(String memeId, String voter, VoteDirection direction) {
         votesByMeme.computeIfAbsent(memeId, id -> new ConcurrentHashMap<>()).put(voter, direction);
     }
 
     @Override
-    public void retractVote(String memeId, String voter) {
+    public void retract(String memeId, String voter) {
         votesByMeme.getOrDefault(memeId, Map.of()).remove(voter);
     }
 

@@ -12,7 +12,7 @@ import Button from '@mui/material/Button';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import {
-  authHeader, jsonHeaders, listComments, memeTally, MemeComment, VoteDirection, VoteTally,
+  authHeader, COMMENTS, jsonHeaders, listComments, memeTally, MemeComment, VoteDirection, VoteTally,
 } from './api';
 
 interface Props {
@@ -67,7 +67,7 @@ export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, on
 
   const voteComment = (commentId: string, direction: VoteDirection) =>
     guard(async () => {
-      const r = await fetch(`/memes/${memeId}/comments/${commentId}/votes`, {
+      const r = await fetch(`${COMMENTS}/memes/${memeId}/comments/${commentId}/votes`, {
         method: 'POST',
         headers: { ...jsonHeaders, ...authHeader(token) },
         body: JSON.stringify({ direction }),
@@ -82,7 +82,7 @@ export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, on
   const postComment = () =>
     guard(async () => {
       if (!text.trim()) return;
-      const r = await fetch(`/memes/${memeId}/comments`, {
+      const r = await fetch(`${COMMENTS}/memes/${memeId}/comments`, {
         method: 'POST',
         headers: { ...jsonHeaders, ...authHeader(token) },
         body: JSON.stringify({ text }),

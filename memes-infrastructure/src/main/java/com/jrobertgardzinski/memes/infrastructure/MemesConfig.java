@@ -1,22 +1,17 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.AddComment;
 import com.jrobertgardzinski.memes.application.CastVote;
-import com.jrobertgardzinski.memes.application.CommentRepository;
-import com.jrobertgardzinski.memes.application.CommentVoteRepository;
-import com.jrobertgardzinski.memes.application.ListComments;
 import com.jrobertgardzinski.memes.application.ListMemes;
 import com.jrobertgardzinski.memes.application.MakeThumbnail;
 import com.jrobertgardzinski.memes.application.MemeContentIndex;
 import com.jrobertgardzinski.memes.application.MemeRepository;
+import com.jrobertgardzinski.memes.application.MemeEvents;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
-import com.jrobertgardzinski.memes.application.VoteOnComment;
 import com.jrobertgardzinski.memes.application.VoteRepository;
-import com.jrobertgardzinski.memes.config.ContentPurgePolicy;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.config.PurgeRule;
 import com.jrobertgardzinski.memes.config.ThumbnailSize;
@@ -68,21 +63,6 @@ class MemesConfig {
     }
 
     @Bean
-    AddComment addComment(MemeRepository memeRepository, CommentRepository commentRepository) {
-        return new AddComment(memeRepository, commentRepository);
-    }
-
-    @Bean
-    ListComments listComments(CommentRepository commentRepository, CommentVoteRepository commentVoteRepository) {
-        return new ListComments(commentRepository, commentVoteRepository);
-    }
-
-    @Bean
-    VoteOnComment voteOnComment(CommentRepository commentRepository, CommentVoteRepository commentVoteRepository) {
-        return new VoteOnComment(commentRepository, commentVoteRepository);
-    }
-
-    @Bean
     CastVote castVote(MemeRepository memeRepository, VoteRepository voteRepository) {
         return new CastVote(memeRepository, voteRepository);
     }
@@ -93,17 +73,16 @@ class MemesConfig {
     }
 
     @Bean
-    ContentPurgePolicy contentPurgePolicy(@Value("${memes.purge.memes:DELETE}") String memes,
-                                          @Value("${memes.purge.comments:ANONYMIZE_AUTHOR}") String comments) {
-        return new ContentPurgePolicy(PurgeRule.parse(memes), PurgeRule.parse(comments));
+    PurgeRule defaultMemesPurgeRule(@Value("${memes.purge.memes:DELETE}") String rule) {
+        return PurgeRule.parse(rule);
     }
 
     @Bean
-    PurgeUserContent purgeUserContent(MemeRepository memeRepository, CommentRepository commentRepository,
-                                      VoteRepository voteRepository, CommentVoteRepository commentVoteRepository,
-                                      MemeContentIndex contentIndex, ContentPurgePolicy policy) {
-        return new PurgeUserContent(memeRepository, commentRepository, voteRepository,
-                commentVoteRepository, contentIndex, policy);
+    PurgeUserContent purgeUserContent(MemeRepository memeRepository, VoteRepository voteRepository,
+                                      MemeContentIndex contentIndex, MemeEvents memeEvents,
+                                      PurgeRule defaultMemesPurgeRule) {
+        return new PurgeUserContent(memeRepository, voteRepository, contentIndex, memeEvents,
+                defaultMemesPurgeRule);
     }
 
     @Bean

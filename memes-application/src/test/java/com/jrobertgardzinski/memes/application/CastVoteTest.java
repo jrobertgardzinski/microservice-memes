@@ -2,7 +2,8 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.domain.RankedMeme;
-import com.jrobertgardzinski.memes.domain.VoteDirection;
+import com.jrobertgardzinski.voting.VoteDirection;
+import com.jrobertgardzinski.voting.VoteTally;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
@@ -48,12 +49,40 @@ class CastVoteTest {
             memes.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
         }
     };
-    private final VoteRepository voteRepository = new VoteRepository() {
-        public void castVote(String memeId, String voter, VoteDirection direction) {
+    private final VoteRepository voteRepository = new FakeVoteRepository(votes);
+    private final CastVote castVote = new CastVote(memeRepository, voteRepository);
+
+    @Test
+    @DisplayName("the library's toggle applies, anchored to an existing meme")
+    void toggles_on_an_existing_meme() {
+        memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
+
+        assertEquals(Optional.of(new VoteTally(1, Optional.of(VoteDirection.UP))),
+                castVote.execute("m1", "alice", VoteDirection.UP));
+        assertEquals(Optional.of(new VoteTally(0, Optional.empty())),
+                castVote.execute("m1", "alice", VoteDirection.UP)); // retracted
+    }
+
+    @Test
+    @DisplayName("refuses to vote on a missing meme")
+    void refuses_missing_meme() {
+        assertTrue(castVote.execute("nope", "alice", VoteDirection.UP).isEmpty());
+        assertTrue(votes.isEmpty());
+    }
+
+    /** Shared in-memory {@link VoteRepository} fake for the use-case tests. */
+    static class FakeVoteRepository implements VoteRepository {
+        private final Map<String, Map<String, VoteDirection>> votes;
+
+        FakeVoteRepository(Map<String, Map<String, VoteDirection>> votes) {
+            this.votes = votes;
+        }
+
+        public void cast(String memeId, String voter, VoteDirection direction) {
             votes.computeIfAbsent(memeId, id -> new HashMap<>()).put(voter, direction);
         }
 
-        public void retractVote(String memeId, String voter) {
+        public void retract(String memeId, String voter) {
             votes.getOrDefault(memeId, Map.of()).remove(voter);
         }
 
@@ -77,38 +106,5 @@ class CastVoteTest {
         public void purgeVoter(String voter) {
             votes.values().forEach(v -> v.remove(voter));
         }
-    };
-    private final CastVote castVote = new CastVote(memeRepository, voteRepository);
-
-    @Test
-    @DisplayName("distinct voters raise the score; the opposite direction switches a voter's mind")
-    void distinct_voters_raise_the_score() {
-        memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
-
-        assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
-        assertEquals(tally(2, VoteDirection.UP), castVote.execute("m1", "bob", VoteDirection.UP));
-        assertEquals(tally(0, VoteDirection.DOWN), castVote.execute("m1", "bob", VoteDirection.DOWN));
-    }
-
-    @Test
-    @DisplayName("repeating the same vote retracts it (a toggle, never stacking)")
-    void repeating_the_same_vote_retracts_it() {
-        memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
-
-        assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
-        assertEquals(Optional.of(new VoteTally(0, Optional.empty())),
-                castVote.execute("m1", "alice", VoteDirection.UP)); // retracted
-        assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
-    }
-
-    private static Optional<VoteTally> tally(int score, VoteDirection mine) {
-        return Optional.of(new VoteTally(score, Optional.of(mine)));
-    }
-
-    @Test
-    @DisplayName("refuses to vote on a missing meme")
-    void refuses_missing_meme() {
-        assertTrue(castVote.execute("nope", "alice", VoteDirection.UP).isEmpty());
-        assertTrue(votes.isEmpty());
     }
 }

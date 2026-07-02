@@ -3,7 +3,6 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
-import com.jrobertgardzinski.memes.config.ContentPurgePolicy;
 import com.jrobertgardzinski.memes.config.PurgeRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,25 +36,24 @@ class PurgeCommandsListener {
     }
 
     /**
-     * The leaver's wizard choice, when the command carries one; unparseable rules fall back to
-     * the deployment default (logged) rather than wedging the saga.
+     * The leaver's wizard choice for THIS service's axis (the memes rule), when the command
+     * carries one; unparseable rules fall back to the deployment default (logged) rather than
+     * wedging the saga.
      */
-    private java.util.Optional<ContentPurgePolicy> requestedPolicy(JsonNode command) {
-        JsonNode policy = command.path("policy");
-        if (policy.isMissingNode()) {
+    private java.util.Optional<PurgeRule> requestedPolicy(JsonNode command) {
+        JsonNode rule = command.path("policy").path("memes");
+        if (rule.isMissingNode()) {
             return java.util.Optional.empty();
         }
         try {
-            return java.util.Optional.of(new ContentPurgePolicy(
-                    PurgeRule.parse(policy.path("memes").asText()),
-                    PurgeRule.parse(policy.path("comments").asText())));
+            return java.util.Optional.of(PurgeRule.parse(rule.asText()));
         } catch (IllegalArgumentException invalid) {
-            LOG.warn("ignoring invalid purge policy in command ({}), using the default", invalid.getMessage());
+            LOG.warn("ignoring invalid memes purge rule ({}), using the default", invalid.getMessage());
             return java.util.Optional.empty();
         }
     }
 
-    @KafkaListener(topics = "memes-commands", groupId = "memes")
+    @KafkaListener(topics = "content-commands", groupId = "memes")
     void receive(String payload) throws Exception {
         JsonNode command;
         try {

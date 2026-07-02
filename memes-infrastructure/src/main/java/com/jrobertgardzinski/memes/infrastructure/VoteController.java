@@ -3,9 +3,8 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.ShowMemeVote;
-import com.jrobertgardzinski.memes.application.VoteOnComment;
-import com.jrobertgardzinski.memes.application.VoteTally;
-import com.jrobertgardzinski.memes.domain.VoteDirection;
+import com.jrobertgardzinski.voting.VoteDirection;
+import com.jrobertgardzinski.voting.VoteTally;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,11 +20,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Web boundary for voting, Reddit-style toggle: a vote counts once per user, repeating it retracts
- * it, the opposite direction switches it (the voter is the identity published by
- * {@link RequireSignInFilter}). Responses carry the new score AND the caller's resulting choice
- * ({@code myVote}), so the UI can render the pressed arrow; the tally GET serves the same for a
- * viewer opening a meme. The hot list is public.
+ * Web boundary for voting on memes (comment voting lives in microservice-comments). The toggle
+ * semantics come from the voting library; responses carry the caller's resulting choice
+ * ({@code myVote}), so the UI can render the pressed arrow. The hot list and the tally GET are
+ * public.
  */
 @RestController
 @RequestMapping("/memes")
@@ -35,13 +33,11 @@ class VoteController {
     record VoteRequest(String direction) {}
 
     private final CastVote castVote;
-    private final VoteOnComment voteOnComment;
     private final ShowMemeVote showMemeVote;
     private final RankMemes rankMemes;
 
-    VoteController(CastVote castVote, VoteOnComment voteOnComment, ShowMemeVote showMemeVote, RankMemes rankMemes) {
+    VoteController(CastVote castVote, ShowMemeVote showMemeVote, RankMemes rankMemes) {
         this.castVote = castVote;
-        this.voteOnComment = voteOnComment;
         this.showMemeVote = showMemeVote;
         this.rankMemes = rankMemes;
     }
@@ -55,18 +51,6 @@ class VoteController {
             return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
         }
         return toResponse(castVote.execute(memeId, voter, direction.get()));
-    }
-
-    @PostMapping("/{memeId}/comments/{commentId}/votes")
-    ResponseEntity<?> voteOnComment(@PathVariable("memeId") String memeId,
-                                    @PathVariable("commentId") String commentId,
-                                    @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String voter,
-                                    @RequestBody VoteRequest request) {
-        Optional<VoteDirection> direction = parseDirection(request);
-        if (direction.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
-        }
-        return toResponse(voteOnComment.execute(memeId, commentId, voter, direction.get()));
     }
 
     @GetMapping("/{memeId}/votes")

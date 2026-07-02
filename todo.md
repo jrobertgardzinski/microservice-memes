@@ -30,6 +30,10 @@ Only open items. History = git log.
   z security przy uploadzie). Reguły per oś: DELETE | ANONYMIZE_AUTHOR |
   KEEP_POPULAR_ANONYMIZED:n; wybór usera z wizarda w UI nadpisuje default per żądanie.
 
+- **Komentarze wydzielone do `microservice-comments`** (2026-07-02 wieczór): ten serwis trzyma
+  memy i głosy na memy (lib `voting`); skasowany mem ogłasza `MEME_DELETED`, a serwis komentarzy
+  kasuje wątek.
+
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - **Tagi + wyszukiwanie** — moduł `memes-tags`.
 - Ranking "hot" z czasem (Reddit-like decay) zamiast czystego score.

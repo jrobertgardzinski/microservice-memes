@@ -1,7 +1,8 @@
 # microservice-memes
 
 A meme service: upload images, serve them optimised for the browser (with on-demand thumbnails and
-content-hash deduplication), comment and vote ("hot" ranking). More monolithic than the split
+content-hash deduplication) and vote ("hot" ranking); comment threads moved to
+`microservice-comments`, voting semantics come from the shared `voting` library. More monolithic than the split
 libraries of `microservice-security`, but still layered into small modules. **Framework: Spring
 Boot** — the third flavour in the portfolio after Micronaut (`microservice-security`, hexagonal)
 and Quarkus (`microservice-email`, BCE).
