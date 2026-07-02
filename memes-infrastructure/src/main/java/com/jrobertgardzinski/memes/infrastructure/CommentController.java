@@ -15,11 +15,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Web boundary for comments on a meme: post a comment, list the comments.
+ * Web boundary for comments on a meme: post a comment, list the comments. The boundary is where
+ * raw input is validated (blank/missing fields → 400), so the domain never sees nulls (ADR 0001).
  */
 @RestController
 @RequestMapping("/memes/{memeId}/comments")
 class CommentController {
+
+    /** What a client posts to comment on a meme. */
+    record CommentRequest(String author, String text) {}
 
     private final AddComment addComment;
     private final ListComments listComments;
@@ -30,13 +34,11 @@ class CommentController {
     }
 
     @PostMapping
-    ResponseEntity<?> add(@PathVariable("memeId") String memeId, @RequestBody Map<String, Object> body) {
-        String author = asString(body.get("author"));
-        String text = asString(body.get("text"));
-        if (author.isBlank() || text.isBlank()) {
+    ResponseEntity<?> add(@PathVariable("memeId") String memeId, @RequestBody CommentRequest request) {
+        if (isBlank(request.author()) || isBlank(request.text())) {
             return ResponseEntity.badRequest().body(Map.of("status", "INVALID_COMMENT"));
         }
-        return addComment.execute(memeId, author, text)
+        return addComment.execute(memeId, request.author(), request.text())
                 .<ResponseEntity<?>>map(comment ->
                         ResponseEntity.status(HttpStatus.CREATED).body(Map.of("id", comment.id())))
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -50,7 +52,7 @@ class CommentController {
                 .toList();
     }
 
-    private static String asString(Object value) {
-        return value == null ? "" : value.toString();
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

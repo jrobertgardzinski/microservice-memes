@@ -15,7 +15,7 @@
       modules. Framework: Spring Boot (the third flavour after Micronaut/security and Quarkus/email).
     -->
     <properties>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.3</spring-boot.version>
         <allure.version>2.29.0</allure.version>

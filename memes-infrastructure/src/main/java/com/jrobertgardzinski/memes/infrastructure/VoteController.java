@@ -15,11 +15,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Web boundary for voting: cast a vote on a meme, and list the hottest memes.
+ * Web boundary for voting: cast a vote on a meme, and list the hottest memes. The boundary parses
+ * raw input into domain types (bad direction → 400), so the use case only sees valid votes.
  */
 @RestController
 @RequestMapping("/memes")
 class VoteController {
+
+    /** What a client posts to vote on a meme: {@code direction} is UP or DOWN (case-insensitive). */
+    record VoteRequest(String direction) {}
 
     private final CastVote castVote;
     private final RankMemes rankMemes;
@@ -30,11 +34,11 @@ class VoteController {
     }
 
     @PostMapping("/{memeId}/votes")
-    ResponseEntity<?> vote(@PathVariable("memeId") String memeId, @RequestBody Map<String, Object> body) {
+    ResponseEntity<?> vote(@PathVariable("memeId") String memeId, @RequestBody VoteRequest request) {
         VoteDirection direction;
         try {
-            direction = VoteDirection.valueOf(String.valueOf(body.get("direction")).trim().toUpperCase());
-        } catch (RuntimeException invalid) {
+            direction = VoteDirection.valueOf(String.valueOf(request.direction()).trim().toUpperCase());
+        } catch (IllegalArgumentException invalid) {
             return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
         }
         return castVote.execute(memeId, direction)
