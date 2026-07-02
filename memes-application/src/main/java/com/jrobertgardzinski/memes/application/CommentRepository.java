@@ -20,8 +20,8 @@ public interface CommentRepository {
 
     List<Comment> findByAuthor(String author);
 
-    void deleteByAuthor(String author);
+    void delete(String commentId);
 
-    /** Replace this author's name on every comment (account deletion may keep texts, not identities). */
-    void anonymizeAuthor(String author, String replacement);
+    /** Replace one comment's author (account deletion may keep the text, never the identity). */
+    void reassignAuthor(String commentId, String newAuthor);
 }

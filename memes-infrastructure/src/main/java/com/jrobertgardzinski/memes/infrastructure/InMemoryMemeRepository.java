@@ -51,9 +51,7 @@ class InMemoryMemeRepository implements MemeRepository {
     }
 
     @Override
-    public void anonymizeAuthor(String author, String replacement) {
-        byId.replaceAll((id, meme) -> meme.author().equals(author)
-                ? new Meme(meme.id(), replacement, meme.format(), meme.data())
-                : meme);
+    public void reassignAuthor(String memeId, String newAuthor) {
+        byId.computeIfPresent(memeId, (id, meme) -> new Meme(meme.id(), newAuthor, meme.format(), meme.data()));
     }
 }

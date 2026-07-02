@@ -40,14 +40,14 @@ class InMemoryCommentRepository implements CommentRepository {
     }
 
     @Override
-    public void deleteByAuthor(String author) {
-        comments.removeIf(comment -> comment.author().equals(author));
+    public void delete(String commentId) {
+        comments.removeIf(comment -> comment.id().equals(commentId));
     }
 
     @Override
-    public void anonymizeAuthor(String author, String replacement) {
-        comments.replaceAll(comment -> comment.author().equals(author)
-                ? new Comment(comment.id(), comment.memeId(), replacement, comment.text())
+    public void reassignAuthor(String commentId, String newAuthor) {
+        comments.replaceAll(comment -> comment.id().equals(commentId)
+                ? new Comment(comment.id(), comment.memeId(), newAuthor, comment.text())
                 : comment);
     }
 }

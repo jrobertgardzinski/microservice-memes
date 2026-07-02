@@ -3,6 +3,8 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.config.ContentPurgePolicy;
+import com.jrobertgardzinski.memes.config.PurgeRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,6 +36,25 @@ class PurgeCommandsListener {
         this.mapper = mapper;
     }
 
+    /**
+     * The leaver's wizard choice, when the command carries one; unparseable rules fall back to
+     * the deployment default (logged) rather than wedging the saga.
+     */
+    private java.util.Optional<ContentPurgePolicy> requestedPolicy(JsonNode command) {
+        JsonNode policy = command.path("policy");
+        if (policy.isMissingNode()) {
+            return java.util.Optional.empty();
+        }
+        try {
+            return java.util.Optional.of(new ContentPurgePolicy(
+                    PurgeRule.parse(policy.path("memes").asText()),
+                    PurgeRule.parse(policy.path("comments").asText())));
+        } catch (IllegalArgumentException invalid) {
+            LOG.warn("ignoring invalid purge policy in command ({}), using the default", invalid.getMessage());
+            return java.util.Optional.empty();
+        }
+    }
+
     @KafkaListener(topics = "memes-commands", groupId = "memes")
     void receive(String payload) throws Exception {
         JsonNode command;
@@ -47,7 +68,7 @@ class PurgeCommandsListener {
             return;
         }
         String email = command.path("email").asText();
-        purgeUserContent.execute(email);
+        purgeUserContent.execute(email, requestedPolicy(command));
         LOG.info("purged content of {} (saga {})", email, command.path("sagaId").asText());
         kafka.send("memes-events", email, mapper.writeValueAsString(mapper.createObjectNode()
                 .put("type", "USER_CONTENT_PURGED")

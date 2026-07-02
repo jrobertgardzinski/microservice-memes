@@ -44,9 +44,8 @@ class CastVoteTest {
             memes.remove(memeId);
         }
 
-        public void anonymizeAuthor(String author, String replacement) {
-            memes.replaceAll((id, m) -> m.author().equals(author)
-                    ? new Meme(m.id(), replacement, m.format(), m.data()) : m);
+        public void reassignAuthor(String memeId, String newAuthor) {
+            memes.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
         }
     };
     private final VoteRepository voteRepository = new VoteRepository() {

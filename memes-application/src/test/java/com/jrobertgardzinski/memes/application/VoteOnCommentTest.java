@@ -44,13 +44,13 @@ class VoteOnCommentTest {
             return comments.stream().filter(c -> c.author().equals(author)).toList();
         }
 
-        public void deleteByAuthor(String author) {
-            comments.removeIf(c -> c.author().equals(author));
+        public void delete(String commentId) {
+            comments.removeIf(c -> c.id().equals(commentId));
         }
 
-        public void anonymizeAuthor(String author, String replacement) {
-            comments.replaceAll(c -> c.author().equals(author)
-                    ? new Comment(c.id(), c.memeId(), replacement, c.text()) : c);
+        public void reassignAuthor(String commentId, String newAuthor) {
+            comments.replaceAll(c -> c.id().equals(commentId)
+                    ? new Comment(c.id(), c.memeId(), newAuthor, c.text()) : c);
         }
     };
     private final CommentVoteRepository commentVoteRepository = new CommentVoteRepository() {

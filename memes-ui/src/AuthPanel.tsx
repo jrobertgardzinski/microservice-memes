@@ -11,6 +11,7 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
+import DeleteAccountDialog from './DeleteAccountDialog';
 import { jsonHeaders, Notice, SECURITY } from './api';
 
 type Mode = 'signin' | 'signup' | 'inbox';
@@ -30,6 +31,7 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // the verification mail links here (?verify=<token>); confirm it on arrival
   useEffect(() => {
@@ -51,13 +53,30 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
 
   if (token) {
     return (
-      <Chip
-        label={`signed in as ${user || '…'}`}
-        color="primary"
-        variant="outlined"
-        onDelete={onLogout}
-        deleteIcon={<span style={{ fontSize: '0.8rem', padding: '0 6px' }}>sign out</span>}
-      />
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Chip
+          label={`signed in as ${user || '…'}`}
+          color="primary"
+          variant="outlined"
+          onDelete={onLogout}
+          deleteIcon={<span style={{ fontSize: '0.8rem', padding: '0 6px' }}>sign out</span>}
+        />
+        <Button size="small" color="error" onClick={() => setDeleting(true)}>delete account…</Button>
+        {deleting && (
+          <DeleteAccountDialog
+            token={token}
+            onClose={() => setDeleting(false)}
+            onDeleted={() => {
+              setDeleting(false);
+              setNotice({
+                tone: 'success',
+                text: 'Account deletion started — your content is being handled as you chose; the goodbye mail will confirm.',
+              });
+              onLogout();
+            }}
+          />
+        )}
+      </Stack>
     );
   }
 

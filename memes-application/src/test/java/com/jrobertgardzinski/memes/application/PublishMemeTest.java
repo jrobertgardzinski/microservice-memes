@@ -48,9 +48,8 @@ class PublishMemeTest {
             store.remove(memeId);
         }
 
-        public void anonymizeAuthor(String author, String replacement) {
-            store.replaceAll((id, m) -> m.author().equals(author)
-                    ? new Meme(m.id(), replacement, m.format(), m.data()) : m);
+        public void reassignAuthor(String memeId, String newAuthor) {
+            store.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
         }
     };
     private final MemeContentIndex contentIndex = new MemeContentIndex() {

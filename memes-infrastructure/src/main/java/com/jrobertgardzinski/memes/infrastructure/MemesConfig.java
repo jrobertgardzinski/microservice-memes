@@ -18,7 +18,7 @@ import com.jrobertgardzinski.memes.application.VoteOnComment;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.config.ContentPurgePolicy;
 import com.jrobertgardzinski.memes.config.ImageLimits;
-import com.jrobertgardzinski.memes.config.PurgeFate;
+import com.jrobertgardzinski.memes.config.PurgeRule;
 import com.jrobertgardzinski.memes.config.ThumbnailSize;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import org.springframework.beans.factory.annotation.Value;
@@ -93,9 +93,9 @@ class MemesConfig {
     }
 
     @Bean
-    ContentPurgePolicy contentPurgePolicy(@Value("${memes.purge.memes:DELETE}") PurgeFate memes,
-                                          @Value("${memes.purge.comments:ANONYMIZE_AUTHOR}") PurgeFate comments) {
-        return new ContentPurgePolicy(memes, comments);
+    ContentPurgePolicy contentPurgePolicy(@Value("${memes.purge.memes:DELETE}") String memes,
+                                          @Value("${memes.purge.comments:ANONYMIZE_AUTHOR}") String comments) {
+        return new ContentPurgePolicy(PurgeRule.parse(memes), PurgeRule.parse(comments));
     }
 
     @Bean

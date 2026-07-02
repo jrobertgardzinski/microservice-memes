@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.config.ContentPurgePolicy;
-import com.jrobertgardzinski.memes.config.PurgeFate;
+import com.jrobertgardzinski.memes.config.PurgeRule;
 import com.jrobertgardzinski.memes.domain.Comment;
 import com.jrobertgardzinski.memes.domain.DeletedAccount;
 import com.jrobertgardzinski.memes.domain.Meme;
@@ -52,9 +52,8 @@ class PurgeUserContentTest {
             memes.remove(memeId);
         }
 
-        public void anonymizeAuthor(String author, String replacement) {
-            memes.replaceAll((id, m) -> m.author().equals(author)
-                    ? new Meme(m.id(), replacement, m.format(), m.data()) : m);
+        public void reassignAuthor(String memeId, String newAuthor) {
+            memes.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
         }
     };
     private final CommentRepository commentRepository = new CommentRepository() {
@@ -78,13 +77,13 @@ class PurgeUserContentTest {
             return comments.stream().filter(c -> c.author().equals(author)).toList();
         }
 
-        public void deleteByAuthor(String author) {
-            comments.removeIf(c -> c.author().equals(author));
+        public void delete(String commentId) {
+            comments.removeIf(c -> c.id().equals(commentId));
         }
 
-        public void anonymizeAuthor(String author, String replacement) {
-            comments.replaceAll(c -> c.author().equals(author)
-                    ? new Comment(c.id(), c.memeId(), replacement, c.text()) : c);
+        public void reassignAuthor(String commentId, String newAuthor) {
+            comments.replaceAll(c -> c.id().equals(commentId)
+                    ? new Comment(c.id(), c.memeId(), newAuthor, c.text()) : c);
         }
     };
     private final VoteRepository voteRepository = new VoteRepository() {
@@ -159,9 +158,9 @@ class PurgeUserContentTest {
             memeRepository, commentRepository, voteRepository, commentVoteRepository, index,
             ContentPurgePolicy.defaults());
 
-    private PurgeUserContent purgeWith(PurgeFate memesFate, PurgeFate commentsFate) {
-        return new PurgeUserContent(memeRepository, commentRepository, voteRepository,
-                commentVoteRepository, index, new ContentPurgePolicy(memesFate, commentsFate));
+    private void purgeAs(PurgeRule memesRule, PurgeRule commentsRule) {
+        purge.execute("leaver@example.com",
+                Optional.of(new ContentPurgePolicy(memesRule, commentsRule)));
     }
 
     @Test
@@ -173,7 +172,7 @@ class PurgeUserContentTest {
         memeVotes.put("leavers-meme", new HashMap<>(Map.of("somebody-else@example.com", VoteDirection.UP)));
         commentVotes.put("c1", new HashMap<>(Map.of("third@example.com", VoteDirection.UP)));
 
-        purge.execute("leaver@example.com");
+        purge.execute("leaver@example.com", Optional.empty());
 
         assertTrue(memes.isEmpty());
         assertTrue(comments.isEmpty());
@@ -188,7 +187,7 @@ class PurgeUserContentTest {
         memes.put("other", new Meme("other", "someone@example.com", "png", new byte[]{2}));
         comments.add(new Comment("c2", "other", "leaver@example.com", "Lorem ipsum"));
 
-        purge.execute("leaver@example.com");
+        purge.execute("leaver@example.com", Optional.empty());
 
         assertEquals(1, comments.size());
         assertEquals(DeletedAccount.AUTHOR, comments.get(0).author());
@@ -202,7 +201,7 @@ class PurgeUserContentTest {
         memes.put("leavers-meme", new Meme("leavers-meme", "leaver@example.com", "png", new byte[]{1}));
         comments.add(new Comment("c1", "leavers-meme", "somebody-else@example.com", "nice"));
 
-        purgeWith(PurgeFate.ANONYMIZE_AUTHOR, PurgeFate.ANONYMIZE_AUTHOR).execute("leaver@example.com");
+        purgeAs(new PurgeRule.AnonymizeAuthor(), new PurgeRule.AnonymizeAuthor());
 
         assertEquals(DeletedAccount.AUTHOR, memes.get("leavers-meme").author());
         assertEquals(1, comments.size()); // the thread survives with the meme
@@ -215,10 +214,31 @@ class PurgeUserContentTest {
         comments.add(new Comment("c2", "other", "leaver@example.com", "Lorem ipsum"));
         commentVotes.put("c2", new HashMap<>(Map.of("third@example.com", VoteDirection.UP)));
 
-        purgeWith(PurgeFate.DELETE, PurgeFate.DELETE).execute("leaver@example.com");
+        purgeAs(new PurgeRule.Delete(), new PurgeRule.Delete());
 
         assertTrue(comments.isEmpty());
         assertTrue(commentVotes.isEmpty()); // votes on the removed comment go with it
+    }
+
+    @Test
+    @DisplayName("KEEP_POPULAR: the community's favourites survive anonymised, the rest goes")
+    void popularity_decides_per_item() {
+        memes.put("hit", new Meme("hit", "leaver@example.com", "png", new byte[]{1}));
+        memes.put("flop", new Meme("flop", "leaver@example.com", "png", new byte[]{2}));
+        memeVotes.put("hit", new HashMap<>(Map.of(
+                "a@example.com", VoteDirection.UP, "b@example.com", VoteDirection.UP)));
+        memes.put("other", new Meme("other", "someone@example.com", "png", new byte[]{3}));
+        comments.add(new Comment("praised", "other", "leaver@example.com", "keeper"));
+        comments.add(new Comment("ignored", "other", "leaver@example.com", "goner"));
+        commentVotes.put("praised", new HashMap<>(Map.of("a@example.com", VoteDirection.UP)));
+
+        purgeAs(new PurgeRule.KeepPopularAnonymized(2), new PurgeRule.KeepPopularAnonymized(1));
+
+        assertEquals(DeletedAccount.AUTHOR, memes.get("hit").author()); // 2 up-votes >= 2: stays
+        assertTrue(!memes.containsKey("flop"));                         // 0 votes: gone
+        assertEquals(1, comments.stream().filter(c -> c.memeId().equals("other")).count());
+        assertEquals("keeper", comments.get(0).text());
+        assertEquals(DeletedAccount.AUTHOR, comments.get(0).author());
     }
 
     @Test
@@ -229,7 +249,7 @@ class PurgeUserContentTest {
                 "leaver@example.com", VoteDirection.UP, "stays@example.com", VoteDirection.UP)));
         commentVotes.put("c3", new HashMap<>(Map.of("leaver@example.com", VoteDirection.DOWN)));
 
-        purge.execute("leaver@example.com");
+        purge.execute("leaver@example.com", Optional.empty());
 
         assertEquals(Map.of("stays@example.com", VoteDirection.UP), memeVotes.get("other"));
         assertTrue(commentVotes.get("c3").isEmpty());

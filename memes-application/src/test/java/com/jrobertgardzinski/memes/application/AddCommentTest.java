@@ -44,9 +44,8 @@ class AddCommentTest {
             memes.remove(memeId);
         }
 
-        public void anonymizeAuthor(String author, String replacement) {
-            memes.replaceAll((id, m) -> m.author().equals(author)
-                    ? new Meme(m.id(), replacement, m.format(), m.data()) : m);
+        public void reassignAuthor(String memeId, String newAuthor) {
+            memes.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
         }
     };
     private final CommentRepository commentRepository = new CommentRepository() {
@@ -70,13 +69,13 @@ class AddCommentTest {
             return comments.stream().filter(c -> c.author().equals(author)).toList();
         }
 
-        public void deleteByAuthor(String author) {
-            comments.removeIf(c -> c.author().equals(author));
+        public void delete(String commentId) {
+            comments.removeIf(c -> c.id().equals(commentId));
         }
 
-        public void anonymizeAuthor(String author, String replacement) {
-            comments.replaceAll(c -> c.author().equals(author)
-                    ? new Comment(c.id(), c.memeId(), replacement, c.text()) : c);
+        public void reassignAuthor(String commentId, String newAuthor) {
+            comments.replaceAll(c -> c.id().equals(commentId)
+                    ? new Comment(c.id(), c.memeId(), newAuthor, c.text()) : c);
         }
     };
     private final AddComment addComment = new AddComment(memeRepository, commentRepository);

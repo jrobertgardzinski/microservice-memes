@@ -1,16 +1,19 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.config.ContentPurgePolicy;
-import com.jrobertgardzinski.memes.config.PurgeFate;
 import com.jrobertgardzinski.memes.domain.Comment;
 import com.jrobertgardzinski.memes.domain.DeletedAccount;
 
+import java.util.Optional;
+
 /**
- * The meme service's part of an account deletion (GDPR) — a configurable saga step, driven by
- * {@link ContentPurgePolicy}: the leaver's memes are deleted with their whole comment threads OR
- * kept with the author anonymised; the leaver's comments are deleted OR kept anonymised (the
- * default: memes go, comment texts stay as "deleted account"). Votes the leaver cast are always
- * retracted — they are keyed by identity. Idempotent: the saga may deliver the command twice.
+ * The meme service's part of an account deletion (GDPR) — a configurable saga step. The
+ * {@link ContentPurgePolicy} (the deployment default, or the leaver's own choice carried with the
+ * saga command) decides each item's fate: delete it, keep it anonymised, or keep it only when the
+ * community rated it highly enough ({@code KEEP_POPULAR_ANONYMIZED}). A meme that goes takes its
+ * whole comment thread, votes and dedup-index entry along; a kept one stays authored by
+ * "deleted account". Votes the leaver cast are always retracted. Idempotent — the saga may
+ * deliver the command twice.
  */
 public class PurgeUserContent {
 
@@ -19,50 +22,47 @@ public class PurgeUserContent {
     private final VoteRepository voteRepository;
     private final CommentVoteRepository commentVoteRepository;
     private final MemeContentIndex contentIndex;
-    private final ContentPurgePolicy policy;
+    private final ContentPurgePolicy defaultPolicy;
 
     public PurgeUserContent(MemeRepository memeRepository, CommentRepository commentRepository,
                             VoteRepository voteRepository, CommentVoteRepository commentVoteRepository,
-                            MemeContentIndex contentIndex, ContentPurgePolicy policy) {
+                            MemeContentIndex contentIndex, ContentPurgePolicy defaultPolicy) {
         this.memeRepository = memeRepository;
         this.commentRepository = commentRepository;
         this.voteRepository = voteRepository;
         this.commentVoteRepository = commentVoteRepository;
         this.contentIndex = contentIndex;
-        this.policy = policy;
+        this.defaultPolicy = defaultPolicy;
     }
 
-    public void execute(String author) {
-        if (policy.memes() == PurgeFate.DELETE) {
-            deleteMemesWithTheirThreads(author);
-        } else {
-            memeRepository.anonymizeAuthor(author, DeletedAccount.AUTHOR);
+    public void execute(String author, Optional<ContentPurgePolicy> requested) {
+        ContentPurgePolicy policy = requested.orElse(defaultPolicy);
+        for (String memeId : memeRepository.findIdsByAuthor(author)) {
+            if (policy.memes().keeps(voteRepository.scoreOf(memeId))) {
+                memeRepository.reassignAuthor(memeId, DeletedAccount.AUTHOR);
+            } else {
+                deleteMemeWithItsThread(memeId);
+            }
         }
-        if (policy.comments() == PurgeFate.DELETE) {
-            deleteCommentsEverywhere(author);
-        } else {
-            commentRepository.anonymizeAuthor(author, DeletedAccount.AUTHOR);
+        for (Comment comment : commentRepository.findByAuthor(author)) {
+            if (policy.comments().keeps(commentVoteRepository.scoreOf(comment.id()))) {
+                commentRepository.reassignAuthor(comment.id(), DeletedAccount.AUTHOR);
+            } else {
+                commentVoteRepository.purgeComment(comment.id());
+                commentRepository.delete(comment.id());
+            }
         }
         voteRepository.purgeVoter(author);
         commentVoteRepository.purgeVoter(author);
     }
 
-    private void deleteMemesWithTheirThreads(String author) {
-        for (String memeId : memeRepository.findIdsByAuthor(author)) {
-            for (Comment comment : commentRepository.findByMeme(memeId)) {
-                commentVoteRepository.purgeComment(comment.id());
-            }
-            commentRepository.deleteByMeme(memeId);
-            voteRepository.purgeMeme(memeId);
-            contentIndex.remove(memeId);
-            memeRepository.deleteById(memeId);
-        }
-    }
-
-    private void deleteCommentsEverywhere(String author) {
-        for (Comment comment : commentRepository.findByAuthor(author)) {
+    private void deleteMemeWithItsThread(String memeId) {
+        for (Comment comment : commentRepository.findByMeme(memeId)) {
             commentVoteRepository.purgeComment(comment.id());
         }
-        commentRepository.deleteByAuthor(author);
+        commentRepository.deleteByMeme(memeId);
+        voteRepository.purgeMeme(memeId);
+        contentIndex.remove(memeId);
+        memeRepository.deleteById(memeId);
     }
 }

@@ -36,15 +36,20 @@ comment's author — the request body cannot impersonate anyone. Anonymous write
 
 ## Account deletion (the saga's memes side)
 
-`PURGE_USER_CONTENT` commands arrive over Kafka and the outcome is **deployment policy**
-(`PURGE_MEMES_POLICY` / `PURGE_COMMENTS_POLICY`, each `DELETE` or `ANONYMIZE_AUTHOR`):
+`PURGE_USER_CONTENT` commands arrive over Kafka. What happens to the leaver's content is a
+**rule per axis** (their memes / their comments), decided in two places: the deployment default
+(`PURGE_MEMES_POLICY` / `PURGE_COMMENTS_POLICY`) and — taking precedence — **the leaver's own
+choice from the deletion wizard**, carried inside the saga command:
 
-| axis | `DELETE` | `ANONYMIZE_AUTHOR` |
-|------|----------|--------------------|
-| memes (default: `DELETE`) | the leaver's memes disappear with their whole comment threads and votes | memes stay, authored by "deleted account" |
-| comments (default: `ANONYMIZE_AUTHOR`) | the leaver's comments disappear everywhere | texts stay, signed "deleted account" |
+| rule | effect |
+|------|--------|
+| `DELETE` | the content disappears (a meme takes its whole comment thread and votes along) |
+| `ANONYMIZE_AUTHOR` | the content stays, authored by "deleted account" |
+| `KEEP_POPULAR_ANONYMIZED:<n>` | items with score ≥ n survive anonymised (the community earned them); the rest is deleted |
 
-Votes the leaver cast are always retracted — they are keyed by identity, no policy keeps them.
+Defaults: memes `DELETE`, comments `ANONYMIZE_AUTHOR`. Votes the leaver cast are always
+retracted — identity-keyed data has no policy escape hatch. Unparseable rules in a command fall
+back to the defaults (logged), never wedging the saga.
 
 ## Contract
 

@@ -27,7 +27,8 @@ Only open items. History = git log.
   `PURGE_MEMES_POLICY`/`PURGE_COMMENTS_POLICY`, osie DELETE|ANONYMIZE_AUTHOR). Domyślnie: memy
   znikają z całymi wątkami i głosami, komentarze gdzie indziej zostają jako „deleted account";
   głosy usera wycofywane zawsze. Potwierdzenie na `memes-events`. Memy mają autora (tożsamość
-  z security przy uploadzie).
+  z security przy uploadzie). Reguły per oś: DELETE | ANONYMIZE_AUTHOR |
+  KEEP_POPULAR_ANONYMIZED:n; wybór usera z wizarda w UI nadpisuje default per żądanie.
 
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - **Tagi + wyszukiwanie** — moduł `memes-tags`.
@@ -40,6 +41,8 @@ Only open items. History = git log.
   ale do domknięcia przy realnej persystencji).
 
 ## Otwarte — infra
+- **Default polityki czystki z bazy** — dziś default z env; docelowo nadpisywalny w bazie
+  (panel administracyjny), wybór per żądanie już działa.
 - **Realna persystencja** — bajty do object storage (S3/MinIO), metadane do bazy (JPA + Postgres).
 - **WebP** zamiast PNG dla mniejszych plików (wymaga enkodera spoza JDK, np. imageio-webp / libwebp).
 - **Dokumentacja jak w security** — glosariusz już skanuje domain/application/infrastructure warstwy;
