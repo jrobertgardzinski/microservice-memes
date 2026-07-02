@@ -10,6 +10,7 @@ import com.jrobertgardzinski.memes.application.MakeThumbnail;
 import com.jrobertgardzinski.memes.application.MemeContentIndex;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
+import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
@@ -87,6 +88,14 @@ class MemesConfig {
     @Bean
     ShowMemeVote showMemeVote(MemeRepository memeRepository, VoteRepository voteRepository) {
         return new ShowMemeVote(memeRepository, voteRepository);
+    }
+
+    @Bean
+    PurgeUserContent purgeUserContent(MemeRepository memeRepository, CommentRepository commentRepository,
+                                      VoteRepository voteRepository, CommentVoteRepository commentVoteRepository,
+                                      MemeContentIndex contentIndex) {
+        return new PurgeUserContent(memeRepository, commentRepository, voteRepository,
+                commentVoteRepository, contentIndex);
     }
 
     @Bean

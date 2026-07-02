@@ -35,6 +35,15 @@ class VoteOnCommentTest {
         public Optional<Comment> find(String commentId) {
             return comments.stream().filter(c -> c.id().equals(commentId)).findFirst();
         }
+
+        public void deleteByMeme(String memeId) {
+            comments.removeIf(c -> c.memeId().equals(memeId));
+        }
+
+        public void anonymizeAuthor(String author, String replacement) {
+            comments.replaceAll(c -> c.author().equals(author)
+                    ? new Comment(c.id(), c.memeId(), replacement, c.text()) : c);
+        }
     };
     private final CommentVoteRepository commentVoteRepository = new CommentVoteRepository() {
         public void castVote(String commentId, String voter, VoteDirection direction) {
@@ -52,6 +61,14 @@ class VoteOnCommentTest {
         public int scoreOf(String commentId) {
             return votes.getOrDefault(commentId, Map.of()).values().stream()
                     .mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
+        }
+
+        public void purgeComment(String commentId) {
+            votes.remove(commentId);
+        }
+
+        public void purgeVoter(String voter) {
+            votes.values().forEach(v -> v.remove(voter));
         }
     };
     private final VoteOnComment voteOnComment = new VoteOnComment(commentRepository, commentVoteRepository);

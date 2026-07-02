@@ -17,4 +17,8 @@ public interface CommentVoteRepository {
     Optional<VoteDirection> voteOf(String commentId, String voter);
 
     int scoreOf(String commentId);
+
+    void purgeComment(String commentId);
+
+    void purgeVoter(String voter);
 }

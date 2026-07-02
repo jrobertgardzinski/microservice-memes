@@ -22,6 +22,11 @@ Only open items. History = git log.
   kumuluje się; **głosowanie na komentarze** (`POST .../comments/{id}/votes`), listing komentarzy
   niesie score.
 
+- **Saga usuwania konta** — `PurgeUserContent` na komendę `PURGE_USER_CONTENT` z Kafki
+  (memy usera znikają z całymi wątkami komentarzy i głosami; jego komentarze gdzie indziej
+  zostają jako „deleted account"; wszystkie jego głosy wycofane); potwierdzenie na
+  `memes-events`. Memy mają od teraz autora (tożsamość z security przy uploadzie).
+
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - **Tagi + wyszukiwanie** — moduł `memes-tags`.
 - Ranking "hot" z czasem (Reddit-like decay) zamiast czystego score.

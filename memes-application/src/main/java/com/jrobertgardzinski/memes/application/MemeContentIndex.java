@@ -11,4 +11,7 @@ public interface MemeContentIndex {
     Optional<String> findIdByContent(byte[] data);
 
     void index(byte[] data, String memeId);
+
+    /** Forget a deleted meme, so re-uploading identical content is not deduplicated into a ghost. */
+    void remove(String memeId);
 }

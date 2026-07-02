@@ -34,4 +34,14 @@ class InMemoryCommentVoteRepository implements CommentVoteRepository {
         return votesByComment.getOrDefault(commentId, Map.of()).values().stream()
                 .mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
     }
+
+    @Override
+    public void purgeComment(String commentId) {
+        votesByComment.remove(commentId);
+    }
+
+    @Override
+    public void purgeVoter(String voter) {
+        votesByComment.values().forEach(votes -> votes.remove(voter));
+    }
 }

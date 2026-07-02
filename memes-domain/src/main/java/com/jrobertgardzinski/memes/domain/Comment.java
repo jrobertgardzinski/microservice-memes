@@ -7,6 +7,9 @@ package com.jrobertgardzinski.memes.domain;
  */
 public record Comment(String id, String memeId, String author, String text) {
 
+    /** The author shown once the writer's account is gone — the text stays, the identity does not. */
+    public static final String DELETED_ACCOUNT_AUTHOR = "deleted account";
+
     public Comment {
         if (author.isBlank()) {
             throw new IllegalArgumentException("author must not be blank");

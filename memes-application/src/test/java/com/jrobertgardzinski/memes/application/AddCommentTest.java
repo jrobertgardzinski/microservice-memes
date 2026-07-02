@@ -35,6 +35,14 @@ class AddCommentTest {
         public List<String> allIds() {
             return List.copyOf(memes.keySet());
         }
+
+        public List<String> findIdsByAuthor(String author) {
+            return memes.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
+        }
+
+        public void deleteById(String memeId) {
+            memes.remove(memeId);
+        }
     };
     private final CommentRepository commentRepository = new CommentRepository() {
         public void save(Comment comment) {
@@ -48,13 +56,22 @@ class AddCommentTest {
         public Optional<Comment> find(String commentId) {
             return comments.stream().filter(c -> c.id().equals(commentId)).findFirst();
         }
+
+        public void deleteByMeme(String memeId) {
+            comments.removeIf(c -> c.memeId().equals(memeId));
+        }
+
+        public void anonymizeAuthor(String author, String replacement) {
+            comments.replaceAll(c -> c.author().equals(author)
+                    ? new Comment(c.id(), c.memeId(), replacement, c.text()) : c);
+        }
     };
     private final AddComment addComment = new AddComment(memeRepository, commentRepository);
 
     @Test
     @DisplayName("adds a comment to an existing meme")
     void adds_a_comment() {
-        memes.put("m1", new Meme("m1", "png", new byte[]{1}));
+        memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
 
         Optional<Comment> added = addComment.execute("m1", "alice", "great meme");
 

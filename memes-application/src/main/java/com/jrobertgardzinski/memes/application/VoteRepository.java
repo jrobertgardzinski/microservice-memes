@@ -22,4 +22,8 @@ public interface VoteRepository {
 
     /** Every meme that has received a vote, with its current score (unordered). */
     List<RankedMeme> allScores();
+
+    void purgeMeme(String memeId);
+
+    void purgeVoter(String voter);
 }

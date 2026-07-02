@@ -36,6 +36,12 @@ class RankMemesTest {
             public List<RankedMeme> allScores() {
                 return List.of(new RankedMeme("low", 1), new RankedMeme("high", 5), new RankedMeme("mid", 3));
             }
+
+            public void purgeMeme(String memeId) {
+            }
+
+            public void purgeVoter(String voter) {
+            }
         };
 
         List<RankedMeme> ranked = new RankMemes(voteRepository).execute();

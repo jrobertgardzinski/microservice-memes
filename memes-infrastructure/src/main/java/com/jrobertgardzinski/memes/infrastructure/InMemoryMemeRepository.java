@@ -35,4 +35,18 @@ class InMemoryMemeRepository implements MemeRepository {
     public List<String> allIds() {
         return List.copyOf(insertionOrder.reversed());
     }
+
+    @Override
+    public List<String> findIdsByAuthor(String author) {
+        return byId.values().stream()
+                .filter(meme -> meme.author().equals(author))
+                .map(Meme::id)
+                .toList();
+    }
+
+    @Override
+    public void deleteById(String memeId) {
+        byId.remove(memeId);
+        insertionOrder.remove(memeId);
+    }
 }

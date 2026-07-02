@@ -39,6 +39,14 @@ class PublishMemeTest {
         public List<String> allIds() {
             return List.copyOf(store.keySet());
         }
+
+        public List<String> findIdsByAuthor(String author) {
+            return store.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
+        }
+
+        public void deleteById(String memeId) {
+            store.remove(memeId);
+        }
     };
     private final MemeContentIndex contentIndex = new MemeContentIndex() {
         public Optional<String> findIdByContent(byte[] data) {
@@ -47,6 +55,10 @@ class PublishMemeTest {
 
         public void index(byte[] data, String memeId) {
             idByContent.put(key(data), memeId);
+        }
+
+        public void remove(String memeId) {
+            idByContent.values().removeIf(memeId::equals);
         }
 
         private String key(byte[] data) {
@@ -59,7 +71,7 @@ class PublishMemeTest {
     @Test
     @DisplayName("publishes an optimized meme")
     void publishes_an_optimized_meme() throws Exception {
-        String id = publishMeme.execute(bmp());
+        String id = publishMeme.execute(bmp(), "alice@example.com");
 
         Meme stored = store.get(id);
         assertEquals("png", stored.format());
@@ -72,8 +84,8 @@ class PublishMemeTest {
     void deduplicates_identical_uploads() throws Exception {
         byte[] image = bmp();
 
-        String first = publishMeme.execute(image);
-        String second = publishMeme.execute(image);
+        String first = publishMeme.execute(image, "alice@example.com");
+        String second = publishMeme.execute(image, "alice@example.com");
 
         assertEquals(first, second);
         assertEquals(1, store.size());

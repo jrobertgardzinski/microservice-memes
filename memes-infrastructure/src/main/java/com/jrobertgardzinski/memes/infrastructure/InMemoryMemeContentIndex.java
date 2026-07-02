@@ -26,6 +26,11 @@ class InMemoryMemeContentIndex implements MemeContentIndex {
         idByHash.put(sha256(data), memeId);
     }
 
+    @Override
+    public void remove(String memeId) {
+        idByHash.values().removeIf(memeId::equals);
+    }
+
     private static String sha256(byte[] data) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));

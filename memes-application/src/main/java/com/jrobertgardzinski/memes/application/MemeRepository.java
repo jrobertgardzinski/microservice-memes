@@ -17,4 +17,8 @@ public interface MemeRepository {
 
     /** Ids of every stored meme, newest first. */
     List<String> allIds();
+
+    List<String> findIdsByAuthor(String author);
+
+    void deleteById(String memeId);
 }

@@ -22,6 +22,11 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
+            <!-- account-deletion saga: consumes purge commands, confirms on memes-events -->
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
             <!-- the built React UI, packed as META-INF/resources — Spring serves it at / -->
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-ui</artifactId>

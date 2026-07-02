@@ -35,6 +35,14 @@ class CastVoteTest {
         public List<String> allIds() {
             return List.copyOf(memes.keySet());
         }
+
+        public List<String> findIdsByAuthor(String author) {
+            return memes.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
+        }
+
+        public void deleteById(String memeId) {
+            memes.remove(memeId);
+        }
     };
     private final VoteRepository voteRepository = new VoteRepository() {
         public void castVote(String memeId, String voter, VoteDirection direction) {
@@ -57,13 +65,21 @@ class CastVoteTest {
         public List<RankedMeme> allScores() {
             return votes.keySet().stream().map(id -> new RankedMeme(id, scoreOf(id))).toList();
         }
+
+        public void purgeMeme(String memeId) {
+            votes.remove(memeId);
+        }
+
+        public void purgeVoter(String voter) {
+            votes.values().forEach(v -> v.remove(voter));
+        }
     };
     private final CastVote castVote = new CastVote(memeRepository, voteRepository);
 
     @Test
     @DisplayName("distinct voters raise the score; the opposite direction switches a voter's mind")
     void distinct_voters_raise_the_score() {
-        memes.put("m1", new Meme("m1", "png", new byte[]{1}));
+        memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
 
         assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
         assertEquals(tally(2, VoteDirection.UP), castVote.execute("m1", "bob", VoteDirection.UP));
@@ -73,7 +89,7 @@ class CastVoteTest {
     @Test
     @DisplayName("repeating the same vote retracts it (a toggle, never stacking)")
     void repeating_the_same_vote_retracts_it() {
-        memes.put("m1", new Meme("m1", "png", new byte[]{1}));
+        memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
 
         assertEquals(tally(1, VoteDirection.UP), castVote.execute("m1", "alice", VoteDirection.UP));
         assertEquals(Optional.of(new VoteTally(0, Optional.empty())),

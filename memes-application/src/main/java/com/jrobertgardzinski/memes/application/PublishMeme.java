@@ -24,13 +24,13 @@ public class PublishMeme {
         this.contentIndex = contentIndex;
     }
 
-    public String execute(byte[] rawImage) {
+    public String execute(byte[] rawImage, String author) {
         OptimizedImage optimized = optimizer.optimize(rawImage);
         Optional<String> existing = contentIndex.findIdByContent(optimized.data());
         if (existing.isPresent()) {
             return existing.get();
         }
-        Meme meme = new Meme(UUID.randomUUID().toString(), optimized.format(), optimized.data());
+        Meme meme = new Meme(UUID.randomUUID().toString(), author, optimized.format(), optimized.data());
         repository.save(meme);
         contentIndex.index(optimized.data(), meme.id());
         return meme.id();

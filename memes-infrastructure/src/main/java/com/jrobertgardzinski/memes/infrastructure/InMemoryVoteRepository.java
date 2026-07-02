@@ -43,6 +43,16 @@ class InMemoryVoteRepository implements VoteRepository {
                 .toList();
     }
 
+    @Override
+    public void purgeMeme(String memeId) {
+        votesByMeme.remove(memeId);
+    }
+
+    @Override
+    public void purgeVoter(String voter) {
+        votesByMeme.values().forEach(votes -> votes.remove(voter));
+    }
+
     private static int score(Map<String, VoteDirection> votes) {
         return votes.values().stream().mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
     }

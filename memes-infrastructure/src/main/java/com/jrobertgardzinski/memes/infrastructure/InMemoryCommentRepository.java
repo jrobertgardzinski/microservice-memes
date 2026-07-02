@@ -28,4 +28,16 @@ class InMemoryCommentRepository implements CommentRepository {
     public Optional<Comment> find(String commentId) {
         return comments.stream().filter(comment -> comment.id().equals(commentId)).findFirst();
     }
+
+    @Override
+    public void deleteByMeme(String memeId) {
+        comments.removeIf(comment -> comment.memeId().equals(memeId));
+    }
+
+    @Override
+    public void anonymizeAuthor(String author, String replacement) {
+        comments.replaceAll(comment -> comment.author().equals(author)
+                ? new Comment(comment.id(), comment.memeId(), replacement, comment.text())
+                : comment);
+    }
 }

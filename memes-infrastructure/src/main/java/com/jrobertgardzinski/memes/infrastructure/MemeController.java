@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,8 +42,10 @@ class MemeController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws IOException {
-        String id = publishMeme.execute(file.getBytes());
+    ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file,
+                                               @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER)
+                                               String uploader) throws IOException {
+        String id = publishMeme.execute(file.getBytes(), uploader);
         return ResponseEntity.created(URI.create("/memes/" + id)).body(Map.of("id", id));
     }
 

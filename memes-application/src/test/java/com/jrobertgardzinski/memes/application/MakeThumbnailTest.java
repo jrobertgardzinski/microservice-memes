@@ -38,6 +38,14 @@ class MakeThumbnailTest {
         public List<String> allIds() {
             return List.copyOf(memes.keySet());
         }
+
+        public List<String> findIdsByAuthor(String author) {
+            return memes.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
+        }
+
+        public void deleteById(String memeId) {
+            memes.remove(memeId);
+        }
     };
     private final MakeThumbnail makeThumbnail = new MakeThumbnail(
             memeRepository, new WebImageOptimizer(new ImageLimits(4096)), new ThumbnailSize(64));
@@ -45,7 +53,7 @@ class MakeThumbnailTest {
     @Test
     @DisplayName("makes a small PNG thumbnail of a stored meme")
     void makes_a_thumbnail() throws Exception {
-        memes.put("m1", new Meme("m1", "png", png(400, 200)));
+        memes.put("m1", new Meme("m1", "alice@example.com", "png", png(400, 200)));
 
         Optional<byte[]> thumb = makeThumbnail.execute("m1");
 

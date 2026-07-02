@@ -15,4 +15,9 @@ public interface CommentRepository {
     List<Comment> findByMeme(String memeId);
 
     Optional<Comment> find(String commentId);
+
+    void deleteByMeme(String memeId);
+
+    /** Replace this author's name on every comment (account deletion keeps texts, drops identity). */
+    void anonymizeAuthor(String author, String replacement);
 }
