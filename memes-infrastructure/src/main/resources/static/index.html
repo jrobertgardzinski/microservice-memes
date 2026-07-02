@@ -53,12 +53,21 @@ function AuthPanel({ token, user, onToken, onLogout }) {
   const [verifyToken, setVerifyToken] = useState('');
   const [msg, setMsg] = useState('');
 
+  // the verification link in the mail points here (?verify=<token>); confirm it on arrival
+  useEffect(() => {
+    const mailedToken = new URLSearchParams(location.search).get('verify');
+    if (!mailedToken) return;
+    history.replaceState(null, '', location.pathname);
+    fetch(SECURITY + '/verify-email', { method: 'POST', headers: json, body: JSON.stringify({ token: mailedToken }) })
+      .then(r => setMsg(r.ok ? 'E-mail verified — sign in below.' : 'Verification link rejected (already used?).'));
+  }, []);
+
   if (token) return html`<div class="who">${user || '...'} <button class="ghost" onClick=${onLogout}>sign out</button></div>`;
 
   const register = async () => {
     const r = await fetch(SECURITY + '/register', { method: 'POST', headers: json, body: JSON.stringify({ email, password }) });
     setMsg(r.status === 201
-      ? 'Registered! A verification link landed in the inbox (Mailpit → http://localhost:8025). Paste the token from it below.'
+      ? 'Registered! Now click the verification link in the inbox (Mailpit → http://localhost:8025) — it brings you back here.'
       : 'Registration refused (' + r.status + ') — taken email or weak password.');
   };
   const verify = async () => {
@@ -77,7 +86,7 @@ function AuthPanel({ token, user, onToken, onLogout }) {
       <input placeholder="password" type="password" value=${password} onInput=${e => setPassword(e.target.value)} />
       <button onClick=${login}>Sign in</button>
       <button class="ghost" onClick=${register}>Sign up</button>
-      <input placeholder="verification token (from the mail)" value=${verifyToken} onInput=${e => setVerifyToken(e.target.value)} />
+      <input placeholder="verification token (fallback: paste from the mail)" value=${verifyToken} onInput=${e => setVerifyToken(e.target.value)} />
       <button class="ghost" onClick=${verify}>Verify</button>
     </form>
     ${msg && html`<div class="msg">${msg}</div>`}
