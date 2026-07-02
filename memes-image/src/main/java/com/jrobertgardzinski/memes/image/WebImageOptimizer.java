@@ -13,8 +13,8 @@ import java.io.UncheckedIOException;
 
 /**
  * Re-encodes any image ImageIO can read (BMP, JPEG, GIF, …) into a browser-friendly PNG, scaling it
- * down so its longest side fits the configured {@link ImageLimits}. PNG re-encoding also drops
- * non-pixel metadata such as EXIF. Heavier optimisation (WebP) can grow here later.
+ * down so its longest side fits a maximum dimension. PNG re-encoding also drops non-pixel metadata
+ * such as EXIF. Heavier optimisation (WebP) can grow here later.
  */
 public class WebImageOptimizer {
 
@@ -26,13 +26,19 @@ public class WebImageOptimizer {
         this.limits = limits;
     }
 
+    /** Optimise to a stored meme, bounded by the configured {@link ImageLimits}. */
     public OptimizedImage optimize(byte[] input) {
+        return toPngWithin(input, limits.maxDimension());
+    }
+
+    /** Re-encode to a PNG whose longest side is at most {@code maxDimension} (used for thumbnails too). */
+    public OptimizedImage toPngWithin(byte[] input, int maxDimension) {
         try {
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(input));
             if (image == null) {
                 throw new IllegalArgumentException("unsupported or unreadable image");
             }
-            BufferedImage bounded = downscaleWithinLimits(image);
+            BufferedImage bounded = downscaleWithin(image, maxDimension);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             if (!ImageIO.write(bounded, TARGET_FORMAT, out)) {
                 throw new IllegalStateException("no writer for " + TARGET_FORMAT);
@@ -43,12 +49,12 @@ public class WebImageOptimizer {
         }
     }
 
-    private BufferedImage downscaleWithinLimits(BufferedImage image) {
+    private static BufferedImage downscaleWithin(BufferedImage image, int maxDimension) {
         int longestSide = Math.max(image.getWidth(), image.getHeight());
-        if (longestSide <= limits.maxDimension()) {
+        if (longestSide <= maxDimension) {
             return image;
         }
-        double scale = (double) limits.maxDimension() / longestSide;
+        double scale = (double) maxDimension / longestSide;
         int width = Math.max(1, (int) Math.round(image.getWidth() * scale));
         int height = Math.max(1, (int) Math.round(image.getHeight() * scale));
         BufferedImage scaled = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);

@@ -31,13 +31,21 @@ public class UploadMemeSteps {
         uploadResponse = RestAssured.given().port(port)
                 .multiPart("file", "meme.bmp", bmp(), "image/bmp")
                 .post("/memes");
+        memeId = uploadResponse.jsonPath().getString("id");
     }
 
     @Then("the meme is stored")
     public void the_meme_is_stored() {
         assertEquals(201, uploadResponse.statusCode());
-        memeId = uploadResponse.jsonPath().getString("id");
         assertNotNull(memeId, "no meme id returned");
+    }
+
+    @Then("fetching its thumbnail returns a PNG")
+    public void fetching_its_thumbnail_returns_a_png() {
+        Response thumbnail = RestAssured.given().port(port).get("/memes/" + memeId + "/thumbnail");
+        assertEquals(200, thumbnail.statusCode());
+        assertEquals("image/png", thumbnail.contentType());
+        assertEquals((byte) 0x89, thumbnail.getBody().asByteArray()[0]); // PNG magic
     }
 
     @And("fetching it returns a PNG")

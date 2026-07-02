@@ -4,6 +4,7 @@ import com.jrobertgardzinski.memes.application.AddComment;
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.CommentRepository;
 import com.jrobertgardzinski.memes.application.ListComments;
+import com.jrobertgardzinski.memes.application.MakeThumbnail;
 import com.jrobertgardzinski.memes.application.MemeContentIndex;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PublishMeme;
@@ -11,6 +12,7 @@ import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.ViewMeme;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.config.ImageLimits;
+import com.jrobertgardzinski.memes.config.ThumbnailSize;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -31,6 +33,16 @@ class MemesConfig {
     @Bean
     WebImageOptimizer webImageOptimizer(ImageLimits imageLimits) {
         return new WebImageOptimizer(imageLimits);
+    }
+
+    @Bean
+    ThumbnailSize thumbnailSize(@Value("${memes.image.thumbnail-max-dimension:256}") int maxDimension) {
+        return new ThumbnailSize(maxDimension);
+    }
+
+    @Bean
+    MakeThumbnail makeThumbnail(MemeRepository repository, WebImageOptimizer optimizer, ThumbnailSize thumbnailSize) {
+        return new MakeThumbnail(repository, optimizer, thumbnailSize);
     }
 
     @Bean

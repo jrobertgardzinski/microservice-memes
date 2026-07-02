@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.memes.application.MakeThumbnail;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.ViewMeme;
 import org.springframework.http.MediaType;
@@ -26,10 +27,12 @@ class MemeController {
 
     private final PublishMeme publishMeme;
     private final ViewMeme viewMeme;
+    private final MakeThumbnail makeThumbnail;
 
-    MemeController(PublishMeme publishMeme, ViewMeme viewMeme) {
+    MemeController(PublishMeme publishMeme, ViewMeme viewMeme, MakeThumbnail makeThumbnail) {
         this.publishMeme = publishMeme;
         this.viewMeme = viewMeme;
+        this.makeThumbnail = makeThumbnail;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -42,6 +45,13 @@ class MemeController {
     ResponseEntity<byte[]> view(@PathVariable("id") String id) {
         return viewMeme.execute(id)
                 .map(meme -> ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(meme.data()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/thumbnail")
+    ResponseEntity<byte[]> thumbnail(@PathVariable("id") String id) {
+        return makeThumbnail.execute(id)
+                .map(bytes -> ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(bytes))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

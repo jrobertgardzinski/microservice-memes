@@ -6,3 +6,7 @@ Feature: Uploading a meme
     When a user uploads a BMP image
     Then the meme is stored
     And fetching it returns a PNG
+
+  Scenario: fetch a meme's thumbnail
+    When a user uploads a BMP image
+    Then fetching its thumbnail returns a PNG
