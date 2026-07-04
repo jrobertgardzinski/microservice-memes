@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Feature("Publish meme")
 class PublishMemeTest {
 
-    private final Map<String, Meme> store = new HashMap<>();
-    private final Map<String, String> idByContent = new HashMap<>();
+    private final Map<String, Meme> store = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, String> idByContent = new java.util.concurrent.ConcurrentHashMap<>();
 
     private final MemeRepository repository = new MemeRepository() {
         public void save(Meme meme) {
@@ -53,12 +53,9 @@ class PublishMemeTest {
         }
     };
     private final MemeContentIndex contentIndex = new MemeContentIndex() {
-        public Optional<String> findIdByContent(byte[] data) {
-            return Optional.ofNullable(idByContent.get(key(data)));
-        }
-
-        public void index(byte[] data, String memeId) {
-            idByContent.put(key(data), memeId);
+        public String claim(byte[] data, String candidateId) {
+            String earlier = idByContent.putIfAbsent(key(data), candidateId);
+            return earlier != null ? earlier : candidateId;
         }
 
         public void remove(String memeId) {
@@ -100,5 +97,26 @@ class PublishMemeTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "bmp", out);
         return out.toByteArray();
+    }
+
+    @Test
+    @DisplayName("two simultaneous uploads of the same picture store exactly one meme")
+    void simultaneous_duplicates_store_one_meme() throws Exception {
+        byte[] image = bmp();
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var gate = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.Callable<String> upload = () -> {
+            gate.await();
+            return publishMeme.execute(image, "racer@example.com");
+        };
+        var first = executor.submit(upload);
+        var second = executor.submit(upload);
+        gate.countDown();
+        String a = first.get();
+        String b = second.get();
+        executor.shutdown();
+
+        assertEquals(a, b, "both uploaders end up holding the same meme");
+        assertEquals(1, store.size(), "no orphaned copy is stored, even in a dead heat");
     }
 }

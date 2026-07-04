@@ -10,11 +10,15 @@ import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.PublicationLog;
 import com.jrobertgardzinski.memes.application.RankMemes;
+import com.jrobertgardzinski.memes.application.SearchMemesByTag;
+import com.jrobertgardzinski.memes.application.TagMeme;
+import com.jrobertgardzinski.memes.application.TagRepository;
 import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.memes.config.TagLimits;
 import com.jrobertgardzinski.memes.config.ThumbnailSize;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,6 +63,21 @@ class MemesConfig {
     }
 
     @Bean
+    TagLimits tagLimits(@Value("${memes.tags.max-per-meme:8}") int maxPerMeme) {
+        return new TagLimits(maxPerMeme);
+    }
+
+    @Bean
+    TagMeme tagMeme(MemeRepository repository, TagRepository tagRepository, TagLimits tagLimits) {
+        return new TagMeme(repository, tagRepository, tagLimits);
+    }
+
+    @Bean
+    SearchMemesByTag searchMemesByTag(MemeRepository repository, TagRepository tagRepository) {
+        return new SearchMemesByTag(repository, tagRepository);
+    }
+
+    @Bean
     ListMemes listMemes(MemeRepository repository) {
         return new ListMemes(repository);
     }
@@ -80,10 +99,10 @@ class MemesConfig {
 
     @Bean
     PurgeUserContent purgeUserContent(MemeRepository memeRepository, VoteRepository voteRepository,
-                                      MemeContentIndex contentIndex, MemeEvents memeEvents,
-                                      PurgeRule defaultMemesPurgeRule) {
-        return new PurgeUserContent(memeRepository, voteRepository, contentIndex, memeEvents,
-                defaultMemesPurgeRule);
+                                      MemeContentIndex contentIndex, TagRepository tagRepository,
+                                      MemeEvents memeEvents, PurgeRule defaultMemesPurgeRule) {
+        return new PurgeUserContent(memeRepository, voteRepository, contentIndex, tagRepository,
+                memeEvents, defaultMemesPurgeRule);
     }
 
     @Bean

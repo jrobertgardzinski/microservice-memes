@@ -28,6 +28,7 @@
         <module>memes-domain</module>
         <module>memes-config</module>
         <module>memes-image</module>
+        <module>memes-tags</module>
         <module>memes-application</module>
         <module>memes-ui</module>
         <module>memes-infrastructure</module>

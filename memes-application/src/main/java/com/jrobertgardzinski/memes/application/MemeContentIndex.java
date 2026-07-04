@@ -1,16 +1,16 @@
 package com.jrobertgardzinski.memes.application;
 
-import java.util.Optional;
-
 /**
- * Port for content-based deduplication: maps the bytes of a stored meme to its id, so uploading the
- * same image twice reuses the existing meme instead of storing a copy.
+ * Port for content-based deduplication: maps the bytes of a stored meme to its id, so uploading
+ * the same image twice reuses the existing meme instead of storing a copy. The mapping is claimed
+ * ATOMICALLY — two simultaneous uploads of the same picture race for one slot and exactly one
+ * wins, so no orphaned copy is ever stored.
  */
 public interface MemeContentIndex {
 
-    Optional<String> findIdByContent(byte[] data);
-
-    void index(byte[] data, String memeId);
+    /** Claim this content for {@code candidateId}; returns the id that OWNS the content — the
+     *  candidate when the claim won, the earlier meme's id when the picture was already known. */
+    String claim(byte[] data, String candidateId);
 
     /** Forget a deleted meme, so re-uploading identical content is not deduplicated into a ghost. */
     void remove(String memeId);

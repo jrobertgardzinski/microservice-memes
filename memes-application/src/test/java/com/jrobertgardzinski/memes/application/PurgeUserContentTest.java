@@ -55,12 +55,9 @@ class PurgeUserContentTest {
     };
     private final VoteRepository voteRepository = new CastVoteTest.FakeVoteRepository(memeVotes);
     private final MemeContentIndex index = new MemeContentIndex() {
-        public Optional<String> findIdByContent(byte[] data) {
-            return Optional.ofNullable(contentIndex.get(new String(data)));
-        }
-
-        public void index(byte[] data, String memeId) {
-            contentIndex.put(new String(data), memeId);
+        public String claim(byte[] data, String candidateId) {
+            String earlier = contentIndex.putIfAbsent(new String(data), candidateId);
+            return earlier != null ? earlier : candidateId;
         }
 
         public void remove(String memeId) {
@@ -68,9 +65,27 @@ class PurgeUserContentTest {
         }
     };
     private final MemeEvents memeEvents = announcedDeletions::add;
+    private final java.util.Map<String, java.util.Set<com.jrobertgardzinski.memes.tags.Tag>> tagIndex =
+            new HashMap<>();
+    private final TagRepository tagRepository = new TagRepository() {
+        public void replaceTags(String memeId, java.util.Set<com.jrobertgardzinski.memes.tags.Tag> tags) {
+            tagIndex.put(memeId, tags);
+        }
 
-    private final PurgeUserContent purge = new PurgeUserContent(
-            memeRepository, voteRepository, index, memeEvents, new PurgeRule.Delete());
+        public java.util.Set<com.jrobertgardzinski.memes.tags.Tag> tagsOf(String memeId) {
+            return tagIndex.getOrDefault(memeId, java.util.Set.of());
+        }
+
+        public java.util.Set<String> memesTagged(com.jrobertgardzinski.memes.tags.Tag tag) {
+            return java.util.Set.of();
+        }
+
+        public void removeMeme(String memeId) {
+            tagIndex.remove(memeId);
+        }
+    };
+
+    private final PurgeUserContent purge = new PurgeUserContent(memeRepository, voteRepository, index, tagRepository, memeEvents, new PurgeRule.Delete());
 
     @Test
     @DisplayName("the leaver's memes disappear with their votes; the thread owner is told")

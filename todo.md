@@ -35,7 +35,12 @@ Only open items. History = git log.
   kasuje wątek.
 
 ## Otwarte — najbliższe (małe moduły, "à la security")
-- **Tagi + wyszukiwanie** — moduł `memes-tags`.
+- ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja
+  lowercase/trim, 2..30 znaków [a-z0-9-], pojedyncze myślniki), use case'y `TagMeme` (autor
+  kuratorem — REPLACE całego zestawu, limit `TagLimits` z env `memes.tags.max-per-meme:8`,
+  403 NOT_THE_AUTHOR) i `SearchMemesByTag` (galeria zawężona tagiem, porządek galerii);
+  REST: POST/GET `/memes/{id}/tags`, `GET /memes?tag=`; purge czyści indeks tagów;
+  3 scenariusze w tag-meme.feature. UI galerii (pole tagów + filtr) — do zrobienia.
 - ~~Ranking hot z czasem~~ — ZROBIONE (2026-07-04): hotness = score/(ageHours+2)^1.5
   (Reddit-like), port `PublicationLog` (store zna czas publikacji; nieznany mem = świeży,
   fail-safe), zwracany score bez zmian — decay tylko porządkuje; GET /memes/hot bez zmiany
@@ -44,9 +49,10 @@ Only open items. History = git log.
   ("SecretGPSLocation…") wchodzi, wychodzi PNG bez śladu metadanych.
 - **Rate-limit uploadu**, **flaga NSFW / moderacja** (moderator = rola po stronie security — czeka
   na RBAC tam).
-- **Dedup pod współbieżnością** — `PublishMeme` ma check-then-act na indeksie treści; przy dwóch
-  równoczesnych uploadach tego samego obrazka może powstać osierocony wpis w repo (nieszkodliwe,
-  ale do domknięcia przy realnej persystencji).
+- ~~Dedup pod współbieżnością~~ — ZROBIONE (2026-07-04): port `MemeContentIndex` to teraz
+  atomowy `claim(data, candidateId)` (putIfAbsent) — przy dwóch równoczesnych uploadach wygrywa
+  dokładnie jeden id i nic osieroconego nie jest zapisywane (save dopiero PO wygranym claimie);
+  pin: test z dwoma wątkami na jednej bramce.
 
 ## Otwarte — infra
 - **Default polityki czystki z bazy** — dziś default z env; docelowo nadpisywalny w bazie

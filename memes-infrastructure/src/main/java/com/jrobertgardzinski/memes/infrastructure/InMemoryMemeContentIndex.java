@@ -7,7 +7,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** In-memory {@link MemeContentIndex}: maps a SHA-256 of the image bytes to the meme id. */
@@ -17,13 +16,10 @@ class InMemoryMemeContentIndex implements MemeContentIndex {
     private final Map<String, String> idByHash = new ConcurrentHashMap<>();
 
     @Override
-    public Optional<String> findIdByContent(byte[] data) {
-        return Optional.ofNullable(idByHash.get(sha256(data)));
-    }
-
-    @Override
-    public void index(byte[] data, String memeId) {
-        idByHash.put(sha256(data), memeId);
+    public String claim(byte[] data, String candidateId) {
+        // putIfAbsent is the whole point: two simultaneous uploads race, exactly one id wins
+        String earlier = idByHash.putIfAbsent(sha256(data), candidateId);
+        return earlier != null ? earlier : candidateId;
     }
 
     @Override

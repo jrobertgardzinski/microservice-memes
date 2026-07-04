@@ -33,12 +33,16 @@ class MemeController {
     private final ViewMeme viewMeme;
     private final MakeThumbnail makeThumbnail;
     private final ListMemes listMemes;
+    private final com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag;
 
-    MemeController(PublishMeme publishMeme, ViewMeme viewMeme, MakeThumbnail makeThumbnail, ListMemes listMemes) {
+    MemeController(PublishMeme publishMeme, ViewMeme viewMeme, MakeThumbnail makeThumbnail,
+                   ListMemes listMemes,
+                   com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag) {
         this.publishMeme = publishMeme;
         this.viewMeme = viewMeme;
         this.makeThumbnail = makeThumbnail;
         this.listMemes = listMemes;
+        this.searchMemesByTag = searchMemesByTag;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -50,8 +54,17 @@ class MemeController {
     }
 
     @GetMapping
-    List<Map<String, String>> all() {
-        return listMemes.execute().stream().map(id -> Map.of("id", id)).toList();
+    ResponseEntity<?> all(@org.springframework.web.bind.annotation.RequestParam(name = "tag",
+            required = false) String tag) {
+        if (tag == null || tag.isBlank()) {
+            return ResponseEntity.ok(listMemes.execute().stream().map(id -> Map.of("id", id)).toList());
+        }
+        try {
+            return ResponseEntity.ok(searchMemesByTag.execute(com.jrobertgardzinski.memes.tags.Tag.of(tag))
+                    .stream().map(id -> Map.of("id", id)).toList());
+        } catch (IllegalArgumentException illegalTag) {
+            return ResponseEntity.badRequest().body(Map.of("status", "INVALID_TAG"));
+        }
     }
 
     @GetMapping("/{id}")

@@ -18,14 +18,17 @@ public class PurgeUserContent {
     private final MemeRepository memeRepository;
     private final VoteRepository voteRepository;
     private final MemeContentIndex contentIndex;
+    private final TagRepository tagRepository;
     private final MemeEvents memeEvents;
     private final PurgeRule defaultRule;
 
     public PurgeUserContent(MemeRepository memeRepository, VoteRepository voteRepository,
-                            MemeContentIndex contentIndex, MemeEvents memeEvents, PurgeRule defaultRule) {
+                            MemeContentIndex contentIndex, TagRepository tagRepository,
+                            MemeEvents memeEvents, PurgeRule defaultRule) {
         this.memeRepository = memeRepository;
         this.voteRepository = voteRepository;
         this.contentIndex = contentIndex;
+        this.tagRepository = tagRepository;
         this.memeEvents = memeEvents;
         this.defaultRule = defaultRule;
     }
@@ -38,6 +41,7 @@ public class PurgeUserContent {
             } else {
                 voteRepository.purgeMeme(memeId);
                 contentIndex.remove(memeId);
+                tagRepository.removeMeme(memeId);
                 memeRepository.deleteById(memeId);
                 memeEvents.memeDeleted(memeId);
             }
