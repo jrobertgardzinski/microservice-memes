@@ -65,7 +65,13 @@ Only open items. History = git log.
   content_index/meme_tags/meme_votes), claim dedupu = unikalność PK w bazie (wyścig rozstrzyga
   constraint), upserty delete+insert jak w comments. Zweryfikowane live na PG: Flyway, galeria,
   filtr tagiem i bajty obrazka przeżywają restart aplikacji. ZOSTAJE: bajty do object storage
-  (S3/MinIO) zamiast bytea, gdy galeria urośnie.
+  (S3/MinIO) zamiast bytea, gdy galeria urośnie. SEAM ZROBIONY (2026-07-04): bajty wyjęte
+  z wiersza mema za port `ObjectStore` (put/get/delete po id); JdbcMemeRepository trzyma tylko
+  metadane i deleguje bajty (zapis/odczyt/kasowanie razem, transakcyjnie). Migracja V2 przenosi
+  bajty do `meme_blobs` i usuwa kolumnę `data`. Dwa adaptery: DB-blob (default, bez nowych
+  zależności) i FILESYSTEM (`memes.blob-store=filesystem`, `memes.blob-dir`) — S3/MinIO to
+  trzeci adapter o tym samym kształcie. Zweryfikowane na PG (schemat V2) + testy (MockMvc round-
+  trip, FilesystemObjectStoreTest z ochroną przed path-traversal).
 - **WebP** zamiast PNG dla mniejszych plików (wymaga enkodera spoza JDK, np. imageio-webp / libwebp).
 - **Dokumentacja jak w security** — glosariusz już skanuje domain/application/infrastructure warstwy;
   ewentualnie cucumber-kontrakt.
