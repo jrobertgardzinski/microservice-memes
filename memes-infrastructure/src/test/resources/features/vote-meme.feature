@@ -1,8 +1,12 @@
 Feature: Voting on memes
 
-  Signed-in users vote; each user has ONE vote per meme, worked as a toggle: repeating the same
-  vote retracts it, the opposite direction switches it. Up-voted memes rank higher in the public
-  hot list.
+  Signed-in users vote on a MEME; each user has ONE vote per MEME, worked as a toggle: repeating
+  the same vote retracts it, the opposite direction switches it. An up-voted MEME becomes a
+  higher-scoring RANKED MEME in the public hot list.
+
+  Nouns:
+    MEME        -> Meme
+    RANKED MEME -> RankedMeme
 
   Scenario: the meme with more distinct up-voters ranks higher
     Given a signed-in user
