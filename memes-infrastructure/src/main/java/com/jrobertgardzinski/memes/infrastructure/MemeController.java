@@ -100,6 +100,15 @@ class MemeController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /** A meme's public metadata (who uploaded it) — the gallery uses it to offer the author the
+     *  delete control on their own memes. The bytes are served separately. */
+    @GetMapping("/{id}/meta")
+    ResponseEntity<Map<String, String>> meta(@PathVariable("id") String id) {
+        return viewMeme.execute(id)
+                .map(meme -> ResponseEntity.ok(Map.of("id", meme.id(), "author", meme.author())))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     /** Take a meme down: its author may remove their own, a MODERATOR may remove anyone's. */
     @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
     ResponseEntity<?> delete(@PathVariable("id") String id,

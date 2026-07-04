@@ -47,6 +47,10 @@ export const authHeader = (token: string | null): Record<string, string> =>
 export const listMemes = async (tag?: string): Promise<MemeRef[]> =>
   (await fetch(tag ? `/memes?tag=${encodeURIComponent(tag)}` : '/memes')).json();
 
+/** A meme's public metadata: who uploaded it. */
+export const memeMeta = async (memeId: string): Promise<{ id: string; author: string }> =>
+  (await fetch(`/memes/${memeId}/meta`)).json();
+
 /** The tags an uploader has put on a meme (sorted). */
 export const memeTags = async (memeId: string): Promise<string[]> =>
   (await fetch(`/memes/${memeId}/tags`)).json();

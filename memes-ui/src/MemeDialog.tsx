@@ -13,8 +13,8 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import {
-  authHeader, COMMENTS, deleteComment, deleteMeme, jsonHeaders, listComments, memeTags, memeTally,
-  MemeComment, setMemeTags, VoteDirection, VoteTally,
+  authHeader, COMMENTS, deleteComment, deleteMeme, jsonHeaders, listComments, memeMeta, memeTags,
+  memeTally, MemeComment, setMemeTags, VoteDirection, VoteTally,
 } from './api';
 
 interface Props {
@@ -55,11 +55,13 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
   const [editingTags, setEditingTags] = useState(false);
   const [tagDraft, setTagDraft] = useState('');
   const [tagError, setTagError] = useState<string | null>(null);
+  const [author, setAuthor] = useState<string | null>(null);
 
   const load = useCallback(() => {
     void memeTally(memeId, token).then(setTally);
     void listComments(memeId, token).then(setComments);
     void memeTags(memeId).then(setTags);
+    void memeMeta(memeId).then((m) => setAuthor(m.author));
   }, [memeId, token]);
   useEffect(load, [load]);
 
@@ -147,9 +149,9 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
           <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
           <Chip label={tally.score} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
-          {isModerator && (
+          {(isModerator || (author !== null && author === user)) && (
             <Button size="small" color="error" sx={{ ml: 'auto' }} onClick={removeMeme}>
-              Delete (moderator)
+              {author === user ? 'Delete' : 'Delete (moderator)'}
             </Button>
           )}
         </Stack>

@@ -61,6 +61,16 @@ class ModerationTest {
         mockMvc.perform(delete("/memes/{id}", "ghost")).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("the meta endpoint reports the uploader, so the UI can offer them delete")
+    void meta_reports_the_author() throws Exception {
+        String id = upload(TestAuthConfig.VALID_TOKEN);
+        mockMvc.perform(get("/memes/{id}/meta", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.author").value(TestAuthConfig.SIGNED_IN_USER));
+        mockMvc.perform(get("/memes/{id}/meta", "ghost")).andExpect(status().isNotFound());
+    }
+
     private String upload(String token) throws Exception {
         BufferedImage image = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
         image.setRGB(1, 1, ThreadLocalRandom.current().nextInt(0xFFFFFF));
