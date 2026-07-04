@@ -57,7 +57,13 @@ Only open items. History = git log.
 ## Otwarte — infra
 - **Default polityki czystki z bazy** — dziś default z env; docelowo nadpisywalny w bazie
   (panel administracyjny), wybór per żądanie już działa.
-- **Realna persystencja** — bajty do object storage (S3/MinIO), metadane do bazy (JPA + Postgres).
+- **Realna persystencja** — ZROBIONA W RDZENIU (2026-07-04): metadane I bajty w bazie —
+  Postgres na stacku (DB_URL), bez DB_URL in-memory H2 w trybie PostgreSQL (dev/testy jeżdżą
+  na TYCH SAMYCH adapterach JDBC co produkcja, zero drugiej implementacji); Flyway V1 (memes/
+  content_index/meme_tags/meme_votes), claim dedupu = unikalność PK w bazie (wyścig rozstrzyga
+  constraint), upserty delete+insert jak w comments. Zweryfikowane live na PG: Flyway, galeria,
+  filtr tagiem i bajty obrazka przeżywają restart aplikacji. ZOSTAJE: bajty do object storage
+  (S3/MinIO) zamiast bytea, gdy galeria urośnie.
 - **WebP** zamiast PNG dla mniejszych plików (wymaga enkodera spoza JDK, np. imageio-webp / libwebp).
 - **Dokumentacja jak w security** — glosariusz już skanuje domain/application/infrastructure warstwy;
   ewentualnie cucumber-kontrakt.
