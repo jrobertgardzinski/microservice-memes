@@ -34,21 +34,28 @@ class MemeController {
     private final MakeThumbnail makeThumbnail;
     private final ListMemes listMemes;
     private final com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag;
+    private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
 
     MemeController(PublishMeme publishMeme, ViewMeme viewMeme, MakeThumbnail makeThumbnail,
                    ListMemes listMemes,
-                   com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag) {
+                   com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag,
+                   com.jrobertgardzinski.memes.config.RateLimit uploadRate) {
         this.publishMeme = publishMeme;
         this.viewMeme = viewMeme;
         this.makeThumbnail = makeThumbnail;
         this.listMemes = listMemes;
         this.searchMemesByTag = searchMemesByTag;
+        this.uploadRate = uploadRate;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file,
                                                @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER)
                                                String uploader) throws IOException {
+        if (!uploadRate.tryAcquire(uploader)) {
+            return ResponseEntity.status(429).header("Retry-After", "60")
+                    .body(Map.of("status", "RATE_LIMITED", "detail", "you are uploading too fast"));
+        }
         String id = publishMeme.execute(file.getBytes(), uploader);
         return ResponseEntity.created(URI.create("/memes/" + id)).body(Map.of("id", id));
     }

@@ -49,7 +49,7 @@ Only open items. History = git log.
   kontraktu. Zegar przez java.time.Clock (bean).
 - ~~EXIF~~ — ZROBIONE (2026-07-04): jawny pin — spreparowany JPEG z segmentem APP1 Exif
   ("SecretGPSLocation…") wchodzi, wychodzi PNG bez śladu metadanych.
-- **Rate-limit uploadu**, **flaga NSFW / moderacja** (moderator = rola po stronie security — czeka
+- ~~Rate-limit uploadu~~ — ZROBIONE (2026-07-04): `RateLimit` w memes-config (per-uploader, env MEMES_UPLOAD_RATE_LIMIT, default 12/min, 0 wyłącza), 429+Retry-After w POST /memes; unit pin + MockMvc z limitem 1/min. **flaga NSFW / moderacja** (moderator = rola po stronie security — czeka
   na RBAC tam).
 - ~~Dedup pod współbieżnością~~ — ZROBIONE (2026-07-04): port `MemeContentIndex` to teraz
   atomowy `claim(data, candidateId)` (putIfAbsent) — przy dwóch równoczesnych uploadach wygrywa
