@@ -24,13 +24,14 @@ export default function App() {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
-    void listMemes().then(setMemes);
+    void listMemes(tagFilter ?? undefined).then(setMemes);
     void hotMemes().then((hot) =>
       setScores(Object.fromEntries(hot.map((h) => [h.memeId, h.score]))),
     );
-  }, []);
+  }, [tagFilter]);
   useEffect(refresh, [refresh]);
 
   useEffect(() => {
@@ -78,6 +79,13 @@ export default function App() {
         <Stack spacing={2}>
           <AuthPanel token={token} user={user} onToken={setToken} onLogout={() => setToken(null)} />
 
+          {tagFilter && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="body2" color="text.secondary">Filtered by tag:</Typography>
+              <Chip label={`#${tagFilter}`} color="primary" onDelete={() => setTagFilter(null)} />
+            </Stack>
+          )}
+
           <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
             {memes.map((m) => (
               <Card key={m.id}>
@@ -91,7 +99,9 @@ export default function App() {
             ))}
           </Box>
           {memes.length === 0 && (
-            <Typography color="text.secondary">No memes yet — sign in and upload the first one.</Typography>
+            <Typography color="text.secondary">
+              {tagFilter ? `No memes tagged #${tagFilter}.` : 'No memes yet — sign in and upload the first one.'}
+            </Typography>
           )}
         </Stack>
       </Container>
@@ -99,6 +109,7 @@ export default function App() {
       {selected && (
         <MemeDialog memeId={selected} token={token}
                     onVoted={refresh} onRequireSignIn={requireSignIn}
+                    onTagClick={(t) => { setTagFilter(t); setSelected(null); }}
                     onClose={() => setSelected(null)} />
       )}
 

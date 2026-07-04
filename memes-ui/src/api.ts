@@ -44,8 +44,25 @@ export const jsonHeaders = { 'Content-Type': 'application/json' };
 export const authHeader = (token: string | null): Record<string, string> =>
   token ? { Authorization: `Bearer ${token}` } : {};
 
-export const listMemes = async (): Promise<MemeRef[]> =>
-  (await fetch('/memes')).json();
+export const listMemes = async (tag?: string): Promise<MemeRef[]> =>
+  (await fetch(tag ? `/memes?tag=${encodeURIComponent(tag)}` : '/memes')).json();
+
+/** The tags an uploader has put on a meme (sorted). */
+export const memeTags = async (memeId: string): Promise<string[]> =>
+  (await fetch(`/memes/${memeId}/tags`)).json();
+
+/** Replace a meme's whole tag set (author only). Returns the accepted tags, or a status on refusal. */
+export const setMemeTags = async (
+  memeId: string, tags: string[], token: string | null,
+): Promise<{ ok: boolean; status?: string; tags?: string[] }> => {
+  const r = await fetch(`/memes/${memeId}/tags`, {
+    method: 'POST',
+    headers: { ...jsonHeaders, ...authHeader(token) },
+    body: JSON.stringify({ tags }),
+  });
+  const body = await r.json().catch(() => ({}));
+  return r.ok ? { ok: true, tags: body.tags } : { ok: false, status: body.status ?? String(r.status) };
+};
 
 export const hotMemes = async (): Promise<HotEntry[]> =>
   (await fetch('/memes/hot')).json();

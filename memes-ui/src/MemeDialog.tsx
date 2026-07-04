@@ -12,7 +12,8 @@ import Button from '@mui/material/Button';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import {
-  authHeader, COMMENTS, jsonHeaders, listComments, memeTally, MemeComment, VoteDirection, VoteTally,
+  authHeader, COMMENTS, jsonHeaders, listComments, memeTags, memeTally, MemeComment, setMemeTags,
+  VoteDirection, VoteTally,
 } from './api';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
   token: string | null;
   onVoted: () => void;
   onRequireSignIn: () => void;
+  onTagClick: (tag: string) => void;
   onClose: () => void;
 }
 
@@ -41,16 +43,41 @@ function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote:
   );
 }
 
-export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, onClose }: Props) {
+export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, onTagClick, onClose }: Props) {
   const [tally, setTally] = useState<VoteTally>({ score: 0, myVote: null });
   const [comments, setComments] = useState<MemeComment[]>([]);
   const [text, setText] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [editingTags, setEditingTags] = useState(false);
+  const [tagDraft, setTagDraft] = useState('');
+  const [tagError, setTagError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     void memeTally(memeId, token).then(setTally);
     void listComments(memeId, token).then(setComments);
+    void memeTags(memeId).then(setTags);
   }, [memeId, token]);
   useEffect(load, [load]);
+
+  const startEditing = () =>
+    guard(() => { setTagDraft(tags.join(', ')); setTagError(null); setEditingTags(true); });
+
+  const saveTags = () =>
+    guard(async () => {
+      const next = tagDraft.split(',').map((t) => t.trim()).filter(Boolean);
+      const result = await setMemeTags(memeId, next, token);
+      if (result.ok) {
+        setTags(result.tags ?? next);
+        setEditingTags(false);
+        setTagError(null);
+      } else if (result.status === 'NOT_THE_AUTHOR') {
+        setTagError('Only the uploader can tag this meme.');
+      } else if (result.status === 'INVALID_TAG') {
+        setTagError('Tags are 2–30 chars: letters, digits and single dashes.');
+      } else {
+        setTagError(`Tagging refused (${result.status}).`);
+      }
+    });
 
   const guard = (action: () => void) => (token ? action() : onRequireSignIn());
 
@@ -103,6 +130,29 @@ export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, on
           <Chip label={tally.score} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
         </Stack>
+
+        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+          {tags.map((t) => (
+            <Chip key={t} label={`#${t}`} size="small" variant="outlined" onClick={() => onTagClick(t)} />
+          ))}
+          {!editingTags && (
+            <Button size="small" onClick={startEditing}>{tags.length ? 'edit tags' : 'add tags'}</Button>
+          )}
+        </Stack>
+        {editingTags && (
+          <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
+            <TextField
+              size="small" fullWidth autoFocus
+              label="tags, comma-separated" placeholder="cats, monday-mood"
+              value={tagDraft} onChange={(e) => setTagDraft(e.target.value)}
+              error={tagError !== null} helperText={tagError ?? 'the uploader curates the whole set'}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveTags(); } }}
+            />
+            <Button variant="contained" onClick={saveTags}>Save</Button>
+            <Button onClick={() => { setEditingTags(false); setTagError(null); }}>Cancel</Button>
+          </Stack>
+        )}
+
         <Divider />
         {comments.map((c) => (
           <Stack key={c.id} direction="row" spacing={1} alignItems="center" sx={{ py: 0.5 }}>
