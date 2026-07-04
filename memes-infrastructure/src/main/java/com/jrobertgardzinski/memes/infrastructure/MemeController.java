@@ -33,18 +33,24 @@ class MemeController {
     private final ListMemes listMemes;
     private final com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag;
     private final com.jrobertgardzinski.memes.application.ServeMeme serveMeme;
+    private final com.jrobertgardzinski.memes.application.ViewMeme viewMeme;
+    private final com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme;
     private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
 
     MemeController(PublishMeme publishMeme, MakeThumbnail makeThumbnail,
                    ListMemes listMemes,
                    com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag,
                    com.jrobertgardzinski.memes.application.ServeMeme serveMeme,
+                   com.jrobertgardzinski.memes.application.ViewMeme viewMeme,
+                   com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme,
                    com.jrobertgardzinski.memes.config.RateLimit uploadRate) {
         this.publishMeme = publishMeme;
         this.makeThumbnail = makeThumbnail;
         this.listMemes = listMemes;
         this.searchMemesByTag = searchMemesByTag;
         this.serveMeme = serveMeme;
+        this.viewMeme = viewMeme;
+        this.deleteMeme = deleteMeme;
         this.uploadRate = uploadRate;
     }
 
@@ -92,5 +98,25 @@ class MemeController {
         return makeThumbnail.execute(id)
                 .map(bytes -> ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(bytes))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** Take a meme down: its author may remove their own, a MODERATOR may remove anyone's. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+    ResponseEntity<?> delete(@PathVariable("id") String id,
+                             @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String caller,
+                             @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
+                                     required = false) java.util.Set<String> roles) {
+        boolean moderator = roles != null && (roles.contains("MODERATOR") || roles.contains("ADMIN"));
+        var meme = viewMeme.execute(id);
+        if (meme.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!moderator && !meme.get().author().equals(caller)) {
+            return ResponseEntity.status(403).body(Map.of("status", "NOT_YOURS",
+                    "detail", "only the author or a moderator can delete this meme"));
+        }
+        deleteMeme.execute(id);
+        return ResponseEntity.ok(Map.of("status", "DELETED", "id", id,
+                "by", moderator && !meme.get().author().equals(caller) ? "MODERATOR" : "AUTHOR"));
     }
 }

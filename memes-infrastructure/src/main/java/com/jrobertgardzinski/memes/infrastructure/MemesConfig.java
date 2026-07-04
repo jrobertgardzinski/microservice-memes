@@ -77,6 +77,14 @@ class MemesConfig {
     }
 
     @Bean
+    com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme(
+            MemeRepository memeRepository, VoteRepository voteRepository, MemeContentIndex contentIndex,
+            TagRepository tagRepository, com.jrobertgardzinski.memes.application.MemeEvents memeEvents) {
+        return new com.jrobertgardzinski.memes.application.DeleteMeme(
+                memeRepository, voteRepository, contentIndex, tagRepository, memeEvents);
+    }
+
+    @Bean
     TagLimits tagLimits(@Value("${memes.tags.max-per-meme:8}") int maxPerMeme) {
         return new TagLimits(maxPerMeme);
     }

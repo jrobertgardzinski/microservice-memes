@@ -9,6 +9,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Browsing is public, contributing requires signing in: every write ({@code POST} under
@@ -20,6 +21,7 @@ import java.util.Optional;
 class RequireSignInFilter extends OncePerRequestFilter {
 
     static final String AUTHENTICATED_USER = "authenticatedUser";
+    static final String AUTHENTICATED_ROLES = "authenticatedRoles";
 
     private final SecurityAuthenticationGate gate;
 
@@ -36,9 +38,13 @@ class RequireSignInFilter extends OncePerRequestFilter {
         }
         // resolve the identity whenever a token is presented (reads use it to show "your vote");
         // only writes REQUIRE it
-        Optional<String> user = bearerToken(request).flatMap(gate::emailFor);
-        user.ifPresent(email -> request.setAttribute(AUTHENTICATED_USER, email));
-        if ("POST".equals(request.getMethod()) && user.isEmpty()) {
+        Optional<Caller> caller = bearerToken(request).flatMap(gate::callerFor);
+        caller.ifPresent(c -> {
+            request.setAttribute(AUTHENTICATED_USER, c.email());
+            request.setAttribute(AUTHENTICATED_ROLES, c.roles());
+        });
+        boolean write = Set.of("POST", "PUT", "DELETE", "PATCH").contains(request.getMethod());
+        if (write && caller.isEmpty()) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"status\":\"SIGN_IN_REQUIRED\"}");
