@@ -1,9 +1,11 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.MemeRepository;
+import com.jrobertgardzinski.memes.application.PublicationLog;
 import com.jrobertgardzinski.memes.domain.Meme;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -11,19 +13,27 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * In-memory {@link MemeRepository}. A real store (object storage for the bytes + a database for
- * metadata) will replace it.
+ * In-memory {@link MemeRepository}, doubling as the {@link PublicationLog} the hot ranking
+ * decays by — the store is where "when did this go up" is known. A real store (object storage
+ * for the bytes + a database for metadata) will replace it.
  */
 @Component
-class InMemoryMemeRepository implements MemeRepository {
+class InMemoryMemeRepository implements MemeRepository, PublicationLog {
 
     private final Map<String, Meme> byId = new ConcurrentHashMap<>();
+    private final Map<String, Instant> published = new ConcurrentHashMap<>();
     private final List<String> insertionOrder = new CopyOnWriteArrayList<>();
 
     @Override
     public void save(Meme meme) {
         byId.put(meme.id(), meme);
+        published.putIfAbsent(meme.id(), Instant.now());
         insertionOrder.add(meme.id());
+    }
+
+    @Override
+    public Optional<Instant> publishedAt(String memeId) {
+        return Optional.ofNullable(published.get(memeId));
     }
 
     @Override

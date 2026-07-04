@@ -36,8 +36,12 @@ Only open items. History = git log.
 
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - **Tagi + wyszukiwanie** — moduł `memes-tags`.
-- Ranking "hot" z czasem (Reddit-like decay) zamiast czystego score.
-- **EXIF** — re-enkodowanie do PNG już zrzuca EXIF; udokumentować/przetestować jawnie.
+- ~~Ranking hot z czasem~~ — ZROBIONE (2026-07-04): hotness = score/(ageHours+2)^1.5
+  (Reddit-like), port `PublicationLog` (store zna czas publikacji; nieznany mem = świeży,
+  fail-safe), zwracany score bez zmian — decay tylko porządkuje; GET /memes/hot bez zmiany
+  kontraktu. Zegar przez java.time.Clock (bean).
+- ~~EXIF~~ — ZROBIONE (2026-07-04): jawny pin — spreparowany JPEG z segmentem APP1 Exif
+  ("SecretGPSLocation…") wchodzi, wychodzi PNG bez śladu metadanych.
 - **Rate-limit uploadu**, **flaga NSFW / moderacja** (moderator = rola po stronie security — czeka
   na RBAC tam).
 - **Dedup pod współbieżnością** — `PublishMeme` ma check-then-act na indeksie treści; przy dwóch

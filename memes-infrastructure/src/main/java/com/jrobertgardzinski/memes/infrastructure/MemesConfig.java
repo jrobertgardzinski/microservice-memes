@@ -8,6 +8,7 @@ import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.MemeEvents;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.application.PublicationLog;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
@@ -86,8 +87,13 @@ class MemesConfig {
     }
 
     @Bean
-    RankMemes rankMemes(VoteRepository voteRepository) {
-        return new RankMemes(voteRepository);
+    RankMemes rankMemes(VoteRepository voteRepository, PublicationLog publicationLog, java.time.Clock clock) {
+        return new RankMemes(voteRepository, publicationLog, clock);
+    }
+
+    @Bean
+    java.time.Clock clock() {
+        return java.time.Clock.systemUTC();
     }
 }
 
