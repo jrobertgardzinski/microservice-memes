@@ -72,3 +72,14 @@ export const listComments = async (memeId: string, token: string | null): Promis
 
 export const memeTally = async (memeId: string, token: string | null): Promise<VoteTally> =>
   (await fetch(`/memes/${memeId}/votes`, { headers: authHeader(token) })).json();
+
+/** Delete a meme — the author (of their own) or a moderator (of anyone's). Server-authorised. */
+export const deleteMeme = async (memeId: string, token: string | null): Promise<boolean> =>
+  (await fetch(`/memes/${memeId}`, { method: 'DELETE', headers: authHeader(token) })).ok;
+
+/** Delete a comment — its author, or a moderator. Server-authorised. */
+export const deleteComment = async (
+  memeId: string, commentId: string, token: string | null,
+): Promise<boolean> =>
+  (await fetch(`${COMMENTS}/memes/${memeId}/comments/${commentId}`,
+    { method: 'DELETE', headers: authHeader(token) })).ok;

@@ -20,6 +20,7 @@ import { authHeader, hotMemes, listMemes, MemeRef, SECURITY } from './api';
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('accessToken'));
   const [user, setUser] = useState('');
+  const [isModerator, setIsModerator] = useState(false);
   const [memes, setMemes] = useState<MemeRef[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<string | null>(null);
@@ -37,13 +38,18 @@ export default function App() {
   useEffect(() => {
     if (!token) {
       setUser('');
+      setIsModerator(false);
       localStorage.removeItem('accessToken');
       return;
     }
     localStorage.setItem('accessToken', token);
     void fetch(`${SECURITY}/me`, { headers: authHeader(token) })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('expired'))))
-      .then((me: { email: string }) => setUser(me.email))
+      .then((me: { email: string; roles?: string[] }) => {
+        setUser(me.email);
+        const roles = me.roles ?? [];
+        setIsModerator(roles.includes('MODERATOR') || roles.includes('ADMIN'));
+      })
       .catch(() => setToken(null));
   }, [token]);
 
@@ -107,9 +113,10 @@ export default function App() {
       </Container>
 
       {selected && (
-        <MemeDialog memeId={selected} token={token}
+        <MemeDialog memeId={selected} token={token} user={user} isModerator={isModerator}
                     onVoted={refresh} onRequireSignIn={requireSignIn}
                     onTagClick={(t) => { setTagFilter(t); setSelected(null); }}
+                    onDeleted={() => { setSelected(null); refresh(); }}
                     onClose={() => setSelected(null)} />
       )}
 

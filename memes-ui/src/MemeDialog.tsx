@@ -11,17 +11,21 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import {
-  authHeader, COMMENTS, jsonHeaders, listComments, memeTags, memeTally, MemeComment, setMemeTags,
-  VoteDirection, VoteTally,
+  authHeader, COMMENTS, deleteComment, deleteMeme, jsonHeaders, listComments, memeTags, memeTally,
+  MemeComment, setMemeTags, VoteDirection, VoteTally,
 } from './api';
 
 interface Props {
   memeId: string;
   token: string | null;
+  user: string;
+  isModerator: boolean;
   onVoted: () => void;
   onRequireSignIn: () => void;
   onTagClick: (tag: string) => void;
+  onDeleted: () => void;
   onClose: () => void;
 }
 
@@ -43,7 +47,7 @@ function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote:
   );
 }
 
-export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, onTagClick, onClose }: Props) {
+export default function MemeDialog({ memeId, token, user, isModerator, onVoted, onRequireSignIn, onTagClick, onDeleted, onClose }: Props) {
   const [tally, setTally] = useState<VoteTally>({ score: 0, myVote: null });
   const [comments, setComments] = useState<MemeComment[]>([]);
   const [text, setText] = useState('');
@@ -80,6 +84,20 @@ export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, on
     });
 
   const guard = (action: () => void) => (token ? action() : onRequireSignIn());
+
+  const removeMeme = () =>
+    guard(async () => {
+      if (!window.confirm('Delete this meme?')) return;
+      if (await deleteMeme(memeId, token)) onDeleted();
+      else window.alert('Could not delete this meme.');
+    });
+
+  const removeComment = (commentId: string) =>
+    guard(async () => {
+      if (await deleteComment(memeId, commentId, token)) {
+        setComments((current) => current.filter((c) => c.id !== commentId));
+      }
+    });
 
   const voteMeme = (direction: VoteDirection) =>
     guard(async () => {
@@ -129,6 +147,11 @@ export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, on
           <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
           <Chip label={tally.score} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
+          {isModerator && (
+            <Button size="small" color="error" sx={{ ml: 'auto' }} onClick={removeMeme}>
+              Delete (moderator)
+            </Button>
+          )}
         </Stack>
 
         <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
@@ -161,6 +184,13 @@ export default function MemeDialog({ memeId, token, onVoted, onRequireSignIn, on
             </Typography>
             <Chip label={c.score} size="small" variant="outlined" />
             <VoteButtons myVote={c.myVote} onVote={(d) => voteComment(c.id, d)} />
+            {(isModerator || c.author === user) && (
+              <IconButton size="small" aria-label="delete comment"
+                          title={c.author === user ? 'delete your comment' : 'delete (moderator)'}
+                          onClick={() => removeComment(c.id)}>
+                <DeleteOutlineIcon fontSize="inherit" />
+              </IconButton>
+            )}
           </Stack>
         ))}
         <Stack component="form" direction="row" spacing={1} sx={{ mt: 1.5 }}
