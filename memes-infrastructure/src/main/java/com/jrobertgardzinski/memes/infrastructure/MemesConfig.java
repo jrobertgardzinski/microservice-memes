@@ -64,6 +64,14 @@ class MemesConfig {
     }
 
     @Bean
+    com.jrobertgardzinski.memes.application.ServeMeme serveMeme(
+            MemeRepository repository,
+            com.jrobertgardzinski.memes.application.ObjectStore objectStore,
+            com.jrobertgardzinski.memes.application.ImageEncoder imageEncoder) {
+        return new com.jrobertgardzinski.memes.application.ServeMeme(repository, objectStore, imageEncoder);
+    }
+
+    @Bean
     RateLimit uploadRate(@Value("${memes.upload.rate-limit-per-minute:12}") int perMinute) {
         return new RateLimit(perMinute);
     }

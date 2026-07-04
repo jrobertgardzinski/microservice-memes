@@ -3,7 +3,6 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.application.ListMemes;
 import com.jrobertgardzinski.memes.application.MakeThumbnail;
 import com.jrobertgardzinski.memes.application.PublishMeme;
-import com.jrobertgardzinski.memes.application.ViewMeme;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,21 +29,22 @@ import java.util.Map;
 class MemeController {
 
     private final PublishMeme publishMeme;
-    private final ViewMeme viewMeme;
     private final MakeThumbnail makeThumbnail;
     private final ListMemes listMemes;
     private final com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag;
+    private final com.jrobertgardzinski.memes.application.ServeMeme serveMeme;
     private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
 
-    MemeController(PublishMeme publishMeme, ViewMeme viewMeme, MakeThumbnail makeThumbnail,
+    MemeController(PublishMeme publishMeme, MakeThumbnail makeThumbnail,
                    ListMemes listMemes,
                    com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag,
+                   com.jrobertgardzinski.memes.application.ServeMeme serveMeme,
                    com.jrobertgardzinski.memes.config.RateLimit uploadRate) {
         this.publishMeme = publishMeme;
-        this.viewMeme = viewMeme;
         this.makeThumbnail = makeThumbnail;
         this.listMemes = listMemes;
         this.searchMemesByTag = searchMemesByTag;
+        this.serveMeme = serveMeme;
         this.uploadRate = uploadRate;
     }
 
@@ -75,9 +75,15 @@ class MemeController {
     }
 
     @GetMapping("/{id}")
-    ResponseEntity<byte[]> view(@PathVariable("id") String id) {
-        return viewMeme.execute(id)
-                .map(meme -> ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(meme.data()))
+    ResponseEntity<byte[]> view(@PathVariable("id") String id,
+                                @org.springframework.web.bind.annotation.RequestHeader(
+                                        name = "Accept", required = false) String accept) {
+        boolean wantsWebp = accept != null && accept.contains("image/webp");
+        return serveMeme.execute(id, wantsWebp)
+                .map(image -> ResponseEntity.ok()
+                        .header("Content-Type", image.contentType())
+                        .header("Vary", "Accept")
+                        .body(image.data()))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 

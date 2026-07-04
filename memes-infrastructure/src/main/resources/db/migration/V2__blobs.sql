@@ -3,7 +3,7 @@
 -- this table; existing bytes are carried over before the column is dropped.
 
 create table meme_blobs (
-    object_key varchar(36) primary key,
+    object_key varchar(64) primary key,   -- meme id, or id + a variant suffix like .webp
     data       bytea       not null
 );
 

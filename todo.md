@@ -72,6 +72,11 @@ Only open items. History = git log.
   zależności) i FILESYSTEM (`memes.blob-store=filesystem`, `memes.blob-dir`) — S3/MinIO to
   trzeci adapter o tym samym kształcie. Zweryfikowane na PG (schemat V2) + testy (MockMvc round-
   trip, FilesystemObjectStoreTest z ochroną przed path-traversal).
-- **WebP** zamiast PNG dla mniejszych plików (wymaga enkodera spoza JDK, np. imageio-webp / libwebp).
+- ~~WebP~~ — ZROBIONE (2026-07-04): OSOBNY MIKROSERWIS `microservice-image` (Python + Pillow,
+  bezframeworkowy jak race-sim: POST /encode?format=webp&quality=, /health). memes: port
+  `ImageEncoder` + adapter HTTP (`HttpImageEncoder`, pusty URL/awaria = empty), use case
+  `ServeMeme` negocjuje po `Accept: image/webp` — WebP kodowany RAZ i cache'owany w ObjectStore
+  pod kluczem {id}.webp, inaczej PNG (enkoder padł = degradacja jakości, nie dostępności).
+  Zweryfikowane live: PNG 1790B → WebP 900B, cache w PG. Testy: 4 sim + WebpNegotiationTest.
 - **Dokumentacja jak w security** — glosariusz już skanuje domain/application/infrastructure warstwy;
   ewentualnie cucumber-kontrakt.
