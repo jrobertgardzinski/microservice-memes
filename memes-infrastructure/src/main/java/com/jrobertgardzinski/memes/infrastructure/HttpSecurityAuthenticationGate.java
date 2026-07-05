@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
  * never by sharing a database.
  */
 @Component
+@ConditionalOnProperty(name = "security.verify", havingValue = "introspect", matchIfMissing = true)
 class HttpSecurityAuthenticationGate implements SecurityAuthenticationGate {
 
     private final RestClient securityService;
