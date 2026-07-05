@@ -27,9 +27,13 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
   const [choice, setChoice] = useState<Choice>('default');
   const [minScore, setMinScore] = useState(100);
   const [busy, setBusy] = useState(false);
+  // deleting is irreversible → step-up: confirm the password, then a factor code if one is enrolled
+  const [password, setPassword] = useState('');
+  const [stepUpTicket, setStepUpTicket] = useState('');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  const submit = async () => {
-    setBusy(true);
+  const doDelete = async () => {
     const rule = `KEEP_POPULAR_ANONYMIZED:${Math.max(1, minScore)}`;
     const purge =
       choice === 'wipe' ? { memes: 'DELETE', comments: 'DELETE' }
@@ -40,8 +44,38 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
       headers: { ...jsonHeaders, ...authHeader(token) },
       body: JSON.stringify(purge ? { purge } : {}),
     });
-    setBusy(false);
     if (r.status === 202) onDeleted();
+    else setError('Deletion was refused — please try again.');
+  };
+
+  // step 1: prove the password (and open the factor chain if the account has one)
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    const r = await fetch(`${SECURITY}/account/step-up`, {
+      method: 'POST',
+      headers: { ...jsonHeaders, ...authHeader(token) },
+      body: JSON.stringify({ action: 'delete-account', password }),
+    });
+    const body: { status?: string; stepUpTicket?: string } = await r.json().catch(() => ({}));
+    if (r.status === 200 && body.status === 'ELEVATED') await doDelete();
+    else if (r.status === 202 && body.status === 'FACTOR_REQUIRED') setStepUpTicket(body.stepUpTicket!);
+    else setError('Wrong password.');
+    setBusy(false);
+  };
+
+  // step 2 (only if a factor is enrolled): the mailed/authenticator code completes the step-up
+  const submitCode = async () => {
+    setBusy(true);
+    setError(null);
+    const r = await fetch(`${SECURITY}/account/step-up/factor`, {
+      method: 'POST',
+      headers: { ...jsonHeaders, ...authHeader(token) },
+      body: JSON.stringify({ stepUpTicket, proof: code }),
+    });
+    if (r.status === 200) await doDelete();
+    else setError('Wrong code.');
+    setBusy(false);
   };
 
   return (
@@ -68,12 +102,27 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
             inputProps={{ min: 1 }}
           />
         )}
+        <Typography variant="body2" sx={{ mt: 2 }}>Confirm it is you:</Typography>
+        {!stepUpTicket ? (
+          <TextField size="small" type="password" label="your password" fullWidth sx={{ mt: 1 }}
+            value={password} onChange={(e) => setPassword(e.target.value)} />
+        ) : (
+          <TextField size="small" label="sign-in code" fullWidth sx={{ mt: 1 }}
+            value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
+        )}
+        {error && <Typography variant="body2" color="error" sx={{ mt: 1 }}>{error}</Typography>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Keep my account</Button>
-        <Button color="error" variant="contained" disabled={busy} onClick={() => void submit()}>
-          Delete my account
-        </Button>
+        {!stepUpTicket ? (
+          <Button color="error" variant="contained" disabled={busy || !password} onClick={() => void submit()}>
+            Delete my account
+          </Button>
+        ) : (
+          <Button color="error" variant="contained" disabled={busy || !code} onClick={() => void submitCode()}>
+            Confirm & delete
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
