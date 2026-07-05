@@ -14,7 +14,7 @@ import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import DeleteAccountDialog from './DeleteAccountDialog';
 import { jsonHeaders, Notice, SECURITY } from './api';
 
-type Mode = 'signin' | 'signup' | 'inbox';
+type Mode = 'signin' | 'signup' | 'inbox' | 'mfa';
 
 const prettify = (code: string) => code.toLowerCase().replaceAll('_', ' ');
 
@@ -32,6 +32,8 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [mfaTicket, setMfaTicket] = useState('');
+  const [code, setCode] = useState('');
 
   // the OAuth callback lands here with the access token in the FRAGMENT (never sent to a
   // server); the refresh token already sits in security's HttpOnly cookie
@@ -123,12 +125,38 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
     if (r.ok) {
       const body: { accessToken: string } = await r.json();
       onToken(body.accessToken);
+    } else if (r.status === 202) {
+      // more sign-in factors owed; the first code is on its way to the mailbox
+      const body: { mfaTicket: string } = await r.json();
+      setMfaTicket(body.mfaTicket);
+      setCode('');
+      setMode('mfa');
     } else if (r.status === 403) {
       setNotice({ tone: 'warning', text: 'E-mail not verified yet — click the link in the mail (inbox: Mailpit, localhost:8025).' });
     } else if (r.status === 429) {
       setNotice({ tone: 'warning', text: 'Too many failed attempts from this machine — blocked for a few minutes.' });
     } else {
       setNotice({ tone: 'warning', text: 'Wrong e-mail or password.' });
+    }
+  };
+
+  const submitFactor = async () => {
+    const r = await fetch(`${SECURITY}/authenticate/factor`, {
+      method: 'POST',
+      headers: jsonHeaders,
+      body: JSON.stringify({ mfaTicket, proof: code }),
+    });
+    if (r.ok) {
+      const body: { accessToken: string } = await r.json();
+      onToken(body.accessToken);
+    } else {
+      const body: { status?: string; attemptsLeft?: number } = await r.json();
+      if (body.status === 'WRONG_CODE') {
+        setNotice({ tone: 'warning', text: `Wrong code${body.attemptsLeft != null ? ` — ${body.attemptsLeft} tries left` : ''}.` });
+      } else {
+        setNotice({ tone: 'warning', text: 'That sign-in expired — start over.' });
+        setMode('signin');
+      }
     }
   };
 
@@ -141,6 +169,23 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
       setBusy(false);
     }
   };
+
+  if (mode === 'mfa') {
+    return (
+      <Paper sx={{ p: 2, maxWidth: 430 }}>
+        <Box component="form" onSubmit={(e) => { e.preventDefault(); void submitFactor(); }}>
+          <Stack spacing={1.5}>
+            <Typography>One more step — we e-mailed a sign-in code to <b>{email}</b>.</Typography>
+            <TextField label="sign-in code" size="small" autoFocus
+                       value={code} onChange={(e) => setCode(e.target.value)} />
+            <Button type="submit" variant="contained" disabled={!code}>Sign in</Button>
+            <Button variant="text" onClick={() => setMode('signin')}>Start over</Button>
+          </Stack>
+        </Box>
+        {notice && <Alert severity={notice.tone} sx={{ mt: 1.5 }}>{notice.text}</Alert>}
+      </Paper>
+    );
+  }
 
   if (mode === 'inbox') {
     return (
