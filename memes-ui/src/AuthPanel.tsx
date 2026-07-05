@@ -87,10 +87,9 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
       body: JSON.stringify({ email, password }),
     });
     if (r.status === 201) {
+      // security answers 201 for taken addresses too (anti-enumeration) —
+      // the mail tells the owner whether it is a verification link or "you already have an account"
       setMode('inbox');
-    } else if (r.status === 409) {
-      setMode('signin');
-      setNotice({ tone: 'warning', text: 'This e-mail is already registered — sign in instead.' });
     } else if (r.status === 422) {
       const errors: { emailErrors?: string[]; passwordErrors?: string[] } = await r.json();
       setNotice({
@@ -138,12 +137,13 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
           <Stack direction="row" spacing={1} alignItems="center">
             <MarkEmailReadIcon color="primary" />
             <Typography>
-              Almost there — we mailed a verification link to <b>{email}</b>.
+              Almost there — check the mail we sent to <b>{email}</b>.
             </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            Open the inbox (<Link href="http://localhost:8025" target="_blank">Mailpit</Link>),
-            click the link, and it brings you back here ready to sign in.
+            Open the inbox (<Link href="http://localhost:8025" target="_blank">Mailpit</Link>) and
+            follow the mail — a verification link brings you back here ready to sign in; if the
+            address already had an account, the mail says so instead.
           </Typography>
           <Button variant="outlined" onClick={() => setMode('signin')}>
             I clicked it — sign in
