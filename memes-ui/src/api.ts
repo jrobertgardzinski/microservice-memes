@@ -9,6 +9,8 @@ export const COMMENTS: string =
 
 export interface MemeRef {
   id: string;
+  /** the moderators' judgement — the gallery blurs flagged memes until deliberately revealed */
+  nsfw?: boolean;
 }
 
 export interface HotEntry {
@@ -48,8 +50,16 @@ export const listMemes = async (tag?: string): Promise<MemeRef[]> =>
   (await fetch(tag ? `/memes?tag=${encodeURIComponent(tag)}` : '/memes')).json();
 
 /** A meme's public metadata: who uploaded it. */
-export const memeMeta = async (memeId: string): Promise<{ id: string; author: string }> =>
+export const memeMeta = async (memeId: string): Promise<{ id: string; author: string; nsfw?: boolean }> =>
   (await fetch(`/memes/${memeId}/meta`)).json();
+
+/** Flag or unflag a meme NSFW — a moderator-only call; the backend is the authority. */
+export const setMemeNsfw = async (memeId: string, nsfw: boolean, token: string | null): Promise<boolean> =>
+  (await fetch(`/memes/${memeId}/nsfw`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ nsfw }),
+  })).ok;
 
 /** The tags an uploader has put on a meme (sorted). */
 export const memeTags = async (memeId: string): Promise<string[]> =>

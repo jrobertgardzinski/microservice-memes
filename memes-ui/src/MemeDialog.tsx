@@ -14,7 +14,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import {
   authHeader, COMMENTS, deleteComment, deleteMeme, jsonHeaders, listComments, memeMeta, memeTags,
-  memeTally, MemeComment, setMemeTags, VoteDirection, VoteTally,
+  memeTally, MemeComment, setMemeNsfw, setMemeTags, VoteDirection, VoteTally,
 } from './api';
 
 interface Props {
@@ -56,12 +56,13 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
   const [tagDraft, setTagDraft] = useState('');
   const [tagError, setTagError] = useState<string | null>(null);
   const [author, setAuthor] = useState<string | null>(null);
+  const [nsfw, setNsfw] = useState(false);
 
   const load = useCallback(() => {
     void memeTally(memeId, token).then(setTally);
     void listComments(memeId, token).then(setComments);
     void memeTags(memeId).then(setTags);
-    void memeMeta(memeId).then((m) => setAuthor(m.author));
+    void memeMeta(memeId).then((m) => { setAuthor(m.author); setNsfw(m.nsfw ?? false); });
   }, [memeId, token]);
   useEffect(load, [load]);
 
@@ -92,6 +93,12 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
       if (!window.confirm('Delete this meme?')) return;
       if (await deleteMeme(memeId, token)) onDeleted();
       else window.alert('Could not delete this meme.');
+    });
+
+  const toggleNsfw = () =>
+    guard(async () => {
+      if (await setMemeNsfw(memeId, !nsfw, token)) setNsfw(!nsfw);
+      else window.alert('Only a moderator may flag NSFW.');
     });
 
   const removeComment = (commentId: string) =>
@@ -149,8 +156,14 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
           <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
           <Chip label={tally.score} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
+          {nsfw && <Chip label="NSFW" size="small" color="warning" />}
+          {isModerator && (
+            <Button size="small" color="warning" sx={{ ml: 'auto' }} onClick={toggleNsfw}>
+              {nsfw ? 'Unflag NSFW' : 'Flag NSFW'}
+            </Button>
+          )}
           {(isModerator || (author !== null && author === user)) && (
-            <Button size="small" color="error" sx={{ ml: 'auto' }} onClick={removeMeme}>
+            <Button size="small" color="error" sx={{ ml: isModerator ? 0 : 'auto' }} onClick={removeMeme}>
               {author === user ? 'Delete' : 'Delete (moderator)'}
             </Button>
           )}

@@ -35,6 +35,8 @@ class MemeController {
     private final com.jrobertgardzinski.memes.application.ServeMeme serveMeme;
     private final com.jrobertgardzinski.memes.application.ViewMeme viewMeme;
     private final com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme;
+    private final com.jrobertgardzinski.memes.application.FlagMeme flagMeme;
+    private final com.jrobertgardzinski.memes.application.ContentFlags contentFlags;
     private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
 
     MemeController(PublishMeme publishMeme, MakeThumbnail makeThumbnail,
@@ -43,6 +45,8 @@ class MemeController {
                    com.jrobertgardzinski.memes.application.ServeMeme serveMeme,
                    com.jrobertgardzinski.memes.application.ViewMeme viewMeme,
                    com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme,
+                   com.jrobertgardzinski.memes.application.FlagMeme flagMeme,
+                   com.jrobertgardzinski.memes.application.ContentFlags contentFlags,
                    com.jrobertgardzinski.memes.config.RateLimit uploadRate) {
         this.publishMeme = publishMeme;
         this.makeThumbnail = makeThumbnail;
@@ -51,6 +55,8 @@ class MemeController {
         this.serveMeme = serveMeme;
         this.viewMeme = viewMeme;
         this.deleteMeme = deleteMeme;
+        this.flagMeme = flagMeme;
+        this.contentFlags = contentFlags;
         this.uploadRate = uploadRate;
     }
 
@@ -69,12 +75,14 @@ class MemeController {
     @GetMapping
     ResponseEntity<?> all(@org.springframework.web.bind.annotation.RequestParam(name = "tag",
             required = false) String tag) {
+        java.util.Set<String> nsfw = contentFlags.nsfwIds();
         if (tag == null || tag.isBlank()) {
-            return ResponseEntity.ok(listMemes.execute().stream().map(id -> Map.of("id", id)).toList());
+            return ResponseEntity.ok(listMemes.execute().stream()
+                    .map(id -> Map.of("id", id, "nsfw", nsfw.contains(id))).toList());
         }
         try {
             return ResponseEntity.ok(searchMemesByTag.execute(com.jrobertgardzinski.memes.tags.Tag.of(tag))
-                    .stream().map(id -> Map.of("id", id)).toList());
+                    .stream().map(id -> Map.of("id", id, "nsfw", nsfw.contains(id))).toList());
         } catch (IllegalArgumentException illegalTag) {
             return ResponseEntity.badRequest().body(Map.of("status", "INVALID_TAG"));
         }
@@ -103,10 +111,27 @@ class MemeController {
     /** A meme's public metadata (who uploaded it) — the gallery uses it to offer the author the
      *  delete control on their own memes. The bytes are served separately. */
     @GetMapping("/{id}/meta")
-    ResponseEntity<Map<String, String>> meta(@PathVariable("id") String id) {
+    ResponseEntity<Map<String, Object>> meta(@PathVariable("id") String id) {
         return viewMeme.execute(id)
-                .map(meme -> ResponseEntity.ok(Map.of("id", meme.id(), "author", meme.author())))
+                .map(meme -> ResponseEntity.ok(Map.<String, Object>of(
+                        "id", meme.id(), "author", meme.author(), "nsfw", contentFlags.isNsfw(id))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** Flag a meme NSFW (or take the flag back): a MODERATOR-only judgement — authors may label
+     *  their uploads editorially, but the gallery's blur trusts only the moderator's word. */
+    @org.springframework.web.bind.annotation.PutMapping("/{id}/nsfw")
+    ResponseEntity<?> flagNsfw(@PathVariable("id") String id,
+                               @org.springframework.web.bind.annotation.RequestBody Map<String, Boolean> body,
+                               @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
+                                       required = false) java.util.Set<String> roles) {
+        boolean moderator = roles != null && (roles.contains("MODERATOR") || roles.contains("ADMIN"));
+        boolean nsfw = Boolean.TRUE.equals(body.get("nsfw"));
+        return switch (flagMeme.execute(id, nsfw, moderator)) {
+            case FLAGGED -> ResponseEntity.ok(Map.of("id", id, "nsfw", nsfw));
+            case NOT_A_MODERATOR -> ResponseEntity.status(403).body(Map.of("status", "NOT_A_MODERATOR"));
+            case NO_SUCH_MEME -> ResponseEntity.notFound().build();
+        };
     }
 
     /** Take a meme down: its author may remove their own, a MODERATOR may remove anyone's. */

@@ -77,6 +77,12 @@ class MemesConfig {
     }
 
     @Bean
+    com.jrobertgardzinski.memes.application.FlagMeme flagMeme(
+            MemeRepository memeRepository, com.jrobertgardzinski.memes.application.ContentFlags contentFlags) {
+        return new com.jrobertgardzinski.memes.application.FlagMeme(memeRepository, contentFlags);
+    }
+
+    @Bean
     com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme(
             MemeRepository memeRepository, VoteRepository voteRepository, MemeContentIndex contentIndex,
             TagRepository tagRepository, com.jrobertgardzinski.memes.application.MemeEvents memeEvents) {

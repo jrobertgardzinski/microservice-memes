@@ -27,6 +27,7 @@ public class ModerationSteps {
 
     private String memeId;
     private Response lastDelete;
+    private Response lastFlag;
 
     @Given("a meme uploaded by its author")
     public void aMemeUploadedByItsAuthor() throws Exception {
@@ -92,6 +93,52 @@ public class ModerationSteps {
     @Then("the meme is gone")
     public void memeGone() {
         assertEquals(404, RestAssured.given().port(port).get("/memes/{id}", memeId).statusCode());
+    }
+
+    @When("a moderator flags it NSFW")
+    public void moderatorFlagsNsfw() {
+        lastFlag = flag(TestAuthConfig.MODERATOR_TOKEN, true);
+        assertEquals(200, lastFlag.statusCode());
+    }
+
+    @When("a moderator takes the NSFW flag back")
+    public void moderatorUnflags() {
+        lastFlag = flag(TestAuthConfig.MODERATOR_TOKEN, false);
+        assertEquals(200, lastFlag.statusCode());
+    }
+
+    @When("the author tries to flag it NSFW")
+    public void authorTriesToFlag() {
+        lastFlag = flag(TestAuthConfig.VALID_TOKEN, true);
+    }
+
+    @Then("the flagging is refused as not-a-moderator")
+    public void flaggingRefused() {
+        assertEquals(403, lastFlag.statusCode());
+        assertEquals("NOT_A_MODERATOR", lastFlag.jsonPath().getString("status"));
+    }
+
+    @Then("the gallery lists the meme as NSFW")
+    public void listedAsNsfw() {
+        assertEquals(true, galleryNsfwOf(memeId), "the listing must carry the flag");
+    }
+
+    @Then("the gallery lists the meme as safe")
+    public void listedAsSafe() {
+        assertEquals(false, galleryNsfwOf(memeId));
+    }
+
+    private Boolean galleryNsfwOf(String id) {
+        return RestAssured.given().port(port).get("/memes")
+                .jsonPath().getBoolean("find { it.id == '" + id + "' }.nsfw");
+    }
+
+    private Response flag(String token, boolean nsfw) {
+        return RestAssured.given().port(port)
+                .header("Authorization", "Bearer " + token)
+                .contentType("application/json")
+                .body("{\"nsfw\":" + nsfw + "}")
+                .put("/memes/{id}/nsfw", memeId);
     }
 
     private Response delete(String token) {

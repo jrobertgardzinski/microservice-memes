@@ -97,7 +97,14 @@ export default function App() {
               <Card key={m.id}>
                 <CardActionArea onClick={() => setSelected(m.id)}>
                   <CardMedia component="img" image={`/memes/${m.id}/thumbnail`} loading="lazy"
-                             sx={{ aspectRatio: '1', objectFit: 'cover' }} />
+                             sx={{ aspectRatio: '1', objectFit: 'cover',
+                                   // NSFW: the moderators' flag blurs the tile; opening the
+                                   // dialog is the deliberate act that reveals the image
+                                   ...(m.nsfw ? { filter: 'blur(14px)' } : {}) }} />
+                  {m.nsfw && (
+                    <Chip label="NSFW" size="small" color="warning"
+                          sx={{ position: 'absolute', top: 6, right: 6 }} />
+                  )}
                   <Chip label={`▲ ${scores[m.id] ?? 0}`} size="small"
                         sx={{ position: 'absolute', bottom: 6, left: 6 }} />
                 </CardActionArea>
