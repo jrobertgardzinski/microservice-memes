@@ -33,6 +33,18 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // the OAuth callback lands here with the access token in the FRAGMENT (never sent to a
+  // server); the refresh token already sits in security's HttpOnly cookie
+  useEffect(() => {
+    const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const oauthToken = fragment.get('accessToken');
+    const oauthError = fragment.get('oauthError');
+    if (!oauthToken && !oauthError) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (oauthToken) onToken(oauthToken);
+    else setNotice({ tone: 'warning', text: `Social sign-in did not complete (${prettify(oauthError!)}).` });
+  }, [onToken]);
+
   // the verification mail links here (?verify=<token>); confirm it on arrival
   useEffect(() => {
     const mailed = new URLSearchParams(location.search).get('verify');
@@ -172,6 +184,16 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
           />
           <Button type="submit" variant="contained" disabled={busy || !email || !password}>
             {mode === 'signup' ? 'Create account' : 'Sign in'}
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => {
+              // security drives the whole OAuth dance; in the local stack "google" is the stub IdP
+              const back = encodeURIComponent(location.origin + location.pathname);
+              location.href = `${SECURITY}/oauth/google/start?return=${back}`;
+            }}
+          >
+            Sign in with Google
           </Button>
         </Stack>
       </Box>
