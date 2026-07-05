@@ -40,11 +40,19 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
   useEffect(() => {
     const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
     const oauthToken = fragment.get('accessToken');
+    const oauthTicket = fragment.get('mfaTicket');
     const oauthError = fragment.get('oauthError');
-    if (!oauthToken && !oauthError) return;
+    if (!oauthToken && !oauthTicket && !oauthError) return;
     history.replaceState(null, '', location.pathname + location.search);
     if (oauthToken) onToken(oauthToken);
-    else setNotice({ tone: 'warning', text: `Social sign-in did not complete (${prettify(oauthError!)}).` });
+    else if (oauthTicket) {
+      // the provider login was link #1; the account has more factors — finish the chain here
+      setMfaTicket(oauthTicket);
+      setCode('');
+      setMode('mfa');
+    } else {
+      setNotice({ tone: 'warning', text: `Social sign-in did not complete (${prettify(oauthError!)}).` });
+    }
   }, [onToken]);
 
   // the verification mail links here (?verify=<token>); confirm it on arrival
