@@ -197,6 +197,9 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
                        value={code} onChange={(e) => setCode(e.target.value)} />
             <Button type="submit" variant="contained" disabled={!code}>Sign in</Button>
             <Button variant="text" onClick={() => setMode('signin')}>Start over</Button>
+            <Typography variant="caption" color="text.secondary">
+              Lost access? Type one of your recovery codes instead — it works once.
+            </Typography>
           </Stack>
         </Box>
         {notice && <Alert severity={notice.tone} sx={{ mt: 1.5 }}>{notice.text}</Alert>}
