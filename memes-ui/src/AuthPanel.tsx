@@ -34,6 +34,15 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [mfaTicket, setMfaTicket] = useState('');
   const [code, setCode] = useState('');
+  const [providers, setProviders] = useState<{ name: string; label: string }[]>([]);
+
+  // one button per configured provider — adding one to security's config is all it takes
+  useEffect(() => {
+    void fetch(`${SECURITY}/oauth/providers`)
+      .then((r) => (r.ok ? r.json() : { providers: [] }))
+      .then((body) => setProviders(body.providers ?? []))
+      .catch(() => setProviders([]));
+  }, []);
 
   // the OAuth callback lands here with the access token in the FRAGMENT (never sent to a
   // server); the refresh token already sits in security's HttpOnly cookie
@@ -238,16 +247,19 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
           <Button type="submit" variant="contained" disabled={busy || !email || !password}>
             {mode === 'signup' ? 'Create account' : 'Sign in'}
           </Button>
-          <Button
-            variant="outlined"
-            onClick={() => {
-              // security drives the whole OAuth dance; in the local stack "google" is the stub IdP
-              const back = encodeURIComponent(location.origin + location.pathname);
-              location.href = `${SECURITY}/oauth/google/start?return=${back}`;
-            }}
-          >
-            Sign in with Google
-          </Button>
+          {providers.map((provider) => (
+            <Button
+              key={provider.name}
+              variant="outlined"
+              onClick={() => {
+                // security drives the whole OAuth dance; in the local stack the providers are stub IdPs
+                const back = encodeURIComponent(location.origin + location.pathname);
+                location.href = `${SECURITY}/oauth/${provider.name}/start?return=${back}`;
+              }}
+            >
+              Sign in with {provider.label}
+            </Button>
+          ))}
         </Stack>
       </Box>
       {notice && (
