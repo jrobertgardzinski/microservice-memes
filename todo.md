@@ -2,6 +2,11 @@
 
 Only open items. History = git log.
 
+**Plan pracy z instrukcjami wykonawczymi: [docs/opus-playbook.md](docs/opus-playbook.md)**
+(2026-07-07; UWAGA: ten todo jest w tyle za repo — NSFW, offline JWT i Google w galerii
+są ZROBIONE; uzgodnienie = zadanie M0 playbooka. Dalej: M1 polityka czystki z bazy →
+M2 ObjectStore S3/MinIO → M3 dokumentacja).
+
 ## Zrobione (walking skeleton)
 - Multi-module Spring Boot (domain / config / image / application / infrastructure).
 - Upload obrazka → optymalizacja do PNG (BMP→PNG, ImageIO) → zapis → serwowanie.
