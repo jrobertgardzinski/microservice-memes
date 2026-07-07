@@ -3,8 +3,7 @@
 Only open items. History = git log.
 
 **Plan pracy z instrukcjami wykonawczymi: [docs/opus-playbook.md](docs/opus-playbook.md)**
-(2026-07-07; UWAGA: ten todo jest w tyle za repo — NSFW, offline JWT i Google w galerii
-są ZROBIONE; uzgodnienie = zadanie M0 playbooka. Dalej: M1 polityka czystki z bazy →
+(2026-07-07; M0 uzgodnienie todo ZROBIONE — dalej: M1 polityka czystki z bazy →
 M2 ObjectStore S3/MinIO → M3 dokumentacja).
 
 ## Zrobione (walking skeleton)
@@ -39,6 +38,19 @@ M2 ObjectStore S3/MinIO → M3 dokumentacja).
   memy i głosy na memy (lib `voting`); skasowany mem ogłasza `MEME_DELETED`, a serwis komentarzy
   kasuje wątek.
 
+## Zrobione (2026-07-04..06 — moderacja, bramy, galeria×security; odnotowane 2026-07-07)
+- **Moderacja + NSFW** — role z security (`Caller{email,roles}` przez bramę): MODERATOR/ADMIN
+  kasuje cudze memy (`50557b7`, cucumber `f56cc81`, przyciski w galerii `8425e20`, autor swoje
+  także z UI `5dcdf70`); **flaga NSFW moderatora rozmywa galerię** (`7ece5d3`: `FlagMeme`/
+  `ContentFlags`/`JdbcContentFlags`, `moderate-meme.feature`, blur+odsłona w UI).
+- **Offline JWT gate** (`3875410`): `JwtSecurityAuthenticationGate` weryfikuje access token
+  po JWKS security (Ed25519) zamiast wołać `/me` — mniej ruchu; kompromis jak w security/todo
+  (offline nie widzi logoutu do wygaśnięcia).
+- **Galeria × security, pełny łańcuch** — logowanie z MFA (krok kodu `90baddb`), dokończenie
+  OAuth wymagającego czynnika (`7c1b37e`), step-up przed delete (`404d9cb`), przyciski social
+  z `GET /oauth/providers` (`a269c60`), hint recovery codes (`c18bb3d`), sign-in z Google
+  (`ef60d6d`), cichy kontrakt rejestracji (`d9ad4b7`).
+
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja
   lowercase/trim, 2..30 znaków [a-z0-9-], pojedyncze myślniki), use case'y `TagMeme` (autor
@@ -54,8 +66,9 @@ M2 ObjectStore S3/MinIO → M3 dokumentacja).
   kontraktu. Zegar przez java.time.Clock (bean).
 - ~~EXIF~~ — ZROBIONE (2026-07-04): jawny pin — spreparowany JPEG z segmentem APP1 Exif
   ("SecretGPSLocation…") wchodzi, wychodzi PNG bez śladu metadanych.
-- ~~Rate-limit uploadu~~ — ZROBIONE (2026-07-04): `RateLimit` w memes-config (per-uploader, env MEMES_UPLOAD_RATE_LIMIT, default 12/min, 0 wyłącza), 429+Retry-After w POST /memes; unit pin + MockMvc z limitem 1/min. **flaga NSFW / moderacja** (moderator = rola po stronie security — czeka
-  na RBAC tam).
+- ~~Rate-limit uploadu~~ — ZROBIONE (2026-07-04): `RateLimit` w memes-config (per-uploader, env MEMES_UPLOAD_RATE_LIMIT, default 12/min, 0 wyłącza), 429+Retry-After w POST /memes; unit pin + MockMvc z limitem 1/min.
+- ~~Flaga NSFW / moderacja~~ — ZROBIONE (2026-07-05, patrz sekcja wyżej): RBAC w security
+  odblokował temat, moderator flaguje, galeria rozmywa.
 - ~~Dedup pod współbieżnością~~ — ZROBIONE (2026-07-04): port `MemeContentIndex` to teraz
   atomowy `claim(data, candidateId)` (putIfAbsent) — przy dwóch równoczesnych uploadach wygrywa
   dokładnie jeden id i nic osieroconego nie jest zapisywane (save dopiero PO wygranym claimie);
