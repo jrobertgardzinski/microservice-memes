@@ -35,12 +35,12 @@ interface Props {
 function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote: (d: VoteDirection) => void }) {
   return (
     <>
-      <IconButton size="small" onClick={() => onVote('UP')}
+      <IconButton size="small" aria-label="vote up" onClick={() => onVote('UP')}
                   color={myVote === 'UP' ? 'primary' : 'default'}
                   sx={myVote === 'UP' ? { bgcolor: 'primary.dark' } : undefined}>
         <ArrowUpwardIcon fontSize="inherit" />
       </IconButton>
-      <IconButton size="small" onClick={() => onVote('DOWN')}
+      <IconButton size="small" aria-label="vote down" onClick={() => onVote('DOWN')}
                   color={myVote === 'DOWN' ? 'error' : 'default'}
                   sx={myVote === 'DOWN' ? { bgcolor: 'error.dark' } : undefined}>
         <ArrowDownwardIcon fontSize="inherit" />
@@ -162,7 +162,7 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
              sx={{ width: '100%', borderRadius: 2 }} />
         <Stack direction="row" spacing={1} alignItems="center" sx={{ my: 1 }}>
           <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
-          <Chip label={tally.score} size="small" />
+          <Chip data-testid="meme-score" label={tally.score} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
           {nsfw && <Chip label="NSFW" size="small" color="warning" />}
           {isModerator && (
