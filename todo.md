@@ -3,7 +3,7 @@
 Only open items. History = git log.
 
 **Plan pracy z instrukcjami wykonawczymi: [docs/opus-playbook.md](docs/opus-playbook.md)**
-(2026-07-07; M0 i M1 ZROBIONE — dalej: M2 ObjectStore S3/MinIO → M3 dokumentacja).
+(2026-07-07; M0–M2 ZROBIONE — zostaje M3 dokumentacja).
 
 ## Zrobione (walking skeleton)
 - Multi-module Spring Boot (domain / config / image / application / infrastructure).
@@ -90,9 +90,15 @@ Only open items. History = git log.
   z wiersza mema za port `ObjectStore` (put/get/delete po id); JdbcMemeRepository trzyma tylko
   metadane i deleguje bajty (zapis/odczyt/kasowanie razem, transakcyjnie). Migracja V2 przenosi
   bajty do `meme_blobs` i usuwa kolumnę `data`. Dwa adaptery: DB-blob (default, bez nowych
-  zależności) i FILESYSTEM (`memes.blob-store=filesystem`, `memes.blob-dir`) — S3/MinIO to
-  trzeci adapter o tym samym kształcie. Zweryfikowane na PG (schemat V2) + testy (MockMvc round-
-  trip, FilesystemObjectStoreTest z ochroną przed path-traversal).
+  zależności) i FILESYSTEM (`memes.blob-store=filesystem`, `memes.blob-dir`). Zweryfikowane
+  na PG (schemat V2) + testy (MockMvc round-trip, FilesystemObjectStoreTest z ochroną przed
+  path-traversal). TRZECI ADAPTER S3/MinIO — ZROBIONY (2026-07-07): `S3ObjectStore`
+  (awssdk s3, `memes.blob-store=s3`, path-style dla MinIO, bucket tworzony idempotentnie
+  na starcie), round-trip na ŻYWYM MinIO (Testcontainers, skip bez dockera; gotcha
+  Docker≥29 → `~/.docker-java.properties` w README), MinIO w compose workspace'u + krok
+  smoke (obiekt mema widoczny w bucket). PRZY OKAZJI NAPRAWIONY BUG doboru adaptera:
+  DbObjectStore był bezwarunkowo `@Primary`, więc `memes.blob-store=filesystem` niczego
+  nie przełączał — teraz dokładnie jeden bean per tryb, pin `BlobStoreSelectionTest`.
 - ~~WebP~~ — ZROBIONE (2026-07-04): OSOBNY MIKROSERWIS `microservice-image` (Python + Pillow,
   bezframeworkowy jak race-sim: POST /encode?format=webp&quality=, /health). memes: port
   `ImageEncoder` + adapter HTTP (`HttpImageEncoder`, pusty URL/awaria = empty), use case

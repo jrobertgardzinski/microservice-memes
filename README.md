@@ -83,3 +83,17 @@ comment listings include each comment's current score.
 ../mvnw -f pom.xml test                              # all module tests (JDK 25 + Spring Boot 3.5)
 ../mvnw -f pom.xml -pl memes-infrastructure spring-boot:run   # run the service (port 8083)
 ```
+
+## Where the image bytes live (`memes.blob-store` / env `MEMES_BLOB_STORE`)
+
+Metadata is always in the database; the bytes sit behind the `ObjectStore` port with three
+interchangeable adapters — `db` (default: a blob table, durability matches the metadata),
+`filesystem` (`memes.blob-dir`), and `s3` (`memes.s3.endpoint/bucket/access-key/secret-key`,
+`path-style` on by default — serves MinIO in the compose stack and real S3 alike; the bucket
+is created at startup). Exactly one adapter bean exists per mode, pinned by
+`BlobStoreSelectionTest`.
+
+> Testcontainers note: the S3 adapter's round-trip test runs against a real MinIO and skips
+> without docker. On Docker Engine ≥ 29 the bundled docker-java client may refuse to negotiate
+> (`client version 1.32 is too old`) — fix once per machine with
+> `echo "api.version=1.44" > ~/.docker-java.properties`.

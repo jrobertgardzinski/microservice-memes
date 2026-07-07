@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.ObjectStore;
-import org.springframework.context.annotation.Primary;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -10,10 +10,13 @@ import java.util.Optional;
 /**
  * The default {@link ObjectStore}: image bytes in their own database table, so durability matches
  * the metadata with no external service. The seam is what matters — swap this bean for the
- * filesystem or an S3 adapter and nothing else in the service changes.
+ * filesystem or the S3 adapter and nothing else in the service changes. (Was {@code @Primary}
+ * with no condition, which silently outranked the filesystem adapter even when
+ * {@code memes.blob-store=filesystem} — exactly one store bean exists per mode now, pinned by
+ * {@code BlobStoreSelectionTest}.)
  */
 @Component
-@Primary
+@ConditionalOnProperty(name = "memes.blob-store", havingValue = "db", matchIfMissing = true)
 class DbObjectStore implements ObjectStore {
 
     private final JdbcClient jdbc;
