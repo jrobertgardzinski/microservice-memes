@@ -3,8 +3,7 @@
 Only open items. History = git log.
 
 **Plan pracy z instrukcjami wykonawczymi: [docs/opus-playbook.md](docs/opus-playbook.md)**
-(2026-07-07; M0 uzgodnienie todo ZROBIONE — dalej: M1 polityka czystki z bazy →
-M2 ObjectStore S3/MinIO → M3 dokumentacja).
+(2026-07-07; M0 i M1 ZROBIONE — dalej: M2 ObjectStore S3/MinIO → M3 dokumentacja).
 
 ## Zrobione (walking skeleton)
 - Multi-module Spring Boot (domain / config / image / application / infrastructure).
@@ -75,8 +74,12 @@ M2 ObjectStore S3/MinIO → M3 dokumentacja).
   pin: test z dwoma wątkami na jednej bramce.
 
 ## Otwarte — infra
-- **Default polityki czystki z bazy** — dziś default z env; docelowo nadpisywalny w bazie
-  (panel administracyjny), wybór per żądanie już działa.
+- ~~Default polityki czystki z bazy~~ — ZROBIONE (2026-07-07): port `PurgePolicyOverride`
+  + generyczna tabela `settings` (V4, klucz `purge.memes`), rozstrzyganie wizard > baza > env
+  w `PurgeUserContent`; REST `GET/PUT/DELETE /admin/purge-policy` (filtr wymaga zalogowania
+  na całym `/admin/**`, kontroler roli ADMIN — 403 NOT_AN_ADMIN); `PurgeRule.asText()`
+  (odwrotność parse, round-trip w teście); panel „Admin" w galerii (dial + reset do env).
+  Testy: 2 nowe unit w PurgeUserContentTest + `admin-purge-policy.feature` (3 scenariusze).
 - **Realna persystencja** — ZROBIONA W RDZENIU (2026-07-04): metadane I bajty w bazie —
   Postgres na stacku (DB_URL), bez DB_URL in-memory H2 w trybie PostgreSQL (dev/testy jeżdżą
   na TYCH SAMYCH adapterach JDBC co produkcja, zero drugiej implementacji); Flyway V1 (memes/

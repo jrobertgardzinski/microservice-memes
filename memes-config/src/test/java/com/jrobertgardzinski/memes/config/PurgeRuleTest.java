@@ -31,6 +31,14 @@ class PurgeRuleTest {
     }
 
     @Test
+    @DisplayName("asText is the inverse of parse — the vocabulary round-trips")
+    void renders_back_to_the_vocabulary() {
+        for (String text : new String[]{"DELETE", "ANONYMIZE_AUTHOR", "KEEP_POPULAR_ANONYMIZED:100"}) {
+            assertEquals(text, PurgeRule.parse(text).asText());
+        }
+    }
+
+    @Test
     @DisplayName("popularity decides what a rule keeps")
     void keeps_by_score() {
         assertFalse(new PurgeRule.Delete().keeps(1000));

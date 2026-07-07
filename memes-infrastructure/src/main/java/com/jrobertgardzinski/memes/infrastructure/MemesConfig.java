@@ -128,9 +128,11 @@ class MemesConfig {
     @Bean
     PurgeUserContent purgeUserContent(MemeRepository memeRepository, VoteRepository voteRepository,
                                       MemeContentIndex contentIndex, TagRepository tagRepository,
-                                      MemeEvents memeEvents, PurgeRule defaultMemesPurgeRule) {
+                                      MemeEvents memeEvents,
+                                      com.jrobertgardzinski.memes.application.PurgePolicyOverride override,
+                                      PurgeRule defaultMemesPurgeRule) {
         return new PurgeUserContent(memeRepository, voteRepository, contentIndex, tagRepository,
-                memeEvents, defaultMemesPurgeRule);
+                memeEvents, override, defaultMemesPurgeRule);
     }
 
     @Bean

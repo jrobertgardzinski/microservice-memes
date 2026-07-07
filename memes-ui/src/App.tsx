@@ -13,6 +13,8 @@ import Stack from '@mui/material/Stack';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import UploadIcon from '@mui/icons-material/Upload';
+import SettingsIcon from '@mui/icons-material/Settings';
+import AdminPanel from './AdminPanel';
 import AuthPanel from './AuthPanel';
 import MemeDialog from './MemeDialog';
 import { authHeader, hotMemes, listMemes, MemeRef, SECURITY } from './api';
@@ -21,6 +23,8 @@ export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('accessToken'));
   const [user, setUser] = useState('');
   const [isModerator, setIsModerator] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [memes, setMemes] = useState<MemeRef[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [selected, setSelected] = useState<string | null>(null);
@@ -39,6 +43,7 @@ export default function App() {
     if (!token) {
       setUser('');
       setIsModerator(false);
+      setIsAdmin(false);
       localStorage.removeItem('accessToken');
       return;
     }
@@ -49,6 +54,7 @@ export default function App() {
         setUser(me.email);
         const roles = me.roles ?? [];
         setIsModerator(roles.includes('MODERATOR') || roles.includes('ADMIN'));
+        setIsAdmin(roles.includes('ADMIN'));
       })
       .catch(() => setToken(null));
   }, [token]);
@@ -68,6 +74,11 @@ export default function App() {
       <AppBar position="sticky" color="default">
         <Toolbar variant="dense">
           <Typography variant="h6" sx={{ flex: 1 }}>memes</Typography>
+          {isAdmin && (
+            <Button startIcon={<SettingsIcon />} onClick={() => setAdminOpen(true)} sx={{ mr: 1 }}>
+              Admin
+            </Button>
+          )}
           <Button component="label" variant="contained" startIcon={<UploadIcon />}
                   onClick={(e) => { if (!token) { e.preventDefault(); requireSignIn(); } }}>
             Upload
@@ -126,6 +137,8 @@ export default function App() {
                     onDeleted={() => { setSelected(null); refresh(); }}
                     onClose={() => setSelected(null)} />
       )}
+
+      <AdminPanel token={token} open={adminOpen} onClose={() => setAdminOpen(false)} />
 
       <Snackbar open={warning !== null} autoHideDuration={4000} onClose={() => setWarning(null)}>
         <Alert severity="warning" onClose={() => setWarning(null)}>{warning}</Alert>

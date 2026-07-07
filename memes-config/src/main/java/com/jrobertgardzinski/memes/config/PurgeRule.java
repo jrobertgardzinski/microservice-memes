@@ -21,6 +21,15 @@ public sealed interface PurgeRule {
         }
     }
 
+    /** The canonical textual form — the inverse of {@link #parse}. */
+    default String asText() {
+        return switch (this) {
+            case Delete() -> "DELETE";
+            case AnonymizeAuthor() -> "ANONYMIZE_AUTHOR";
+            case KeepPopularAnonymized(int minScore) -> "KEEP_POPULAR_ANONYMIZED:" + minScore;
+        };
+    }
+
     /** True when content with this score survives (anonymised) under the rule. */
     default boolean keeps(int score) {
         return switch (this) {

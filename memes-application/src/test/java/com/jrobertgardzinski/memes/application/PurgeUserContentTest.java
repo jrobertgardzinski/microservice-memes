@@ -85,7 +85,22 @@ class PurgeUserContentTest {
         }
     };
 
-    private final PurgeUserContent purge = new PurgeUserContent(memeRepository, voteRepository, index, tagRepository, memeEvents, new PurgeRule.Delete());
+    private Optional<PurgeRule> adminOverride = Optional.empty();
+    private final PurgePolicyOverride override = new PurgePolicyOverride() {
+        public Optional<PurgeRule> current() {
+            return adminOverride;
+        }
+
+        public void set(PurgeRule rule, String updatedBy) {
+            adminOverride = Optional.of(rule);
+        }
+
+        public void clear() {
+            adminOverride = Optional.empty();
+        }
+    };
+
+    private final PurgeUserContent purge = new PurgeUserContent(memeRepository, voteRepository, index, tagRepository, memeEvents, override, new PurgeRule.Delete());
 
     @Test
     @DisplayName("the leaver's memes disappear with their votes; the thread owner is told")
@@ -115,6 +130,30 @@ class PurgeUserContentTest {
         assertEquals(DeletedAccount.AUTHOR, memes.get("hit").author());
         assertFalse(memes.containsKey("flop"));
         assertEquals(List.of("flop"), announcedDeletions); // only the deleted one is announced
+    }
+
+    @Test
+    @DisplayName("the admin's override beats the deployment default")
+    void admin_override_beats_the_default() {
+        adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
+        memes.put("kept", new Meme("kept", "leaver@example.com", "png", new byte[]{1}));
+
+        purge.execute("leaver@example.com", Optional.empty());   // default says DELETE
+
+        assertEquals(DeletedAccount.AUTHOR, memes.get("kept").author());
+        assertTrue(announcedDeletions.isEmpty());
+    }
+
+    @Test
+    @DisplayName("the leaver's wizard choice beats the admin's override")
+    void wizard_choice_beats_the_override() {
+        adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
+        memes.put("gone", new Meme("gone", "leaver@example.com", "png", new byte[]{1}));
+
+        purge.execute("leaver@example.com", Optional.of(new PurgeRule.Delete()));
+
+        assertTrue(memes.isEmpty());
+        assertEquals(List.of("gone"), announcedDeletions);
     }
 
     @Test

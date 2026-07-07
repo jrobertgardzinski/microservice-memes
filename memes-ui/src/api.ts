@@ -97,3 +97,31 @@ export const deleteComment = async (
 ): Promise<boolean> =>
   (await fetch(`${COMMENTS}/memes/${memeId}/comments/${commentId}`,
     { method: 'DELETE', headers: authHeader(token) })).ok;
+
+/** The purge-policy dial, admin-only: what happens to a leaver's memes unless their wizard says otherwise. */
+export interface PurgePolicy {
+  axis: string;
+  effective: string;
+  source: 'DB' | 'ENV';
+  envDefault: string;
+}
+
+export const getPurgePolicy = async (token: string | null): Promise<PurgePolicy | null> => {
+  const r = await fetch('/admin/purge-policy', { headers: authHeader(token) });
+  return r.ok ? r.json() : null;
+};
+
+export const setPurgePolicy = async (
+  rule: string, token: string | null,
+): Promise<{ ok: boolean; detail?: string }> => {
+  const r = await fetch('/admin/purge-policy', {
+    method: 'PUT',
+    headers: { ...jsonHeaders, ...authHeader(token) },
+    body: JSON.stringify({ memes: rule }),
+  });
+  const body = await r.json().catch(() => ({}));
+  return r.ok ? { ok: true } : { ok: false, detail: body.detail ?? body.status ?? String(r.status) };
+};
+
+export const clearPurgePolicy = async (token: string | null): Promise<boolean> =>
+  (await fetch('/admin/purge-policy', { method: 'DELETE', headers: authHeader(token) })).ok;
