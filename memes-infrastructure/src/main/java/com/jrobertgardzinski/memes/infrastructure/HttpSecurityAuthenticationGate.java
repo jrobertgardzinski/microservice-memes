@@ -44,7 +44,11 @@ class HttpSecurityAuthenticationGate implements SecurityAuthenticationGate {
             Set<String> roles = body.get("roles") instanceof Collection<?> raw
                     ? raw.stream().map(String::valueOf).collect(Collectors.toUnmodifiableSet())
                     : Set.of("USER");
-            return Optional.of(new Caller(email, roles));
+            // the MFA floor: an under-enrolled privileged account acts as a plain USER (fail-closed
+            // when the field is missing — an old security that doesn't report it withholds nothing
+            // from ordinary users, only from privileged ones)
+            boolean mfaCompliant = Boolean.TRUE.equals(body.get("mfaCompliant"));
+            return Optional.of(new Caller(email, Caller.withMfaFloor(roles, mfaCompliant)));
         } catch (RestClientException invalidTokenOrServiceDown) {
             return Optional.empty();
         }
