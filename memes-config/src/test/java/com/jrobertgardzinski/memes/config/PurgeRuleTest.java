@@ -10,6 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Mirrored by {@code PurgeRuleContractTest} in microservice-comments — the vocabulary is a shared
+ * textual contract (deliberately duplicated; a library waits for a third consumer). Change the
+ * literals here and the mirror goes red, by design.
+ */
 @Epic("Config")
 @Feature("Purge rules")
 class PurgeRuleTest {
