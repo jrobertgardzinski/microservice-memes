@@ -6,9 +6,11 @@ import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.config.PurgeRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,7 +56,19 @@ class PurgeCommandsListener {
     }
 
     @KafkaListener(topics = "content-commands", groupId = "memes")
-    void receive(String payload) throws Exception {
+    void receive(String payload,
+                 @Header(name = KafkaTracing.HEADER, required = false) String cid) throws Exception {
+        if (cid != null) {
+            MDC.put("cid", cid);   // continue the trace the deletion request started in security
+        }
+        try {
+            handle(payload);
+        } finally {
+            MDC.remove("cid");
+        }
+    }
+
+    private void handle(String payload) throws Exception {
         JsonNode command;
         try {
             command = mapper.readTree(payload);
@@ -68,9 +82,10 @@ class PurgeCommandsListener {
         String email = command.path("email").asText();
         purgeUserContent.execute(email, requestedPolicy(command));
         LOG.info("purged content of {} (saga {})", email, command.path("sagaId").asText());
-        kafka.send("memes-events", email, mapper.writeValueAsString(mapper.createObjectNode()
+        // forward the cid on the confirmation so security's listener continues the same trace
+        kafka.send(KafkaTracing.withCid("memes-events", email, mapper.writeValueAsString(mapper.createObjectNode()
                 .put("type", "USER_CONTENT_PURGED")
                 .put("sagaId", command.path("sagaId").asText())
-                .put("email", email)));
+                .put("email", email))));
     }
 }

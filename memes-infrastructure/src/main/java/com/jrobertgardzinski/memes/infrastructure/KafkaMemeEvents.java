@@ -21,6 +21,7 @@ class KafkaMemeEvents implements MemeEvents {
 
     @Override
     public void memeDeleted(String memeId) {
-        kafka.send("memes-events", memeId, "{\"type\":\"MEME_DELETED\",\"memeId\":\"" + memeId + "\"}");
+        kafka.send(KafkaTracing.withCid("memes-events", memeId,
+                "{\"type\":\"MEME_DELETED\",\"memeId\":\"" + memeId + "\"}"));
     }
 }
