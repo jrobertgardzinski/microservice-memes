@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.ObjectStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,7 @@ class S3ObjectStore implements ObjectStore {
     private final S3Client s3;
     private final String bucket;
 
+    @Autowired   // two constructors: Spring must be told the Environment one is the container's
     S3ObjectStore(Environment env) {
         this(S3Client.builder()
                         .endpointOverride(URI.create(required(env, "memes.s3.endpoint")))
