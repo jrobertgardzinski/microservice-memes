@@ -9,6 +9,9 @@ import java.nio.charset.StandardCharsets;
  * Carries the correlation id across the Kafka boundary, so the async saga hops keep the same
  * {@code cid} as the request that started them (matching {@link CorrelationIdFilter} on the HTTP
  * edge). Producers stamp the header from MDC; consumers restore it into MDC for the log context.
+ *
+ * <p>Deliberately byte-identical (modulo package) with its twin in microservice-comments — audited
+ * 2026-07-07. If you change one, change both.
  */
 final class KafkaTracing {
 
