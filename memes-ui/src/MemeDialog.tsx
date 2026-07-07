@@ -12,9 +12,11 @@ import Button from '@mui/material/Button';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   authHeader, COMMENTS, deleteComment, deleteMeme, jsonHeaders, listComments, memeMeta, memeTags,
-  memeTally, MemeComment, setMemeNsfw, setMemeTags, VoteDirection, VoteTally,
+  memeTally, MemeComment, setCommentHidden, setMemeNsfw, setMemeTags, VoteDirection, VoteTally,
 } from './api';
 
 interface Props {
@@ -108,6 +110,12 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
       }
     });
 
+  const toggleHidden = (commentId: string, hidden: boolean) =>
+    guard(async () => {
+      if (await setCommentHidden(memeId, commentId, !hidden, token)) load();
+      else window.alert('Only a moderator may hide a comment.');
+    });
+
   const voteMeme = (direction: VoteDirection) =>
     guard(async () => {
       const r = await fetch(`/memes/${memeId}/votes`, {
@@ -195,10 +203,24 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
         {comments.map((c) => (
           <Stack key={c.id} direction="row" spacing={1} alignItems="center" sx={{ py: 0.5 }}>
             <Typography variant="body2" sx={{ flex: 1 }}>
-              <Box component="b" sx={{ color: 'primary.light' }}>{c.author}</Box> {c.text}
+              <Box component="b" sx={{ color: 'primary.light' }}>{c.author}</Box>{' '}
+              {c.hidden && c.text === null ? (
+                <Box component="i" sx={{ color: 'text.disabled' }}>hidden by a moderator</Box>
+              ) : (
+                <Box component="span" sx={c.hidden ? { color: 'text.disabled', fontStyle: 'italic' } : undefined}>
+                  {c.text}{c.hidden && ' (hidden by a moderator)'}
+                </Box>
+              )}
             </Typography>
             <Chip label={c.score} size="small" variant="outlined" />
             <VoteButtons myVote={c.myVote} onVote={(d) => voteComment(c.id, d)} />
+            {isModerator && (
+              <IconButton size="small" aria-label={c.hidden ? 'reveal comment' : 'hide comment'}
+                          title={c.hidden ? 'reveal (moderator)' : 'hide (moderator)'}
+                          onClick={() => toggleHidden(c.id, c.hidden ?? false)}>
+                {c.hidden ? <VisibilityIcon fontSize="inherit" /> : <VisibilityOffIcon fontSize="inherit" />}
+              </IconButton>
+            )}
             {(isModerator || c.author === user) && (
               <IconButton size="small" aria-label="delete comment"
                           title={c.author === user ? 'delete your comment' : 'delete (moderator)'}

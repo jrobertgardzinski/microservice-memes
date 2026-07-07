@@ -3,7 +3,9 @@
 Only open items. History = git log.
 
 **Plan pracy z instrukcjami wykonawczymi: [docs/opus-playbook.md](docs/opus-playbook.md)**
-(2026-07-07; M0–M3 ZROBIONE — playbook memes wyczerpany).
+(2026-07-07; M0–M3 ZROBIONE — playbook memes wyczerpany). Galeria dostała też odsłonę
+ukrywania komentarzy (C4 po stronie comments): przycisk oka moderatora + tombstone;
+naprawiony bliźniaczy leak `nsfwIds` (`.stream()`→`.list()`).
 
 ## Zrobione (walking skeleton)
 - Multi-module Spring Boot (domain / config / image / application / infrastructure).

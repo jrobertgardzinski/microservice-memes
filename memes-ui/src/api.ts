@@ -21,9 +21,12 @@ export interface HotEntry {
 export interface MemeComment {
   id: string;
   author: string;
-  text: string;
+  /** null for a reader when a moderator has hidden the comment (the author still sees their own) */
+  text: string | null;
   score: number;
   myVote: VoteDirection | null;
+  /** a moderator's soft flag: the comment shows as a tombstone rather than being deleted */
+  hidden?: boolean;
 }
 
 export type VoteDirection = 'UP' | 'DOWN';
@@ -97,6 +100,16 @@ export const deleteComment = async (
 ): Promise<boolean> =>
   (await fetch(`${COMMENTS}/memes/${memeId}/comments/${commentId}`,
     { method: 'DELETE', headers: authHeader(token) })).ok;
+
+/** Hide or reveal a comment — a moderator-only soft touch (a tombstone, not a deletion). */
+export const setCommentHidden = async (
+  memeId: string, commentId: string, hidden: boolean, token: string | null,
+): Promise<boolean> =>
+  (await fetch(`${COMMENTS}/memes/${memeId}/comments/${commentId}/hidden`, {
+    method: 'PUT',
+    headers: { ...jsonHeaders, ...authHeader(token) },
+    body: JSON.stringify({ hidden }),
+  })).ok;
 
 /** The purge-policy dial, admin-only: what happens to a leaver's memes unless their wizard says otherwise. */
 export interface PurgePolicy {

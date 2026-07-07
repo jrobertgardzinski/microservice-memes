@@ -5,7 +5,6 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Postgres-backed {@link ContentFlags} (H2 in dev/tests). One row per flagged meme; the foreign
@@ -37,7 +36,8 @@ class JdbcContentFlags implements ContentFlags {
 
     @Override
     public Set<String> nsfwIds() {
-        return jdbc.sql("SELECT meme_id FROM meme_flags WHERE nsfw")
-                .query(String.class).stream().collect(Collectors.toUnmodifiableSet());
+        // .list() materialises and closes the connection; .stream() would keep the cursor open
+        return Set.copyOf(jdbc.sql("SELECT meme_id FROM meme_flags WHERE nsfw")
+                .query(String.class).list());
     }
 }
