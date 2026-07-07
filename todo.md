@@ -3,7 +3,7 @@
 Only open items. History = git log.
 
 **Plan pracy z instrukcjami wykonawczymi: [docs/opus-playbook.md](docs/opus-playbook.md)**
-(2026-07-07; M0–M2 ZROBIONE — zostaje M3 dokumentacja).
+(2026-07-07; M0–M3 ZROBIONE — playbook memes wyczerpany).
 
 ## Zrobione (walking skeleton)
 - Multi-module Spring Boot (domain / config / image / application / infrastructure).
@@ -105,5 +105,8 @@ Only open items. History = git log.
   `ServeMeme` negocjuje po `Accept: image/webp` — WebP kodowany RAZ i cache'owany w ObjectStore
   pod kluczem {id}.webp, inaczej PNG (enkoder padł = degradacja jakości, nie dostępności).
   Zweryfikowane live: PNG 1790B → WebP 900B, cache w PG. Testy: 4 sim + WebpNegotiationTest.
-- **Dokumentacja jak w security** — glosariusz już skanuje domain/application/infrastructure warstwy;
-  ewentualnie cucumber-kontrakt.
+- ~~Dokumentacja jak w security~~ — ZROBIONE (2026-07-07): README dostał sekcję
+  „Documentation — the living contract" (feature'y jako kontrakt zachowania + wskazanie
+  workspace'owych powierzchni: glosariusz UL i zbiorczy Allure przez
+  `../create-documentation.sh`); generator celowo NIE dublowany per repo —
+  workspace'owy skanuje memes od dawna.

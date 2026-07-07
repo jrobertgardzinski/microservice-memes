@@ -84,6 +84,16 @@ comment listings include each comment's current score.
 ../mvnw -f pom.xml -pl memes-infrastructure spring-boot:run   # run the service (port 8083)
 ```
 
+## Documentation — the living contract
+
+The behaviour contract is the Cucumber features in
+`memes-infrastructure/src/test/resources/features/` (upload, vote, tag, moderate,
+admin-purge-policy) — black-box over HTTP, green in every build. The workspace-level tooling
+(`../create-documentation.sh`) folds this repo into the shared surfaces: the
+Ubiquitous-Language glossary (`../docs/glossary/glossary.md`, scanned from the domain,
+application and infrastructure layers here) and the aggregated Allure summary
+(`../allure-summary.md`). Run it from the workspace root after `mvn test` to regenerate both.
+
 ## Where the image bytes live (`memes.blob-store` / env `MEMES_BLOB_STORE`)
 
 Metadata is always in the database; the bytes sit behind the `ObjectStore` port with three
