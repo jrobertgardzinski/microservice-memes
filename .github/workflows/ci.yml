@@ -1,7 +1,7 @@
 name: CI
 
-# microservice-memes needs one sibling SNAPSHOT (voting, public), so CI checks it out and installs
-# it first. Checkouts use the workspace layout (each repo in its own directory) because the
+# microservice-memes needs two sibling SNAPSHOTs (voting and offline-jwt, both public), so CI
+# checks them out and installs them first. Checkouts use the workspace layout (each repo in its own directory) because the
 # saga-confirmation provider test verifies microservice-security's committed pact from the sibling
 # checkout. The reactor CI (in the aggregator repo) still validates everything together.
 
@@ -22,6 +22,10 @@ jobs:
         with:
           repository: jrobertgardzinski/voting
           path: voting
+      - uses: actions/checkout@v4
+        with:
+          repository: jrobertgardzinski/offline-jwt
+          path: offline-jwt
       # consumer of this service's confirmations — checkout only (its pacts/), no build
       - uses: actions/checkout@v4
         with:
@@ -33,7 +37,9 @@ jobs:
           distribution: temurin
           java-version: '25'
           cache: maven
-      - name: Install the voting library
-        run: mvn -B -q --no-transfer-progress -f voting/pom.xml install -DskipTests
+      - name: Install the shared libraries
+        run: |
+          mvn -B -q --no-transfer-progress -f voting/pom.xml install -DskipTests
+          mvn -B -q --no-transfer-progress -f offline-jwt/pom.xml install -DskipTests
       - name: Build and test (including pact provider verification)
         run: mvn -B --no-transfer-progress -f microservice-memes/pom.xml clean verify
