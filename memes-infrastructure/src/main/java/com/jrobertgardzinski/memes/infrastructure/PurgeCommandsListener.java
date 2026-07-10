@@ -86,6 +86,8 @@ class PurgeCommandsListener {
         kafka.send(KafkaTracing.withCid("memes-events", email, mapper.writeValueAsString(mapper.createObjectNode()
                 .put("type", "USER_CONTENT_PURGED")
                 .put("sagaId", command.path("sagaId").asText())
-                .put("email", email))));
+                .put("email", email)
+                // envelope version (workspace ADR 0004): fields only ever added within version 1
+                .put("version", 1))));
     }
 }
