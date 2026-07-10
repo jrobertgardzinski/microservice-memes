@@ -1,5 +1,6 @@
 import { AfterAll, BeforeAll, Before, After, setWorldConstructor, setDefaultTimeout } from '@cucumber/cucumber';
 import { chromium } from 'playwright';
+import zlib from 'node:zlib';
 
 // the harness (run-e2e.sh) starts these; ports avoid the docker stack's 8080/8083/8085
 export const SECURITY = process.env.SECURITY_URL ?? 'http://localhost:8180';
@@ -10,6 +11,35 @@ setDefaultTimeout(15_000);
 
 let browser;
 let counter = 0;
+
+/**
+ * A 1x1 PNG with a UNIQUE pixel colour per call. The meme service deduplicates identical bytes
+ * (MemeContentIndex), so a shared fixture PNG would silently collapse every scenario's "upload"
+ * into the first one — with the first uploader as author. Chunk CRCs are real (zlib.crc32).
+ */
+export function uniquePng() {
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const out = Buffer.alloc(8 + data.length + 4);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(zlib.crc32(body), 8 + data.length);
+    return out;
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(1, 0);   // width
+  ihdr.writeUInt32BE(1, 4);   // height
+  ihdr[8] = 8;                // bit depth
+  ihdr[9] = 6;                // RGBA
+  const pixel = Buffer.from([0, ...Buffer.from([counter++ & 255, Math.floor(Math.random() * 256),
+      Math.floor(Math.random() * 256), 255])]);   // filter byte + unique RGBA
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(pixel)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
 
 BeforeAll(async () => {
   browser = await chromium.launch();
@@ -47,11 +77,8 @@ class GalleryWorld {
   async seedMeme() {
     const uploader = await this.provisionAccount();   // its own throwaway author
     const token = await this.apiToken();
-    const png = Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-      'base64');
     const form = new FormData();
-    form.append('file', new Blob([png], { type: 'image/png' }), 'pixel.png');
+    form.append('file', new Blob([uniquePng()], { type: 'image/png' }), 'pixel.png');
     const r = await fetch(`${MEMES}/memes`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

@@ -138,3 +138,24 @@ export const setPurgePolicy = async (
 
 export const clearPurgePolicy = async (token: string | null): Promise<boolean> =>
   (await fetch('/admin/purge-policy', { method: 'DELETE', headers: authHeader(token) })).ok;
+
+/** Favourites live in microservice-user-collections: opaque refs, hydrated by THIS gallery. */
+export const COLLECTIONS: string =
+  import.meta.env.VITE_COLLECTIONS_URL ?? 'http://localhost:8092';
+
+export interface FavouriteRef { itemType: string; itemId: string; }
+
+/** The caller's saved refs, newest first. Throws on anything but 200 — callers degrade quietly. */
+export const listFavourites = async (token: string): Promise<FavouriteRef[]> => {
+  const r = await fetch(`${COLLECTIONS}/collections/favourites/items`, { headers: authHeader(token) });
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json();
+};
+
+export const saveFavourite = async (memeId: string, token: string): Promise<boolean> =>
+  (await fetch(`${COLLECTIONS}/collections/favourites/items/meme/${encodeURIComponent(memeId)}`,
+    { method: 'PUT', headers: authHeader(token) })).ok;
+
+export const removeFavourite = async (memeId: string, token: string): Promise<boolean> =>
+  (await fetch(`${COLLECTIONS}/collections/favourites/items/meme/${encodeURIComponent(memeId)}`,
+    { method: 'DELETE', headers: authHeader(token) })).ok;

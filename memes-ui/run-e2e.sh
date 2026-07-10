@@ -8,13 +8,14 @@ cd "$(dirname "$0")"
 SEC_JAR=../../microservice-security/security-infrastructure/target/security-infrastructure-1.0.0-SNAPSHOT.jar
 MEMES_JAR=../memes-infrastructure/target/memes-infrastructure-1.0.0-SNAPSHOT.jar
 COMMENTS_JAR=../../microservice-comments/target/microservice-comments-1.0.0-SNAPSHOT.jar
-if [ ! -f "$SEC_JAR" ] || [ ! -f "$MEMES_JAR" ] || [ ! -f "$COMMENTS_JAR" ]; then
+COLLECTIONS_JAR=../../microservice-user-collections/target/microservice-user-collections.jar
+if [ ! -f "$SEC_JAR" ] || [ ! -f "$MEMES_JAR" ] || [ ! -f "$COMMENTS_JAR" ] || [ ! -f "$COLLECTIONS_JAR" ]; then
     echo "building the service jars first (reactor closure)..."
-    (cd ../../ && ./mvnw -q -pl microservice-security/security-infrastructure,microservice-memes/memes-infrastructure,microservice-comments \
+    (cd ../../ && ./mvnw -q -pl microservice-security/security-infrastructure,microservice-memes/memes-infrastructure,microservice-comments,microservice-user-collections \
         -am package -DskipTests)
 fi
 
-cleanup() { kill "${SEC_PID:-}" "${MEMES_PID:-}" "${COMMENTS_PID:-}" "${UI_PID:-}" 2>/dev/null || true; }
+cleanup() { kill "${SEC_PID:-}" "${MEMES_PID:-}" "${COMMENTS_PID:-}" "${COLLECTIONS_PID:-}" "${UI_PID:-}" 2>/dev/null || true; }
 trap cleanup EXIT
 
 echo "== starting security (test environment, :8180)"
@@ -38,14 +39,21 @@ SERVER_PORT=8185 SECURITY_URL=http://localhost:8180 MEMES_URL=http://localhost:8
     java -jar "$COMMENTS_JAR" >/tmp/memes-ui-e2e-comments.log 2>&1 &
 COMMENTS_PID=$!
 
+echo "== starting user-collections (in-memory H2, :8192) — the favourites star's backend"
+COLLECTIONS_PORT=8192 SECURITY_URL=http://localhost:8180 \
+    COLLECTIONS_ALLOWED_ORIGINS=http://localhost:4300 \
+    java -jar "$COLLECTIONS_JAR" >/tmp/memes-ui-e2e-collections.log 2>&1 &
+COLLECTIONS_PID=$!
+
 echo "== starting the Vite dev server (:4300, proxying /memes to :8183)"
 MEMES_URL=http://localhost:8183 \
     VITE_SECURITY_URL=http://localhost:8180 VITE_COMMENTS_URL=http://localhost:8185 \
+    VITE_COLLECTIONS_URL=http://localhost:8192 \
     npx vite --port 4300 >/tmp/memes-ui-e2e-ui.log 2>&1 &
 UI_PID=$!
 
 for url in http://localhost:8180/health http://localhost:8183/memes/hot \
-           http://localhost:8185/memes/warmup/comments http://localhost:4300; do
+           http://localhost:8185/memes/warmup/comments http://localhost:8192/health http://localhost:4300; do
     for i in $(seq 1 60); do
         curl -sf "$url" >/dev/null && break
         [ "$i" = 60 ] && { echo "FAIL: $url did not come up"; exit 1; }

@@ -1,5 +1,6 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import { expect } from 'playwright/test';
+import { uniquePng } from '../support/world.mjs';
 
 Given('a meme has been uploaded by someone', async function () {
   await this.seedMeme();
@@ -41,11 +42,9 @@ Then('opening it shows {string}', async function (caption) {
 });
 
 When('they upload an image', async function () {
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-    'base64');
+  // unique bytes — identical content would be deduplicated into someone else's meme
   await this.page.locator('input[type="file"]').setInputFiles({
-    name: 'fresh.png', mimeType: 'image/png', buffer: png,
+    name: 'fresh.png', mimeType: 'image/png', buffer: uniquePng(),
   });
 });
 
