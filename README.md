@@ -1,5 +1,48 @@
 # microservice-memes
 
+> 👋 **Welcome, and thanks for looking!** This is a meme gallery that looks simple from the
+> browser and is deliberately grown-up underneath. The five specs below are **executable** —
+> Cucumber drives them over real HTTP in every build — so everything they describe is verified,
+> not aspirational:
+> [upload](./memes-infrastructure/src/test/resources/features/upload-meme.feature) ·
+> [vote](./memes-infrastructure/src/test/resources/features/vote-meme.feature) ·
+> [tag](./memes-infrastructure/src/test/resources/features/tag-meme.feature) ·
+> [moderate](./memes-infrastructure/src/test/resources/features/moderate-meme.feature) ·
+> [admin purge policy](./memes-infrastructure/src/test/resources/features/admin-purge-policy.feature)
+
+## Highlights — what's worth a closer look
+
+- **The framework is a detail**: Spring Boot lives in **one module of seven**; domain, use cases,
+  image processing and tags compile and test without it.
+- **Upload pipeline doubles as a security boundary**: every image is re-encoded (a crafted JPEG
+  with GPS EXIF goes in, a clean PNG comes out — there's a test), bounded by size limits and a
+  per-uploader rate limit (429 + `Retry-After`).
+- **Content-hash dedup that survives a race**: two concurrent uploads of the same bytes yield
+  exactly one meme — an atomic *claim* (unique constraint in Postgres), saving only after the
+  claim is won; pinned by a two-thread test.
+- **Image bytes behind a port**: one `ObjectStore` port, three adapters (DB blob / filesystem /
+  S3-MinIO), switched by env — the hexagonal promise kept for real.
+- **Graceful degradation**: WebP is encoded by a sidecar service and cached once per meme; if the
+  encoder is down you get PNG — quality degrades, availability doesn't.
+- **Identity done right**: reads are public, writes need a bearer token confirmed against
+  `microservice-security`; the author is the **confirmed identity**, never a request field; a
+  privileged role without completed MFA is demoted at the gate (fail-closed MFA floor).
+- **A real distributed flow**: this service is a participant in the account-deletion saga —
+  the leaver's content follows a configurable rule per axis (`DELETE` / `ANONYMIZE_AUTHOR` /
+  `KEEP_POPULAR_ANONYMIZED:n`), the leaver's own choice wins, and their votes are always
+  retracted; confirmations flow back over Kafka.
+- **Contracts, not hope**: Pact pins both what this service reads from the saga command
+  (message pact) and from `GET /me` (HTTP pact); event envelopes carry a version and evolve
+  additively.
+- **Proven at every level**: unit → Cucumber black-box over HTTP → a Playwright suite driving
+  the gallery in a real Chromium → whole-stack smoke; metrics, correlation-id logs and
+  distributed traces out of the box (one upload = one trace across memes and security).
+
+Part of a [portfolio of microservices](https://github.com/jrobertgardzinski) exploring the same
+architecture across six frameworks; this one plays the Spring Boot flavour.
+
+---
+
 A meme service: upload images, serve them optimised for the browser (with on-demand thumbnails and
 content-hash deduplication) and vote ("hot" ranking); comment threads moved to
 `microservice-comments`, voting semantics come from the shared `voting` library. More monolithic than the split
