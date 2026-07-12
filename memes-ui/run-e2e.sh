@@ -5,13 +5,15 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SEC_JAR=../../microservice-security/security-infrastructure/target/security-infrastructure-1.0.0-SNAPSHOT.jar
+# security lives in the SHARED workspace (../../../shared), the portal neighbours in this one
+SEC_JAR=../../../shared/microservice-security/security-infrastructure/target/security-infrastructure-1.0.0-SNAPSHOT.jar
 MEMES_JAR=../memes-infrastructure/target/memes-infrastructure-1.0.0-SNAPSHOT.jar
 COMMENTS_JAR=../../microservice-comments/target/microservice-comments-1.0.0-SNAPSHOT.jar
 COLLECTIONS_JAR=../../microservice-user-collections/target/microservice-user-collections.jar
 if [ ! -f "$SEC_JAR" ] || [ ! -f "$MEMES_JAR" ] || [ ! -f "$COMMENTS_JAR" ] || [ ! -f "$COLLECTIONS_JAR" ]; then
-    echo "building the service jars first (reactor closure)..."
-    (cd ../../ && ./mvnw -q -pl microservice-security/security-infrastructure,microservice-memes/memes-infrastructure,microservice-comments,microservice-user-collections \
+    echo "building the service jars first (shared kernel, then the portal reactor closure)..."
+    (cd ../../../shared && ./mvnw -q -pl microservice-security/security-infrastructure,voting -am install -DskipTests)
+    (cd ../../ && ./mvnw -q -pl microservice-memes/memes-infrastructure,microservice-comments,microservice-user-collections \
         -am package -DskipTests)
 fi
 
@@ -22,7 +24,7 @@ echo "== starting security (test environment, :8180)"
 MICRONAUT_ENVIRONMENTS=test MICRONAUT_SERVER_PORT=8180 \
     KAFKA_ENABLED=false SECURITY_REGISTRATION_MAX_PER_WINDOW=0 SECURITY_COOKIE_SECURE=false \
     MICRONAUT_SERVER_CORS_CONFIGURATIONS_UI_ALLOWED_ORIGINS=http://localhost:4300 \
-    java -cp "$SEC_JAR:../../microservice-security/security-infrastructure/target/lib/*" com.jrobertgardzinski.App \
+    java -cp "$SEC_JAR:../../../shared/microservice-security/security-infrastructure/target/lib/*" com.jrobertgardzinski.App \
     >/tmp/memes-ui-e2e-security.log 2>&1 &
 SEC_PID=$!
 
