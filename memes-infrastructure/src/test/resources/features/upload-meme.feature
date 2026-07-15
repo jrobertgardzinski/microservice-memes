@@ -3,9 +3,6 @@ Feature: Uploading a meme
   Signed-in users upload images; a MEME is stored optimised for the browser. Browsing is public:
   anyone can fetch a MEME, its thumbnail, or the gallery without signing in.
 
-  Nouns:
-    MEME -> Meme
-
   Scenario: a signed-in user uploads, anyone fetches it back
     Given a signed-in user
     When the user uploads a BMP image

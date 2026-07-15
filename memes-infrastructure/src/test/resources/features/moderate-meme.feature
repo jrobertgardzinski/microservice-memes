@@ -3,9 +3,6 @@ Feature: Moderating memes
   A MEME belongs to its uploader, who may delete it; a MODERATOR (a role microservice-security
   reports for the caller) may delete anyone's MEME. Everyone else is refused.
 
-  Nouns:
-    MEME -> Meme
-
   Scenario: a stranger cannot delete someone else's meme
     Given a meme uploaded by its author
     When another user tries to delete it

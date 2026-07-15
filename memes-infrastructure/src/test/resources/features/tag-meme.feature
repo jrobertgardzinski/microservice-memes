@@ -3,10 +3,6 @@ Feature: Tagging memes and finding them by tag
   The uploader curates their MEME's TAGs — a small, legal set of search keys, not free text.
   Anyone browses the gallery narrowed to one TAG; the TAGs of a purged MEME vanish with it.
 
-  Nouns:
-    MEME -> Meme
-    TAG* -> Tag
-
   Scenario: the author tags their meme and the gallery finds it by tag
     Given a signed-in user
     And an uploaded meme
