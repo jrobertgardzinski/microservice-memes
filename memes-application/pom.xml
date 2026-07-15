@@ -15,23 +15,19 @@
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-domain</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <!-- the voting bounded context: toggle semantics + tally, shared with microservice-comments -->
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>voting</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-tags</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-image</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
