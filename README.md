@@ -80,6 +80,13 @@ comment's author — the request body cannot impersonate anyone. Anonymous write
 
 ## Account deletion (the saga's memes side)
 
+> **The whole road, across all four services, is one page:
+> [docs/account-deletion-across-services.md](docs/account-deletion-across-services.md)** — the
+> step-up, the immediate lock (which is NOT deletion), the outbox fact, offboarding as process
+> manager, every participant's confirmation, and what happens when one never comes. Read it
+> before changing anything here; this section only describes the piece that runs in this repo.
+
+
 `PURGE_USER_CONTENT` commands arrive over Kafka. What happens to the leaver's content is a
 **rule per axis** (their memes / their comments), decided in two places: the deployment default
 (`PURGE_MEMES_POLICY` / `PURGE_COMMENTS_POLICY`) and — taking precedence — **the leaver's own
@@ -119,6 +126,23 @@ POST /memes/{id}/comments/{cid}/votes   same body/answers — votes on a comment
 One vote per user per meme/comment: voting again replaces your previous vote (never stacks);
 comment listings include each comment's current score.
 ```
+
+## Which runtime am I actually in?
+
+Behaviour here is not one thing — several ports have interchangeable adapters, and predicting
+what the service does means knowing which of them is wired. Worth checking before debugging:
+
+| axis | modes | where |
+|------|-------|-------|
+| image bytes | `db` (default) / `filesystem` / `s3` | `MEMES_BLOB_STORE` — see the section at the bottom |
+| who the caller is | introspection against security (`/me`) / offline JWT via its JWKS | `SecurityAuthenticationGate` vs `JwtSecurityAuthenticationGate` |
+| events | real Kafka / `NoopMemeEvents` (nothing published, saga silent) | `KAFKA_ENABLED` |
+| purge policy | the leaver's wizard choice > the admin override in the DB > the deployment default | `PurgeUserContent`, `GET/PUT /admin/purge-policy`, `PURGE_MEMES_POLICY` |
+| "make it go away" | delete / NSFW blur (moderator flag) / hidden tombstone (comments' side) | three different mechanics, deliberately |
+
+Environment variables are mapped to properties once, in `application.properties`
+(`memes.upload.rate-limit-per-minute=${MEMES_UPLOAD_RATE_LIMIT:12}`) — the code reads the
+property, deployments set the env var.
 
 ## Run & test
 

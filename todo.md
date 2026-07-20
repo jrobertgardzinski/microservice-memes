@@ -88,6 +88,44 @@ galeria miała własną kopię i nikt jej nie prowadził przeglądarką. Naprawi
 `r.ok`, plus obsługa 202 w `submitFactor` dla łańcucha dłuższego niż jedno ogniwo).
 18 scenariuszy e2e zielonych (dwa biegi pod rząd), `tsc` czysty, suita modułu 41 zielona.
 
+## OCENA ZROZUMIAŁOŚCI PROJEKTU (2026-07-20, na prośbę właściciela) — i co z niej naprawiamy
+
+Ocena trudności zrozumienia: **6/10 łącznie**, ale ta liczba jest myląca, bo trudność nie leży
+tam, gdzie się jej szuka:
+
+- **czytanie kodu: 3/10** — 2493 linie produkcyjnego Javy w 7 modułach, 2578 linii testów
+  (1:1), największy plik produkcyjny 156 linii, hexagon prawdziwy, komentarze tłumaczą DLACZEGO,
+  a dziewięć plików `.feature` jest kontraktem zachowania. **WERDYKT WŁAŚCICIELA: „bardziej się
+  nie da"** — zgoda, 3 to praktycznie podłoga i NIC z tej listy nie celuje w kod.
+- **bezpieczna zmiana zachowania: 6/10** — wymienne adaptery mnożą modele mentalne (trzy
+  ObjectStore, dwie bramy autoryzacji, Kafka albo Noop, polityka czystki rozstrzygana kaskadą).
+- **odpowiedź „co się dzieje, gdy user kasuje konto": 8/10** — i TO jest cel napraw: znaczenie
+  tego zdania było rozłożone na cztery repozytoria i nie istniało nigdzie w całości.
+
+SPROSTOWANIE do własnej oceny: zarzut o „podwójną pisownię konfiguracji" (`PURGE_MEMES_POLICY`
+vs `memes.purge.memes`) był BŁĘDNY — to jednokierunkowe mapowanie ENV→property w
+application.properties, czyli dokładnie dobra praktyka. Wycofane.
+
+ZROBIONE tego samego dnia:
+- **`docs/account-deletion-across-services.md`** — cała droga przez cztery serwisy: step-up,
+  natychmiastowa BLOKADA (która NIE jest usunięciem), fakt w outboxie, offboarding jako proces
+  sagi, potwierdzenia uczestników, kompensacja gdy któreś nie przyjdzie, plus tabela „gdzie co
+  leży". README linkuje do niej z sekcji o usuwaniu konta.
+- **README: „Which runtime am I actually in?"** — tabela osi wymiennych adapterów, bo bez wiedzy,
+  w której konfiguracji się jest, nie da się przewidzieć zachowania.
+- **Pułapki spisane** (wcześniej wiedza plemienna): środowisko `test` security bez publikacji
+  outboxu; `mvn package` bez `clean` serwujący stary front; „pierwszy kafelek na ścianie" to nie
+  twój mem; kody jednorazowe po obu stronach.
+
+ZOSTAJE (kolejne kroki tej samej naprawy):
+- **Diagram/strona na poziomie PORTALU, nie tylko memów** — dziś ta droga jest opisana w repo
+  memów; siostrzane repa (comments, collections) mają ten sam problem i powinny linkować do
+  jednej strony w workspace, zamiast każde do własnej kopii.
+- **Trzy mechaniki „zniknięcia treści"** (delete / NSFW blur / tombstone) opisane razem w jednym
+  miejscu, bo dziś czyta się je z trzech osobnych commitów.
+- **Onboardingowy „pierwszy dzień"** dla portalu: minimalna ścieżka „postaw stack → zaloguj się →
+  wrzuć mema → skasuj konto → zobacz, co zniknęło", z komendami. Dziś każdy składa to sam.
+
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja
   lowercase/trim, 2..30 znaków [a-z0-9-], pojedyncze myślniki), use case'y `TagMeme` (autor
