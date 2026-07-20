@@ -1,6 +1,6 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import { expect } from 'playwright/test';
-import { SECURITY, UI } from '../support/world.mjs';
+import { COMMENTS, MEMES, SECURITY, UI } from '../support/world.mjs';
 
 // --- the doors into the gallery ---------------------------------------------------------------
 
@@ -94,6 +94,7 @@ When('they open the danger zone', async function () {
 });
 
 When('confirm the deletion with their password', async function () {
+  this.markCodeRequested();     // the step-up mails its own code when a factor is enrolled
   await this.page.getByLabel('your password').fill(this.account.password);
   await this.page.getByRole('button', { name: 'Delete my account' }).click();
 });
@@ -125,8 +126,45 @@ Then('the dialog complains about the password', async function () {
 });
 
 Then('signing in with that account is refused', async function () {
-  const r = await this.post(`${SECURITY}/authenticate`, this.account);
-  expect(r.status, 'a deleted account cannot come back through the front door').not.toBe(200);
+  // the saga has a road to travel (security -> offboarding -> the content services and back),
+  // so the front door closes for good within a beat rather than instantly
+  await this.eventually(async () => {
+    const r = await this.post(`${SECURITY}/authenticate`, this.account);
+    expect(r.status, 'a deleted account cannot come back through the front door').not.toBe(200);
+  });
+});
+
+When('choose to burn every meme and comment', async function () {
+  await this.page.getByRole('radio', { name: /Burn it all/ }).click();
+});
+
+When('close the meme', async function () {
+  await this.page.keyboard.press('Escape');
+  await expect(this.page.getByTestId('meme-score')).toHaveCount(0);
+});
+
+Then('their meme is on the wall', async function () {
+  await expect(this.page.locator('img[src*="/thumbnail"]').first()).toBeVisible();
+  await this.captureOwnMeme();
+});
+
+Then('their meme is gone from the wall', async function () {
+  // the whole point of the saga: the identity going is not enough, the content must follow
+  await this.eventually(async () => {
+    const r = await fetch(`${MEMES}/memes/${this.uploadedMemeId}/meta`);
+    expect(r.status, 'the burnt meme is gone from the service, not just from the page').toBe(404);
+  });
+  await this.page.reload();
+  await expect(this.page.locator(`img[src*="${this.uploadedMemeId}/thumbnail"]`)).toHaveCount(0);
+});
+
+Then('the comment {string} still stands, signed {string}', async function (text, author) {
+  await this.eventually(async () => {
+    const thread = await (await fetch(`${COMMENTS}/memes/${this.memeId}/comments`)).json();
+    const mine = (thread.comments ?? thread).find((c) => c.text === text);
+    expect(mine, `the comment "${text}" should have outlived its author`).toBeTruthy();
+    expect(mine.author).toBe(author);
+  });
 });
 
 Then('signing in with that account still works', async function () {

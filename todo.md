@@ -65,17 +65,28 @@ Gherkina, wszystko przez REALNY panel w realnej przeglądarce:
 - `account-deletion.feature` — danger zone: kreator polityki treści, step-up hasłem, konto
   NAPRAWDĘ znika (nie wpuszcza z powrotem), złe hasło nic nie kasuje, „Keep my account"
   zostawia wszystko, a konto z czynnikiem dostaje krok kodu także na wyjściu.
-  ZAKRES: harness nie ma Kafki, więc security startuje w trybie identity-only
-  (`ACCOUNT_DELETION_AWAIT_PORTAL_PURGE=false`) i te scenariusze przybijają POŁOWĘ
-  TOŻSAMOŚCIOWĄ; połowę treściową (saga czyszcząca memy/komentarze wg polityki) trzymają
-  testy `PurgeUserContent` i infra-smoke żywego stacku.
+  Scenariusze idą PEŁNYM łańcuchem: usunięcie konta wyjeżdża z security outboxem na Kafkę,
+  offboarding rozkazuje czystkę, memes/comments/collections kasują i potwierdzają, a test
+  sprawdza NA SERWISIE, że spalony mem zwraca 404 i że komentarz po „zalecanej" polityce
+  stoi podpisany „deleted account".
+
+**HARNESS = PRAWDZIWY STACK (poprawka po werdykcie właściciela 2026-07-20: „chujowo robić
+e2e bez jakiegoś członu")**: `run-e2e.sh` nie stawia już czterech jarów z pamięciowymi
+sklepami — podnosi (albo zastaje) `docker compose` portalu i prowadzi scenariusze po nim.
+Powód techniczny, wart zapamiętania: środowisko `test` security NIE MA publikacji outboxu
+(`@Requires(notEnv = "test")`), więc w starym harnessie nic nigdy nie wychodziło na broker,
+a usunięte konto tylko się blokowało — test przechodził, dowodząc niczego. Maile czyta się
+teraz ze skrzynki stacku (Mailpit API), czyli tak, jak czyta je człowiek: zero furtek
+testowych. GOTCHA przy debugowaniu: `mvn package` BEZ `clean` potrafi zostawić stary fat jar
+(jar:jar pomija, repackage podkłada zastane archiwum) — obraz memes serwował wtedy UI sprzed
+naprawy; `clean package` załatwia sprawę.
 
 **ZŁAPANY BUG PRODUKCYJNY**: `AuthPanel.signIn` sprawdzał `r.ok`, a to jest PRAWDA dla 202 —
 gałąź drugiego czynnika w galerii była martwym kodem (konto z czynnikiem dostawało undefined
 zamiast kroku kodu). Ta sama klasa błędu, którą security-ui złapało u siebie 2026-07-06;
 galeria miała własną kopię i nikt jej nie prowadził przeglądarką. Naprawione (200 zamiast
 `r.ok`, plus obsługa 202 w `submitFactor` dla łańcucha dłuższego niż jedno ogniwo).
-17 scenariuszy e2e zielonych, `tsc` czysty, suita modułu 41 zielona.
+18 scenariuszy e2e zielonych (dwa biegi pod rząd), `tsc` czysty, suita modułu 41 zielona.
 
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja

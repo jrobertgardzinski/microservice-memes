@@ -14,7 +14,11 @@ When('they favourite their own meme', async function () {
   for (let attempt = 0; attempt < 20 && !mine; attempt++) {
     const memes = await (await fetch(`${MEMES}/memes`)).json();
     for (const meme of memes) {
-      const meta = await (await fetch(`${MEMES}/memes/${meme.id}/meta`)).json();
+      // a shared wall changes under us: a meme another scenario just purged answers 404 with an
+      // empty body, and json() on that is a crash, not a miss
+      const metaResponse = await fetch(`${MEMES}/memes/${meme.id}/meta`);
+      if (!metaResponse.ok) continue;
+      const meta = await metaResponse.json();
       if (meta.author === this.account.email) { mine = meme.id; break; }
     }
     if (!mine) await new Promise((r) => setTimeout(r, 250));

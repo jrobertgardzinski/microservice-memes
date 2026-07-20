@@ -2,12 +2,18 @@ import { AfterAll, BeforeAll, Before, After, setWorldConstructor, setDefaultTime
 import { chromium } from 'playwright';
 import zlib from 'node:zlib';
 
-// the harness (run-e2e.sh) starts these; ports avoid the docker stack's 8080/8083/8085
-export const SECURITY = process.env.SECURITY_URL ?? 'http://localhost:8180';
-export const MEMES = process.env.MEMES_URL ?? 'http://localhost:8183';
-export const UI = process.env.UI_URL ?? 'http://localhost:4300';
+// the harness (run-e2e.sh) points these at the REAL stack — security, the mail chain, the
+// broker, the saga's process manager and every content service, all of them actually running.
+// An end-to-end that stubs a member proves nothing about the member it stubbed.
+export const SECURITY = process.env.SECURITY_URL ?? 'http://localhost:8080';
+export const MEMES = process.env.MEMES_URL ?? 'http://localhost:8083';
+export const COMMENTS = process.env.COMMENTS_URL ?? 'http://localhost:8085';
+export const UI = process.env.UI_URL ?? 'http://localhost:8083';
+export const MAILPIT = process.env.MAILPIT_URL ?? 'http://localhost:8025';
 
-setDefaultTimeout(15_000);
+// the saga steps wait for a chain of services to finish talking; the per-step budget has to be
+// bigger than the retry window inside `eventually`, or cucumber kills the step mid-wait
+setDefaultTimeout(40_000);
 
 let browser;
 let counter = 0;
@@ -69,22 +75,66 @@ class GalleryWorld {
     return this.account;
   }
 
-  /** What the verification mail carried (the test environment's captured mailbox — a browser
-   *  cannot read e-mail, and this is the only backdoor these scenarios use). */
-  async verificationToken(email) {
-    const r = await fetch(`${SECURITY}/test/mailbox/verification-token?email=${encodeURIComponent(email)}`);
-    if (!r.ok) throw new Error(`no verification mail for ${email}`);
-    return (await r.json()).token;
+  /** The newest mail delivered to an address, read from the stack's own inbox (Mailpit) — the
+   *  same way a person would read it. No test backdoor anywhere in these scenarios: the mail
+   *  travelled security -> outbox -> Kafka -> microservice-email -> SMTP to get here, and if any
+   *  of that were broken the scenario would fail, which is the entire point. */
+  async newestMail(email, { matching, consume = false } = {}) {
+    const query = encodeURIComponent(`to:${email}`);
+    for (let i = 0; i < 160; i++) {
+      const found = await fetch(`${MAILPIT}/api/v1/search?query=${query}&limit=25`);
+      if (found.ok) {
+        const { messages = [] } = await found.json();
+        const newestFirst = [...messages].sort(
+          (a, b) => new Date(b.Created).getTime() - new Date(a.Created).getTime());
+        for (const message of newestFirst) {
+          if (this.readMailIds.has(message.ID)) continue;   // a code is good for exactly one read
+          const body = await (await fetch(`${MAILPIT}/api/v1/message/${message.ID}`)).json();
+          const text = `${body.Text ?? ''}\n${body.HTML ?? ''}`;
+          if (matching && !matching.test(text)) continue;
+          if (consume) this.readMailIds.add(message.ID);
+          return text;
+        }
+      }
+      await new Promise((done) => setTimeout(done, 250));
+    }
+    throw new Error(`no unread matching mail for ${email}`);
   }
 
-  /** The sign-in code the same mailbox captured (the second factor, and the step-up's own step). */
+  /** The token in the verification link the mail carried. */
+  async verificationToken(email) {
+    const text = await this.newestMail(email, { matching: /[?&]verify=|token=/ });
+    return decodeURIComponent(text.match(/(?:[?&]verify=|token=)([A-Za-z0-9._~%-]+)/)[1]);
+  }
+
+  /** The sign-in code (the second factor, and the step-up's own step) out of its own mail.
+   *  Codes are asked for repeatedly in a scenario, so only mail newer than the request counts. */
   async signInCode(email) {
-    for (let i = 0; i < 20; i++) {           // the code is mailed as the request is served
-      const r = await fetch(`${SECURITY}/test/mailbox/signin-code?email=${encodeURIComponent(email)}`);
-      if (r.ok) return (await r.json()).code;
-      await new Promise((done) => setTimeout(done, 100));
-    }
-    throw new Error(`no sign-in code for ${email}`);
+    // codes are one-shot on both sides: the newest UNREAD code mail, and never that one again —
+    // a scenario that signs in twice must not re-type the first code
+    const text = await this.newestMail(email, { matching: /sign-in code is/i, consume: true });
+    return text.match(/sign-in code is:\s*([A-Za-z0-9-]+)/i)[1];
+  }
+
+  markCodeRequested() { /* the mailbox is read by consumption now; kept for step readability */ }
+
+  /** The id of the meme THIS account uploaded — asked of the service, not guessed from the wall
+   *  (a shared stack's gallery is full of other scenarios' memes, and "the first tile" is a lie). */
+  async captureOwnMeme() {
+    return this.eventually(async () => {
+      const listing = await (await fetch(`${MEMES}/memes`)).json();
+      const ids = (Array.isArray(listing) ? listing : listing.memes ?? []).map((m) => m.id);
+      for (const id of ids.slice(0, 40)) {
+        const metaResponse = await fetch(`${MEMES}/memes/${id}/meta`);
+        if (!metaResponse.ok) continue;          // purged under us by a neighbouring scenario
+        const meta = await metaResponse.json();
+        if (meta.author === this.account.email) {
+          this.uploadedMemeId = id;
+          return id;
+        }
+      }
+      throw new Error(`no meme of ${this.account.email} on the wall yet`);
+    }, { timeoutMs: 15_000 });
   }
 
   /** Gives the account a mailed-code second factor, over the API: the scenarios that USE the
@@ -92,6 +142,7 @@ class GalleryWorld {
   async enrolCodeFactor() {
     const token = await this.apiToken();
     const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+    this.markCodeRequested();
     const start = await fetch(`${SECURITY}/account/factors/EMAIL_CODE/enroll/start`,
       { method: 'POST', headers: auth, body: '{}' });
     if (!start.ok) throw new Error(`factor enrolment refused: ${start.status}`);
@@ -115,6 +166,7 @@ class GalleryWorld {
   /** Fills the panel and presses Sign in — no assertion, because half the scenarios are about
    *  what happens when it does NOT simply work. */
   async signIn({ email = this.account.email, password = this.account.password } = {}) {
+    this.markCodeRequested();     // a factored account gets its code mailed by this very click
     await this.page.getByLabel('e-mail').fill(email);
     await this.page.getByLabel('password', { exact: true }).fill(password);
     await this.page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -131,6 +183,7 @@ class GalleryWorld {
    *  An account that already carries a factor answers 202 with a ticket — the seeding path
    *  finishes that chain with the mailed code, exactly as the panel would. */
   async apiToken() {
+    this.markCodeRequested();
     const r = await this.post(`${SECURITY}/authenticate`, this.account);
     const body = await r.json();
     if (body.accessToken) return body.accessToken;
@@ -158,6 +211,29 @@ class GalleryWorld {
     return this.memeId;
   }
 
+  /** Retries an assertion while the saga travels: security announces, offboarding orders, the
+   *  content services purge and confirm. Seconds, not milliseconds — and a real deadline, so a
+   *  chain that never completes fails the scenario instead of hanging it. */
+  async eventually(check, { timeoutMs = 20_000, everyMs = 250 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      try {
+        return await check();
+      } catch (last) {
+        if (Date.now() > deadline) throw last;
+        await new Promise((done) => setTimeout(done, everyMs));
+      }
+    }
+  }
+
+  /** The id behind the newest tile on the wall — what the scenario just uploaded, so the saga
+   *  can be checked against the SERVICE and not only against the page. */
+  async captureNewestMeme() {
+    const src = await this.page.locator('img[src*="/thumbnail"]').first().getAttribute('src');
+    this.uploadedMemeId = src.match(/memes\/([^/]+)\/thumbnail/)[1];
+    return this.uploadedMemeId;
+  }
+
   async openGallery() {
     this.context = await browser.newContext();
     this.page = await this.context.newPage();
@@ -177,7 +253,9 @@ setWorldConstructor(GalleryWorld);
 
 Before(function () {
   this.memeId = undefined;
+  this.uploadedMemeId = undefined;
   this.account = undefined;
+  this.readMailIds = new Set();   // codes are one-shot; a scenario never re-reads its own mail
 });
 
 After(async function () {

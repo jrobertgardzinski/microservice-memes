@@ -1,23 +1,40 @@
-Feature: Leaving — deleting the account from the gallery
+Feature: Leaving — deleting the account, content and all
   The danger zone in the panel is the RODO exit, and it is deliberately not a single click: the
   visitor says what should happen to what they posted, then proves it is really them (step-up —
-  a stolen session must not be able to end an account), and only then does the account go.
+  a stolen session must not be able to end an account). What follows is a SAGA across the whole
+  portal: security announces the deletion, offboarding orders every participant to purge, memes,
+  comments and collections do it and confirm, and only then is the account gone for good.
 
-  NOTE ON SCOPE: this harness runs without Kafka, so security is started in its identity-only
-  mode (account-deletion.await-portal-purge=false) and these scenarios pin the IDENTITY half of
-  the exit — the wizard, the step-up, the account really being gone. The content half (the saga
-  that has memes and comments purge per the chosen policy) is proven where it lives: the purge
-  use cases' own tests in memes and comments, and the live stack's infra-smoke.
+  These scenarios drive that entire road in a real browser against real services on a real
+  broker — no member of the chain stubbed out, because an end-to-end missing a member proves
+  nothing about the member it skipped.
 
-  Scenario: Deleting the account needs the password, then it is really gone
+  Scenario: Burning it all takes the account AND the memes with it
     Given a verified account exists
     And the visitor opens the gallery
     And signs in with that account
+    And they upload an image
+    Then their meme is on the wall
     When they open the danger zone
+    And choose to burn every meme and comment
     And confirm the deletion with their password
     Then the panel says the deletion started
-    And the panel does not show them as signed in
     And signing in with that account is refused
+    And their meme is gone from the wall
+
+  Scenario: The recommended choice keeps the comment, signed by nobody
+    Given a meme has been uploaded by someone
+    And a verified account exists
+    And the visitor opens the gallery
+    And signs in with that account
+    And opens the meme
+    When they post the comment "I was here before I left"
+    And close the meme
+    And they open the danger zone
+    And confirm the deletion with their password
+    Then the panel says the deletion started
+    And signing in with that account is refused
+    And the comment "I was here before I left" still stands, signed "deleted account"
 
   Scenario: The wrong password does not end an account
     Given a verified account exists
