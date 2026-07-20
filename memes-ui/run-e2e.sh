@@ -21,8 +21,13 @@ cleanup() { kill "${SEC_PID:-}" "${MEMES_PID:-}" "${COMMENTS_PID:-}" "${COLLECTI
 trap cleanup EXIT
 
 echo "== starting security (test environment, :8180)"
+# ...in its IDENTITY-ONLY mode: there is no Kafka here, so the account-deletion saga would sit
+# waiting for a portal confirmation that can never arrive. The deletion scenarios pin the
+# identity half (wizard, step-up, the account really gone); the content half is proven by the
+# purge use cases' own tests and by the live stack's infra-smoke.
 MICRONAUT_ENVIRONMENTS=test MICRONAUT_SERVER_PORT=8180 \
     KAFKA_ENABLED=false SECURITY_REGISTRATION_MAX_PER_WINDOW=0 SECURITY_COOKIE_SECURE=false \
+    ACCOUNT_DELETION_AWAIT_PORTAL_PURGE=false \
     MICRONAUT_SERVER_CORS_CONFIGURATIONS_UI_ALLOWED_ORIGINS=http://localhost:4300 \
     java -cp "$SEC_JAR:../../../shared/microservice-security/security-infrastructure/target/lib/*" com.jrobertgardzinski.App \
     >/tmp/memes-ui-e2e-security.log 2>&1 &

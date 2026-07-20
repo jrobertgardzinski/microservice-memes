@@ -55,22 +55,90 @@ AfterAll(async () => {
  * memes through the real upload endpoint. The UI is only driven for what the scenario is ABOUT.
  */
 class GalleryWorld {
-  /** A scenario-unique account, registered and verified through the service (not the UI). */
-  async provisionAccount() {
+  /** A scenario-unique account, registered and verified through the service (not the UI).
+   *  `verify: false` leaves it standing at the door with the mail unread — the state a
+   *  scenario needs when the POINT is what an unverified account is told. */
+  async provisionAccount({ verify = true } = {}) {
     const email = `gallery-${Date.now()}-${counter++}@example.com`;
     const password = 'StrongPassword1!';
     await this.post(`${SECURITY}/register`, { email, password });
-    const mailbox = await fetch(`${SECURITY}/test/mailbox/verification-token?email=${encodeURIComponent(email)}`);
-    const { token } = await mailbox.json();
-    await this.post(`${SECURITY}/verify-email`, { token });
     this.account = { email, password };
+    if (verify) {
+      await this.post(`${SECURITY}/verify-email`, { token: await this.verificationToken(email) });
+    }
     return this.account;
   }
 
-  /** Signs the account in over HTTP and returns the access token (for API-side seeding). */
+  /** What the verification mail carried (the test environment's captured mailbox — a browser
+   *  cannot read e-mail, and this is the only backdoor these scenarios use). */
+  async verificationToken(email) {
+    const r = await fetch(`${SECURITY}/test/mailbox/verification-token?email=${encodeURIComponent(email)}`);
+    if (!r.ok) throw new Error(`no verification mail for ${email}`);
+    return (await r.json()).token;
+  }
+
+  /** The sign-in code the same mailbox captured (the second factor, and the step-up's own step). */
+  async signInCode(email) {
+    for (let i = 0; i < 20; i++) {           // the code is mailed as the request is served
+      const r = await fetch(`${SECURITY}/test/mailbox/signin-code?email=${encodeURIComponent(email)}`);
+      if (r.ok) return (await r.json()).code;
+      await new Promise((done) => setTimeout(done, 100));
+    }
+    throw new Error(`no sign-in code for ${email}`);
+  }
+
+  /** Gives the account a mailed-code second factor, over the API: the scenarios that USE the
+   *  factor are about the panel's code step, not about the enrolment screen. */
+  async enrolCodeFactor() {
+    const token = await this.apiToken();
+    const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+    const start = await fetch(`${SECURITY}/account/factors/EMAIL_CODE/enroll/start`,
+      { method: 'POST', headers: auth, body: '{}' });
+    if (!start.ok) throw new Error(`factor enrolment refused: ${start.status}`);
+    const code = await this.signInCode(this.account.email);
+    const confirm = await fetch(`${SECURITY}/account/factors/EMAIL_CODE/enroll/confirm`,
+      { method: 'POST', headers: auth, body: JSON.stringify({ code }) });
+    if (!confirm.ok) throw new Error(`factor confirmation refused: ${confirm.status}`);
+  }
+
+  /** The one-time codes shown exactly once when generated — kept for the scenario that spends one. */
+  async generateRecoveryCodes() {
+    const token = await this.apiToken();
+    const r = await fetch(`${SECURITY}/account/recovery-codes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) throw new Error(`recovery codes refused: ${r.status}`);
+    return (await r.json()).codes;
+  }
+
+  /** Fills the panel and presses Sign in — no assertion, because half the scenarios are about
+   *  what happens when it does NOT simply work. */
+  async signIn({ email = this.account.email, password = this.account.password } = {}) {
+    await this.page.getByLabel('e-mail').fill(email);
+    await this.page.getByLabel('password', { exact: true }).fill(password);
+    await this.page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  }
+
+  /** The panel's second step: the mailed code — or a recovery code, which the chain accepts
+   *  in its place. */
+  async submitSignInCode(code) {
+    await this.page.getByLabel('sign-in code').fill(code);
+    await this.page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  }
+
+  /** Signs the account in over HTTP and returns the access token (for API-side seeding).
+   *  An account that already carries a factor answers 202 with a ticket — the seeding path
+   *  finishes that chain with the mailed code, exactly as the panel would. */
   async apiToken() {
     const r = await this.post(`${SECURITY}/authenticate`, this.account);
-    return (await r.json()).accessToken;
+    const body = await r.json();
+    if (body.accessToken) return body.accessToken;
+    if (!body.mfaTicket) throw new Error(`no token and no ticket for ${this.account.email}`);
+    const code = await this.signInCode(this.account.email);
+    const done = await this.post(`${SECURITY}/authenticate/factor`,
+      { mfaTicket: body.mfaTicket, proof: code });
+    return (await done.json()).accessToken;
   }
 
   /** Uploads a 1x1 PNG through the real endpoint; remembers the meme id. */

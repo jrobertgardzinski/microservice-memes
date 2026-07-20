@@ -52,6 +52,31 @@ naprawiony bliźniaczy leak `nsfwIds` (`.stream()`→`.list()`).
   z `GET /oauth/providers` (`a269c60`), hint recovery codes (`c18bb3d`), sign-in z Google
   (`ef60d6d`), cichy kontrakt rejestracji (`d9ad4b7`).
 
+## E2E galerii (2026-07-20, na życzenie właściciela: „w memach brakuje e2e")
+
+Suita przeglądarkowa BYŁA (5 scenariuszy z 2026-07-07: przeglądanie, logowanie hasłem,
+upload, głos, komentarz + 3 ulubione), ale pokrywała jedne drzwi. Dołożone dwa pliki
+Gherkina, wszystko przez REALNY panel w realnej przeglądarce:
+
+- `identity.feature` — założenie konta z panelu i wejście z mailowego linku, złe hasło,
+  konto niezweryfikowane odesłane do skrzynki, **drugi czynnik (krok kodu)** i **kod
+  odzyskiwania zamiast mailowego**. Jedyna furtka testowa to skrzynka security (przeglądarka
+  nie czyta maili).
+- `account-deletion.feature` — danger zone: kreator polityki treści, step-up hasłem, konto
+  NAPRAWDĘ znika (nie wpuszcza z powrotem), złe hasło nic nie kasuje, „Keep my account"
+  zostawia wszystko, a konto z czynnikiem dostaje krok kodu także na wyjściu.
+  ZAKRES: harness nie ma Kafki, więc security startuje w trybie identity-only
+  (`ACCOUNT_DELETION_AWAIT_PORTAL_PURGE=false`) i te scenariusze przybijają POŁOWĘ
+  TOŻSAMOŚCIOWĄ; połowę treściową (saga czyszcząca memy/komentarze wg polityki) trzymają
+  testy `PurgeUserContent` i infra-smoke żywego stacku.
+
+**ZŁAPANY BUG PRODUKCYJNY**: `AuthPanel.signIn` sprawdzał `r.ok`, a to jest PRAWDA dla 202 —
+gałąź drugiego czynnika w galerii była martwym kodem (konto z czynnikiem dostawało undefined
+zamiast kroku kodu). Ta sama klasa błędu, którą security-ui złapało u siebie 2026-07-06;
+galeria miała własną kopię i nikt jej nie prowadził przeglądarką. Naprawione (200 zamiast
+`r.ok`, plus obsługa 202 w `submitFactor` dla łańcucha dłuższego niż jedno ogniwo).
+17 scenariuszy e2e zielonych, `tsc` czysty, suita modułu 41 zielona.
+
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja
   lowercase/trim, 2..30 znaków [a-z0-9-], pojedyncze myślniki), use case'y `TagMeme` (autor

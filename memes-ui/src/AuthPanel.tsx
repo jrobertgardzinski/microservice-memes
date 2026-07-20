@@ -139,7 +139,10 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
       headers: jsonHeaders,
       body: JSON.stringify({ email, password }),
     });
-    if (r.ok) {
+    if (r.status === 200) {
+      // 200, not r.ok: a 202 is ALSO "ok" to fetch, and reading it as success made the whole
+      // second-factor branch below dead code — the account with a factor was handed an
+      // undefined token instead of the code step (the same trap the sign-in UI fell into once)
       const body: { accessToken: string } = await r.json();
       onToken(body.accessToken);
     } else if (r.status === 202) {
@@ -163,9 +166,14 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
       headers: jsonHeaders,
       body: JSON.stringify({ mfaTicket, proof: code }),
     });
-    if (r.ok) {
+    if (r.status === 200) {
       const body: { accessToken: string } = await r.json();
       onToken(body.accessToken);
+    } else if (r.status === 202) {
+      // a chain longer than one link: this factor is satisfied, the next one is owed
+      const body: { mfaTicket: string } = await r.json();
+      setMfaTicket(body.mfaTicket);
+      setCode('');
     } else {
       const body: { status?: string; attemptsLeft?: number } = await r.json();
       if (body.status === 'WRONG_CODE') {

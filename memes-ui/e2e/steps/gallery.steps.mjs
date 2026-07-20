@@ -16,9 +16,7 @@ When('the visitor opens the gallery', async function () {
 
 When('signs in with that account', signIn);
 async function signIn() {
-  await this.page.getByLabel('e-mail').fill(this.account.email);
-  await this.page.getByLabel('password', { exact: true }).fill(this.account.password);
-  await this.page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await this.signIn();          // the filling lives in the world — the identity scenarios share it
   await expect(this.page.getByText(`signed in as ${this.account.email}`)).toBeVisible();
 }
 
