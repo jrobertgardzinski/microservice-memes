@@ -77,17 +77,20 @@ class JdbcMemeRepository implements MemeRepository, PublicationLog {
     public void deleteById(String memeId) {
         jdbc.sql("DELETE FROM memes WHERE id = ?").params(memeId).update();
         objects.delete(memeId);
-        // ServeMeme caches a WebP variant under this derived key (see its webpKey); without this
-        // the encoded copy of a deleted image would sit in the store forever. Every adapter's
-        // delete is a no-op on a missing key, so "never encoded" costs nothing.
+        // ServeMeme caches a WebP variant under {id}.webp and MakeThumbnail a thumbnail under
+        // {id}.thumb; without this sweep the derived copies of a deleted image would sit in the
+        // store forever. Every adapter's delete is a no-op on a missing key, so "never cached"
+        // costs nothing.
         String variantKey = memeId + ".webp";
+        String thumbKey = memeId + ".thumb";
         objects.delete(variantKey);
-        // On the DB store the sweep above runs INSIDE this transaction, so it misses a variant
-        // that a concurrent ServeMeme writes between it and our commit — and that serve's own
-        // exists() re-check still sees our uncommitted row, so it leaves the variant in place
-        // too. Sweep once more AFTER the commit: any variant put whose commit lands before ours
-        // is caught here; one landing after ours is caught by ServeMeme's re-check (the row is
-        // then visibly gone). On filesystem/S3 the store's delete PARKS itself again from inside
+        objects.delete(thumbKey);
+        // On the DB store the sweeps above run INSIDE this transaction, so they miss a variant
+        // that a concurrent ServeMeme/MakeThumbnail writes between them and our commit — and
+        // that writer's own exists() re-check still sees our uncommitted row, so it leaves the
+        // variant in place too. Sweep once more AFTER the commit: any variant put whose commit
+        // lands before ours is caught here; one landing after ours is caught by the writer's
+        // re-check (the row is then visibly gone). On filesystem/S3 the store's delete PARKS itself again from inside
         // our after-commit callback — TransactionAwareDeletes delivers such late registrations
         // in the afterCompletion phase (a plain afterCommit-only registration would silently
         // never run, and the second sweep would vanish without a trace).
@@ -100,7 +103,10 @@ class JdbcMemeRepository implements MemeRepository, PublicationLog {
         // (probed in round 3). That restore is exactly why spring.datasource.hikari.auto-commit
         // must stay true (the default, pinned by TransactionAwareDeletesTest): with
         // auto-commit=false the pending DELETE would roll back silently instead.
+        // two separate parked runnables, not one: TransactionAwareDeletes isolates failures per
+        // runnable, so a store hiccup on the WebP sweep cannot cost the thumbnail its sweep
         TransactionAwareDeletes.afterCommitOrNow(() -> objects.delete(variantKey));
+        TransactionAwareDeletes.afterCommitOrNow(() -> objects.delete(thumbKey));
     }
 
     @Override

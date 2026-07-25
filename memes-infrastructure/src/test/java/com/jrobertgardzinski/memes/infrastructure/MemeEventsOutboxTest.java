@@ -48,10 +48,12 @@ class MemeEventsOutboxTest {
     private KafkaMemeEvents events;
     private MemeEventsOutboxRepublisher republisher;
 
+    private static final long RETENTION_HOURS = 24;
+
     @BeforeEach
     void freshOutbox() {
         events = new KafkaMemeEvents(kafka, outbox);
-        republisher = new MemeEventsOutboxRepublisher(outbox, events);
+        republisher = new MemeEventsOutboxRepublisher(outbox, events, RETENTION_HOURS);
         jdbc.sql("DELETE FROM meme_events_outbox").update();
     }
 
@@ -120,5 +122,52 @@ class MemeEventsOutboxTest {
 
         verifyNoMoreInteractions(kafka);
         assertFalse(published("just-now"), "still waiting for the republisher, once it is old enough");
+    }
+
+    @Test
+    @DisplayName("retention: a delivered row past the threshold is reaped; a fresh delivered one and an old undelivered one stay")
+    void retention_reaps_only_delivered_rows_past_the_threshold() {
+        outbox.append("e-old-done", "memes-events", "MEME_DELETED", "delivered-long-ago", null, "{}");
+        outbox.append("e-new-done", "memes-events", "MEME_DELETED", "delivered-just-now", null, "{}");
+        outbox.append("e-old-owed", "memes-events", "MEME_DELETED", "still-owed", null, "{}");
+        outbox.markPublished("e-old-done");
+        outbox.markPublished("e-new-done");
+        backdateBeyondRetention("delivered-long-ago");
+        backdateBeyondRetention("still-owed");
+        // the pass will also re-try the aged unpublished row — keep the broker down so it stays
+        when(kafka.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.failedFuture(new RuntimeException("broker down")));
+
+        republisher.republish();
+
+        assertFalse(rowExists("delivered-long-ago"),
+                "a delivered event past retention has no value left — the row must go");
+        assertTrue(rowExists("delivered-just-now"),
+                "retention must not touch a delivered row that is younger than the threshold");
+        assertTrue(rowExists("still-owed"),
+                "an UNDELIVERED row is never reaped, however old — it still carries an obligation");
+        assertFalse(published("still-owed"));
+    }
+
+    @Test
+    @DisplayName("a payload wider than the old varchar(1024) is stored intact — TEXT since V6, no silent cliff")
+    void a_payload_wider_than_the_old_column_survives_intact() {
+        String fat = "{\"type\":\"SOME_RICHER_EVENT\",\"blob\":\"" + "x".repeat(4096) + "\"}";
+
+        outbox.append("fat-event", "memes-events", "SOME_RICHER_EVENT", "fat", null, fat);
+
+        assertEquals(fat, jdbc.sql("SELECT payload FROM meme_events_outbox WHERE id = ?")
+                        .params("fat-event").query(String.class).single(),
+                "the payload must come back byte-for-byte — a future event type must not be cut short");
+    }
+
+    private void backdateBeyondRetention(String memeId) {
+        jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('HOUR', ?, created_at)"
+                + " WHERE event_key = ?").params(-(RETENTION_HOURS + 1), memeId).update();
+    }
+
+    private boolean rowExists(String memeId) {
+        return jdbc.sql("SELECT COUNT(*) FROM meme_events_outbox WHERE event_key = ?")
+                .params(memeId).query(Integer.class).single() > 0;
     }
 }

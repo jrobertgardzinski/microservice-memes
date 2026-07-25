@@ -21,10 +21,18 @@ import java.util.concurrent.TimeUnit;
  * <p>This is a real outbox now (the todo that stood since round 3): the event row goes into
  * {@link MemeEventsOutbox} in the SAME transaction as the delete/purge announcing it, so a
  * rollback discards the announcement with the teardown. After the commit the send is attempted
- * once, and the row is marked published only after the broker CONFIRMED delivery — a crash
- * between commit and send (or a broker outage) leaves the row unpublished for
- * {@link MemeEventsOutboxRepublisher} to re-send. The payload's eventId is the row key, so a
- * redelivery repeats the exact same event; comments' thread-drop is idempotent on duplicates.
+ * once — WITHOUT waiting for the ack: the attempt fires the record and returns, and the broker's
+ * confirmation callback marks the row published. A crash between commit and send (or a broker
+ * outage) leaves the row unpublished for {@link MemeEventsOutboxRepublisher} to re-send — the
+ * republisher, not the first attempt, is the durability mechanism, and IT still waits for the
+ * ack before marking (delivered-first). The payload's eventId is the row key, so a redelivery
+ * repeats the exact same event; comments' thread-drop is idempotent on duplicates.
+ *
+ * <p>Why the first attempt must not block: it used to {@code Future.get(5s)} per event, on the
+ * announcing thread. A purge of N memes with the broker down would then hold the Kafka LISTENER
+ * thread (PurgeCommandsListener drives the purge) for N&times;5s — long enough to blow
+ * {@code max.poll.interval.ms} and trigger a consumer-group rebalance, turning a broker outage
+ * into a purge-saga outage.
  */
 @Component
 @ConditionalOnProperty(name = "memes.kafka-enabled", havingValue = "true")
@@ -35,9 +43,9 @@ class KafkaMemeEvents implements MemeEvents {
     static final String TOPIC = "memes-events";
 
     /**
-     * How long the after-commit attempt waits for the broker's ack before leaving the row to the
-     * republisher. It briefly holds the request thread (and its still-bound DB connection), so it
-     * must stay short — the republisher, not a longer wait, is the durability mechanism.
+     * How long the REPUBLISHER'S attempt waits for the broker's ack before leaving the row for
+     * the next pass. Only the scheduler thread ever holds this wait — the first, after-commit
+     * attempt is callback-based and never blocks (see {@link #publishFirstAttempt}).
      */
     private static final Duration CONFIRMATION_PATIENCE = Duration.ofSeconds(5);
 
@@ -62,14 +70,53 @@ class KafkaMemeEvents implements MemeEvents {
                 + "\",\"eventId\":\"" + eventId + "\"}";
         MemeEventsOutbox.Pending event = outbox.append(eventId, TOPIC, "MEME_DELETED", memeId,
                 MDC.get(CorrelationIdFilter.MDC_KEY), payload);
-        TransactionAwareDeletes.afterCommitOrNow(() -> publish(event));
+        TransactionAwareDeletes.afterCommitOrNow(() -> publishFirstAttempt(event));
     }
 
     /**
-     * One delivery attempt: send, wait for the broker's ack, and only then mark the row
-     * published. Any failure is logged and otherwise swallowed — the row simply stays
-     * unpublished and the republisher retries it. Shared with the republisher, so both paths
-     * mark rows under the same "confirmed first" rule.
+     * The FIRST delivery attempt, fire-and-mark-later: hand the record to the producer and
+     * return immediately — the announcing thread (a request, or worse the Kafka listener thread
+     * driving a purge) never waits for the broker. The completion callback marks the row
+     * published on a confirmed send and only logs a failed one; either way the row is the
+     * safety net and the republisher the guarantee.
+     *
+     * <p>The callback runs on the PRODUCER'S I/O thread, not ours — it must not touch the
+     * announcing thread's (already committed, still bound) transaction. {@link
+     * MemeEventsOutbox#markPublished} is safe there: a single short UPDATE through a freshly
+     * borrowed autocommit connection, no transaction anywhere near it. If the mark itself fails,
+     * the event was still DELIVERED — the republisher will redeliver a duplicate, which the
+     * deterministic eventId makes recognizable and comments' thread-drop absorbs.
+     */
+    void publishFirstAttempt(MemeEventsOutbox.Pending event) {
+        try {
+            kafka.send(toRecord(event)).whenComplete((ack, notConfirmed) -> {
+                if (notConfirmed != null) {
+                    LOG.error("event {} ({}) was not confirmed by the broker — the outbox keeps it,"
+                            + " the republisher will retry", event.id(), event.key(), notConfirmed);
+                    return;
+                }
+                try {
+                    outbox.markPublished(event.id());
+                } catch (RuntimeException markFailed) {
+                    LOG.warn("event {} ({}) was delivered but could not be marked published — the"
+                                    + " republisher may redeliver a harmless duplicate",
+                            event.id(), event.key(), markFailed);
+                }
+            });
+        } catch (RuntimeException sendRefused) {
+            // KafkaTemplate.send can also fail synchronously (producer closed, buffer full with
+            // block.on.buffer.full=false, serialization) — same contract: log, row stays, retry
+            LOG.error("event {} ({}) could not even be handed to the producer — the outbox keeps"
+                    + " it, the republisher will retry", event.id(), event.key(), sendRefused);
+        }
+    }
+
+    /**
+     * The REPUBLISHER'S delivery attempt: send, wait for the broker's ack, and only then mark
+     * the row published (delivered-first — the guarantee lives here). Any failure is logged and
+     * otherwise swallowed — the row simply stays unpublished and the next pass retries it.
+     * Blocking is fine on the scheduler thread; it is the listener/request threads that must
+     * never wait (see {@link #publishFirstAttempt}).
      */
     void publish(MemeEventsOutbox.Pending event) {
         try {

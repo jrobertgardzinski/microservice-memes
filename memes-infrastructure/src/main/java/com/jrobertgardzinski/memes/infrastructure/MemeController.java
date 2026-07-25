@@ -104,7 +104,14 @@ class MemeController {
     @GetMapping("/{id}/thumbnail")
     ResponseEntity<byte[]> thumbnail(@PathVariable("id") String id) {
         return makeThumbnail.execute(id)
-                .map(bytes -> ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).body(bytes))
+                .map(bytes -> ResponseEntity.ok()
+                        .contentType(MediaType.IMAGE_PNG)
+                        // a thumbnail is immutable per id (ids never return to circulation), so
+                        // browsers and proxies may hold it a long while — an hour keeps even a
+                        // sweeping delete's stale window bounded
+                        .cacheControl(org.springframework.http.CacheControl
+                                .maxAge(java.time.Duration.ofHours(1)).cachePublic())
+                        .body(bytes))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 

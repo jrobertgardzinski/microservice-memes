@@ -54,8 +54,11 @@ class ConcurrencyGuardedImageOptimizer extends WebImageOptimizer {
         try {
             acquired = permits.tryAcquire(patience.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
+            // restore the flag FIRST — whoever interrupted (shutdown, cancellation) must still
+            // see it; then refuse as "unavailable" (503), NOT as overload (429): a 429 would
+            // invite the client to retry against the very instance being torn down
             Thread.currentThread().interrupt();
-            throw new ImageDecodeOverloadedException("interrupted while waiting for a decode permit");
+            throw new ImageDecodeInterruptedException("interrupted while waiting for a decode permit");
         }
         if (!acquired) {
             throw new ImageDecodeOverloadedException(

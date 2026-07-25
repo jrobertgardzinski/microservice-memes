@@ -44,6 +44,16 @@ class WebErrorHandler {
                 .body(Map.of("status", "BUSY", "detail", "too many images are being processed right now"));
     }
 
+    @ExceptionHandler(ImageDecodeInterruptedException.class)
+    ResponseEntity<Map<String, String>> decodeInterrupted(ImageDecodeInterruptedException torn) {
+        // the permit WAIT was interrupted — this worker is being torn down (shutdown,
+        // cancellation), not throttling anyone. 503, not 429: "this instance is unavailable, go
+        // elsewhere", where the 429 above means "I am healthy, just busy — retry me shortly".
+        LOG.warn("refusing request: {}", torn.getMessage());
+        return ResponseEntity.status(503)
+                .body(Map.of("status", "UNAVAILABLE", "detail", "the server is shutting this worker down"));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Map<String, String>> refusedInput(IllegalArgumentException refused) {
         // still the caller's fault (an argument WE validated and rejected), but the raw message

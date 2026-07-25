@@ -25,8 +25,10 @@ import static org.mockito.Mockito.when;
  * MEME_DELETED must respect the delete/purge transaction it is announced from — and since round 5
  * the mechanism is a real outbox: the event row is written in the SAME transaction as the
  * teardown, so a rollback discards row and event alike; after the commit the send is attempted
- * and the row is marked published only once the broker CONFIRMED delivery. A crash between
- * commit and send leaves an unpublished row for the republisher (see MemeEventsOutboxTest).
+ * WITHOUT blocking the announcing thread — the broker's completion callback marks the row
+ * published once delivery is CONFIRMED (the mocks here complete their futures synchronously, so
+ * the callback has run by the time the assertions look). A crash between commit and send leaves
+ * an unpublished row for the republisher (see MemeEventsOutboxTest).
  */
 @SpringBootTest(classes = MemesApplication.class)
 class KafkaMemeEventsTransactionTest {
@@ -105,6 +107,31 @@ class KafkaMemeEventsTransactionTest {
         assertEquals(1, outboxRows(), "the event must survive the failed send");
         assertTrue(!published("stranded"),
                 "an unconfirmed send must NOT mark the row — delivery has not happened");
+    }
+
+    @Test
+    @DisplayName("a broker that never answers does not hold the deleting thread — the mark rides the ack callback")
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void first_attempt_never_blocks_the_announcing_thread() {
+        // The round-4 hazard: the first attempt used to Future.get(5s) PER EVENT on the
+        // announcing thread — a purge of N memes with the broker down held the Kafka listener
+        // thread N×5s, flirting with max.poll.interval and a rebalance. Now the send's future
+        // may stay incomplete forever and memeDeleted must still return promptly; the row is
+        // marked only when (and if) the broker's ack arrives.
+        CompletableFuture pendingAck = new CompletableFuture();
+        when(kafka.send(any(ProducerRecord.class))).thenReturn(pendingAck);
+
+        long before = System.nanoTime();
+        tx.executeWithoutResult(status -> events.memeDeleted("slow-broker"));
+        long heldMillis = java.time.Duration.ofNanos(System.nanoTime() - before).toMillis();
+
+        assertTrue(heldMillis < 2_000,
+                "the commit path must not wait for the broker (the old code held it 5s) — took "
+                        + heldMillis + " ms");
+        assertTrue(!published("slow-broker"), "no ack yet — the row must not be marked");
+
+        pendingAck.complete(null);   // the ack finally arrives; the callback runs synchronously here
+        assertTrue(published("slow-broker"), "the completion callback must mark the row");
     }
 
     @Test

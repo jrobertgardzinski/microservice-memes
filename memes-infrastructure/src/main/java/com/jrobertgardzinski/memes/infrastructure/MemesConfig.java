@@ -53,8 +53,10 @@ class MemesConfig {
     }
 
     @Bean
-    MakeThumbnail makeThumbnail(MemeRepository repository, WebImageOptimizer optimizer, ThumbnailSize thumbnailSize) {
-        return new MakeThumbnail(repository, optimizer, thumbnailSize);
+    MakeThumbnail makeThumbnail(MemeRepository repository,
+                                com.jrobertgardzinski.memes.application.ObjectStore objectStore,
+                                WebImageOptimizer optimizer, ThumbnailSize thumbnailSize) {
+        return new MakeThumbnail(repository, objectStore, optimizer, thumbnailSize);
     }
 
     @Bean
