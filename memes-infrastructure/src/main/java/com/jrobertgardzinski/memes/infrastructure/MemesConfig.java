@@ -39,8 +39,12 @@ class MemesConfig {
     }
 
     @Bean
-    WebImageOptimizer webImageOptimizer(ImageLimits imageLimits) {
-        return new WebImageOptimizer(imageLimits);
+    WebImageOptimizer webImageOptimizer(ImageLimits imageLimits,
+                                        @Value("${memes.decode.concurrency:3}") int decodeConcurrency) {
+        // the guard is infrastructure (a JVM-wide semaphore sized by an env dial), so it wraps
+        // the pure optimizer here — the memes-image module stays free of concurrency policy
+        return new ConcurrencyGuardedImageOptimizer(new WebImageOptimizer(imageLimits), imageLimits,
+                decodeConcurrency, java.time.Duration.ofSeconds(5));
     }
 
     @Bean

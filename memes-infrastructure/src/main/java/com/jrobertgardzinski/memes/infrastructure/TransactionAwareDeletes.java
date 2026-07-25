@@ -15,63 +15,91 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *
  * <p>The same parking serves every commit-dependent side effect of a teardown, not only blob
  * deletes: {@link JdbcMemeRepository} re-sweeps the WebP variant here, and {@link KafkaMemeEvents}
- * parks the MEME_DELETED publication so a rollback cannot un-delete a meme whose event already
- * left the building.
+ * parks the outbox publication attempt so it never runs before the commit that made the event true.
  *
- * <p>One trap this class must dodge itself: a parked runnable may call back into
+ * <p>Two traps this class dodges itself. First: a parked runnable may call back into
  * {@link #afterCommitOrNow} — the repository's after-commit variant re-sweep calls
- * {@code objects.delete}, and on filesystem/S3 that delete parks again. Spring iterates a
- * SNAPSHOT of the registered synchronizations, so a registration made from inside an afterCommit
- * callback is never invoked (and vanishes silently in the cleanup). The {@link #IN_AFTER_COMMIT}
- * flag marks the window where our own callbacks run; a delete issued inside it executes inline —
- * the commit has already happened, which is exactly the state "after commit" promises.
+ * {@code objects.delete}, and on filesystem/S3 that delete parks AGAIN, from inside the
+ * after-commit phase, whose synchronization snapshot Spring has already taken. Such a late
+ * registration still lands in the live list though, and Spring takes a FRESH snapshot for
+ * afterCompletion — so {@link ParkedSideEffect} listens on both phases and runs at whichever
+ * comes first (Spring clears the synchronization list before invoking afterCompletion, so a
+ * registration attempt from THAT phase falls through to the run-now branch instead of parking
+ * into the void). Second (the round-3 finding, fixed in round 5): during the after-commit phase
+ * the just-committed transaction still reads as active, but a runnable that opens REQUIRES_NEW
+ * inside a callback must have ITS delete parked on the NEW transaction — the registration lands
+ * in the new scope automatically and fires at ITS commit (or dies with its rollback). That is
+ * why the active-transaction check runs UNCONDITIONALLY, with no "already after commit, run
+ * inline" shortcut in front of it: the old shortcut fired such a delete before the new
+ * transaction committed, resurrecting the exact bug this class exists to prevent.
  */
 final class TransactionAwareDeletes {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransactionAwareDeletes.class);
 
-    /** True while THIS thread is inside one of our afterCommit callbacks — see the class doc. */
-    private static final ThreadLocal<Boolean> IN_AFTER_COMMIT = ThreadLocal.withInitial(() -> false);
-
     private TransactionAwareDeletes() {
     }
 
     static void afterCommitOrNow(Runnable delete) {
-        if (IN_AFTER_COMMIT.get()) {
-            // registering now would be a silent no-op (Spring already snapshotted the list), and
-            // the commit is a fact — run inline; the enclosing callback's isolation catch keeps
-            // a failure here from cutting down the other parked runnables
-            delete.run();
-            return;
-        }
         if (TransactionSynchronizationManager.isActualTransactionActive()
                 && TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    // Best-effort, isolated — like PublishMeme's deleteUploadedBytesBestEffort:
-                    // the DB commit has already happened, so a failing side effect must neither
-                    // surface out of tx.execute nor cut down the OTHER parked runnables (Spring
-                    // stops invoking synchronizations at the first exception). Throwable, not
-                    // RuntimeException: an Error (OOM in an image buffer, an assertion) would
-                    // otherwise abort the remaining synchronizations too — including the parked
-                    // MEME_DELETED publication. Swallowing an Error is normally taboo, but after
-                    // the commit there is no caller left to tell; isolation wins, the log gets
-                    // the truth, and a JVM sick enough for the Error to matter will fail the
-                    // next request on its own.
-                    IN_AFTER_COMMIT.set(true);
-                    try {
-                        delete.run();
-                    } catch (Throwable sideEffectFailed) {
-                        LOG.warn("after-commit action failed — the transaction is committed, "
-                                + "continuing with the remaining ones", sideEffectFailed);
-                    } finally {
-                        IN_AFTER_COMMIT.remove();
-                    }
-                }
-            });
+            TransactionSynchronizationManager.registerSynchronization(new ParkedSideEffect(delete));
             return;
         }
         delete.run();
+    }
+
+    /**
+     * Best-effort, isolated — like PublishMeme's deleteUploadedBytesBestEffort: once the DB commit
+     * has happened, a failing side effect must neither surface out of {@code tx.execute} nor cut
+     * down the OTHER parked runnables (Spring stops invoking synchronizations at the first
+     * exception). Throwable, not RuntimeException: an Error (OOM in an image buffer, an assertion)
+     * would otherwise abort the remaining synchronizations too — including the parked MEME_DELETED
+     * publication. Swallowing an Error is normally taboo, but after the commit there is no caller
+     * left to tell; isolation wins, the log gets the truth (at ERROR — an Error is never routine),
+     * and a JVM sick enough for the Error to matter will fail the next request on its own.
+     *
+     * <p>Listens on BOTH after-phases and runs exactly once, at whichever arrives first: a normal
+     * registration is served by afterCommit; one made DURING the after-commit phase (invisible to
+     * that phase's already-taken snapshot) is caught by afterCompletion, whose snapshot Spring
+     * takes fresh. A rollback reaches only afterCompletion, with a non-committed status — the
+     * parked side effect is silently dropped, which is the whole point of parking.
+     */
+    private static final class ParkedSideEffect implements TransactionSynchronization {
+
+        private final Runnable delete;
+        private boolean done;
+
+        private ParkedSideEffect(Runnable delete) {
+            this.delete = delete;
+        }
+
+        @Override
+        public void afterCommit() {
+            runOnce();
+        }
+
+        @Override
+        public void afterCompletion(int status) {
+            if (status == STATUS_COMMITTED) {
+                runOnce();
+            }
+        }
+
+        private void runOnce() {
+            if (done) {
+                return;
+            }
+            done = true;
+            try {
+                delete.run();
+            } catch (Error catastrophe) {
+                LOG.error("after-commit action failed with an Error — swallowed only so the "
+                        + "remaining parked actions still run; the JVM may be unhealthy", catastrophe);
+            } catch (Throwable sideEffectFailed) {
+                LOG.warn("after-commit action failed — the transaction is committed, "
+                        + "continuing with the remaining ones", sideEffectFailed);
+            }
+        }
     }
 }

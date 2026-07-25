@@ -33,6 +33,17 @@ class WebErrorHandler {
         return ResponseEntity.badRequest().body(Map.of("error", String.valueOf(refused.getMessage())));
     }
 
+    @ExceptionHandler(ImageDecodeOverloadedException.class)
+    ResponseEntity<Map<String, String>> decodeSaturated(ImageDecodeOverloadedException busy) {
+        // the global decode cap (ConcurrencyGuardedImageOptimizer) is full: neither the caller's
+        // fault nor a fault of ours — "try again shortly". 429 + Retry-After, deliberately the
+        // same refusal shape as the per-user upload rate limit in MemeController, so clients
+        // handle one throttling contract, not two; the body's status distinguishes the axes.
+        LOG.warn("refusing request: {}", busy.getMessage());
+        return ResponseEntity.status(429).header("Retry-After", "5")
+                .body(Map.of("status", "BUSY", "detail", "too many images are being processed right now"));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Map<String, String>> refusedInput(IllegalArgumentException refused) {
         // still the caller's fault (an argument WE validated and rejected), but the raw message
