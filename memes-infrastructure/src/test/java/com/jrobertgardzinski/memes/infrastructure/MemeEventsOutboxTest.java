@@ -11,10 +11,12 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -159,6 +161,51 @@ class MemeEventsOutboxTest {
         assertEquals(fat, jdbc.sql("SELECT payload FROM meme_events_outbox WHERE id = ?")
                         .params("fat-event").query(String.class).single(),
                 "the payload must come back byte-for-byte — a future event type must not be cut short");
+    }
+
+    @Test
+    @DisplayName("retention is batched and capped: a huge backlog goes 500 at a time, exactly as many batches as promised, the rest next pass")
+    void retention_deletes_in_capped_batches() {
+        // 1200 delivered rows past retention — the shape of the FIRST pass after this feature
+        // ships on a gallery that has been deleting memes for months. One statement over all of
+        // them would be a single long transaction on the scheduler thread.
+        for (int i = 0; i < 1200; i++) {
+            outbox.append("bulk-" + i, "memes-events", "MEME_DELETED", "bulk", null, "{}");
+            outbox.markPublished("bulk-" + i);
+        }
+        backdateBeyondRetention("bulk");
+
+        int firstPass = outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), 2);
+
+        assertEquals(2 * MemeEventsOutbox.RETENTION_BATCH_ROWS, firstPass,
+                "a capped pass deletes exactly what the cap promises — no more (the point) and no"
+                        + " less (or a backlog would never drain)");
+        assertEquals(200, rowCount("bulk"), "the remainder waits for the next pass");
+
+        int secondPass = outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), 2);
+
+        assertEquals(200, secondPass, "the next pass takes what is left and stops early");
+        assertEquals(0, rowCount("bulk"));
+        assertEquals(0, outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), 2),
+                "an empty backlog costs one short statement, not a batch loop");
+    }
+
+    @Test
+    @DisplayName("a retention of zero or less refuses the boot, naming the property and echoing the value")
+    void a_non_positive_retention_refuses_to_start() {
+        for (long broken : new long[]{0, -1, -24}) {
+            IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                    () -> new MemeEventsOutboxRepublisher(outbox, events, broken));
+            assertTrue(refused.getMessage().contains("memes.outbox.retention-hours"),
+                    "the operator who set the dial must read its NAME: " + refused.getMessage());
+            assertTrue(refused.getMessage().contains(String.valueOf(broken)),
+                    "…and the value they set: " + refused.getMessage());
+        }
+    }
+
+    private int rowCount(String memeId) {
+        return jdbc.sql("SELECT COUNT(*) FROM meme_events_outbox WHERE event_key = ?")
+                .params(memeId).query(Integer.class).single();
     }
 
     private void backdateBeyondRetention(String memeId) {

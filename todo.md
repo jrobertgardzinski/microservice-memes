@@ -150,10 +150,27 @@ ZOSTAJE (kolejne kroki tej samej naprawy):
   pin: test z dwoma wątkami na jednej bramce.
 
 ## Otwarte — infra
+- **Cache miniatur a RODO — świadomy kompromis (2026-07-25).** `GET /memes/{id}/thumbnail`
+  odpowiada `Cache-Control: public, max-age=3600`, więc **delete/purge NIE dosięga kopii już
+  wydanych**: miniatura skasowanego mema może żyć w przeglądarkach i w cache'ach pośredniczących
+  (CDN, proxy firmowe) jeszcze do godziny po tym, jak serwer o niej zapomniał. Obowiązek
+  usunięcia realizujemy u ŹRÓDŁA (wiersz, blob i oba warianty giną w transakcji delete'u; od
+  2026-07-25 dodatkowo bramka `exists` na trafieniu w cache — sierota po crashu nie jest
+  serwowana), a to, co zostaje, to ogon ograniczony i wygasający. Gdyby czystka miała być
+  twardsza: `private` odcina cache współdzielone, `no-store` daje natychmiastowość kosztem
+  round-tripu na każdy kafelek galerii. Polityka mieszka w `MemeController#thumbnail` —
+  tam komentarz z tym samym rozumowaniem.
 - ~~Outbox dla MEME_DELETED~~ — ZROBIONE (2026-07-25): tabela `meme_events_outbox` (V5),
   wpis w TEJ SAMEJ transakcji co teardown, after-commit wysyła i markuje `published` dopiero
   po POTWIERDZONYM doręczeniu, `MemeEventsOutboxRepublisher` (co 15s) dosyła niezmarkowane
   starsze niż 30s; eventId = klucz wiersza (duplikat rozpoznawalny, comments idempotentne).
+  DOMKNIĘTE (2026-07-25): zegary producenta JAWNE — `max.block.ms=5000` (default Kafki to 60s,
+  a `send()` blokuje wątek ogłaszający na fetchu metadanych; przy purge'u na wątku listenera
+  N×60s wysadziłoby `max.poll.interval.ms`), `delivery.timeout.ms=30000`,
+  `request.timeout.ms=15000` — te same co w offboardingu i collections, pin
+  `KafkaProducerClocksTest`. Retencja kasuje batchami po 500, max 4 batche na pass (pierwszy
+  pass na dużej tabeli nie jest jedną wielką transakcją na wątku schedulera);
+  `memes.outbox.retention-hours` ≤ 0 = odmowa startu z nazwą i wartością.
 - ~~Default polityki czystki z bazy~~ — ZROBIONE (2026-07-07): port `PurgePolicyOverride`
   + generyczna tabela `settings` (V4, klucz `purge.memes`), rozstrzyganie wizard > baza > env
   w `PurgeUserContent`; REST `GET/PUT/DELETE /admin/purge-policy` (filtr wymaga zalogowania

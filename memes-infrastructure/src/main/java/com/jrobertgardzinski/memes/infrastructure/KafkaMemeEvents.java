@@ -33,6 +33,18 @@ import java.util.concurrent.TimeUnit;
  * thread (PurgeCommandsListener drives the purge) for N&times;5s — long enough to blow
  * {@code max.poll.interval.ms} and trigger a consumer-group rebalance, turning a broker outage
  * into a purge-saga outage.
+ *
+ * <p>"Never blocks" is precise, not absolute: {@code KafkaTemplate.send()} is asynchronous only
+ * once the record is in the accumulator, and getting there waits on the metadata fetch and on
+ * buffer space for up to the producer's {@code max.block.ms}. That dial is therefore set
+ * EXPLICITLY in {@code application.properties} to <strong>5s</strong> (Kafka's own default is
+ * 60s), together with {@code delivery.timeout.ms=30s} and {@code request.timeout.ms=15s} — the
+ * clocks microservice-offboarding and microservice-user-collections already run on. So the exact
+ * promise is: the announcing thread waits at most {@code max.block.ms} per event and never for
+ * the broker's ack. A purge of N memes against a leaderless topic costs N&times;5s on the
+ * listener thread, which stays inside the 300s {@code max.poll.interval.ms} up to ~60 memes;
+ * past that the send simply fails, which costs nothing durable — the row stays and
+ * {@link MemeEventsOutboxRepublisher} redelivers.
  */
 @Component
 @ConditionalOnProperty(name = "memes.kafka-enabled", havingValue = "true")
@@ -45,7 +57,9 @@ class KafkaMemeEvents implements MemeEvents {
     /**
      * How long the REPUBLISHER'S attempt waits for the broker's ack before leaving the row for
      * the next pass. Only the scheduler thread ever holds this wait — the first, after-commit
-     * attempt is callback-based and never blocks (see {@link #publishFirstAttempt}).
+     * attempt is callback-based and waits for no ack at all (see {@link #publishFirstAttempt}).
+     * Deliberately the same 5s as {@code spring.kafka.producer.properties.max.block.ms}: one
+     * "how long do we wait for a broker" number for the whole service.
      */
     private static final Duration CONFIRMATION_PATIENCE = Duration.ofSeconds(5);
 
@@ -75,10 +89,12 @@ class KafkaMemeEvents implements MemeEvents {
 
     /**
      * The FIRST delivery attempt, fire-and-mark-later: hand the record to the producer and
-     * return immediately — the announcing thread (a request, or worse the Kafka listener thread
-     * driving a purge) never waits for the broker. The completion callback marks the row
-     * published on a confirmed send and only logs a failed one; either way the row is the
-     * safety net and the republisher the guarantee.
+     * return — the announcing thread (a request, or worse the Kafka listener thread driving a
+     * purge) never waits for the broker's ack, and waits to hand the record over for at most the
+     * producer's {@code max.block.ms} (5s, pinned in application.properties and by
+     * KafkaProducerClocksTest — Kafka's 60s default would make this paragraph false). The
+     * completion callback marks the row published on a confirmed send and only logs a failed
+     * one; either way the row is the safety net and the republisher the guarantee.
      *
      * <p>The callback runs on the PRODUCER'S I/O thread, not ours — it must not touch the
      * announcing thread's (already committed, still bound) transaction. {@link

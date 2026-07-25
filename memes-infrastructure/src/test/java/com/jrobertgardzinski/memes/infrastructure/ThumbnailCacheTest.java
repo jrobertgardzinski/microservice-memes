@@ -45,6 +45,9 @@ class ThumbnailCacheTest {
     /** Bumped on every FULL-image decode for a thumbnail — the work the cache must avoid. */
     static final AtomicInteger thumbnailDecodes = new AtomicInteger();
 
+    /** Serial number of the uploaded image, painted into its pixels: unique WITHOUT rolling dice. */
+    static final AtomicInteger uploads = new AtomicInteger();
+
     @TestConfiguration
     static class CountingDecodes {
         @Bean
@@ -109,10 +112,32 @@ class ThumbnailCacheTest {
         mockMvc.perform(get("/memes/{id}/thumbnail", id)).andExpect(status().isNotFound());
     }
 
+    @Test
+    @DisplayName("an orphaned thumbnail left by a crash is not served — the cache hit is gated on the meme still existing")
+    void an_orphaned_thumbnail_is_not_served() throws Exception {
+        // The one interleaving the post-put re-check cannot cover: the process dies between
+        // caching the variant and re-checking the meme. What is left in the store is exactly
+        // this — a {id}.thumb of a meme that does not exist, which no later delete will sweep.
+        // Reproduce the leftover directly; the crash itself is not the interesting part.
+        String vanished = "ghost-" + java.util.UUID.randomUUID();
+        objects.put(vanished + ".thumb", new byte[]{(byte) 0x89, 'P', 'N', 'G'});
+
+        mockMvc.perform(get("/memes/{id}/thumbnail", vanished)).andExpect(status().isNotFound());
+
+        assertTrue(objects.get(vanished + ".thumb").isEmpty(),
+                "and the orphan is swept on the way out, not left to be re-checked forever");
+    }
+
     /** Uploads a fresh, unique image as the signed-in test user and returns the meme id. */
     private String upload() throws Exception {
         BufferedImage image = new BufferedImage(64, 48, BufferedImage.TYPE_INT_RGB);
-        image.setRGB(0, 0, (int) (Math.random() * 0xFFFFFF));   // distinct pixels beat the dedup index
+        // Distinct pixels beat the dedup index (identical bytes would resolve to the FIRST
+        // upload's id). Deterministically distinct: a counter painted into two pixels gives
+        // 2^48 distinct images with zero chance of a collision — Math.random() on one pixel had
+        // a 1-in-16.7M chance per pair of uploads of quietly returning the wrong meme's id.
+        int nth = uploads.incrementAndGet();
+        image.setRGB(0, 0, nth);
+        image.setRGB(1, 0, ~nth & 0xFFFFFF);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "png", out);
         MockMultipartFile file = new MockMultipartFile("file", "m.png", "image/png", out.toByteArray());

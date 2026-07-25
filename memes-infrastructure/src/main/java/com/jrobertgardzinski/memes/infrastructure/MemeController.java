@@ -108,7 +108,20 @@ class MemeController {
                         .contentType(MediaType.IMAGE_PNG)
                         // a thumbnail is immutable per id (ids never return to circulation), so
                         // browsers and proxies may hold it a long while — an hour keeps even a
-                        // sweeping delete's stale window bounded
+                        // sweeping delete's stale window bounded.
+                        //
+                        // RODO/GDPR, stated plainly because this is where the policy lives:
+                        // "public, max-age=3600" means a delete or an account purge does NOT
+                        // reach copies already handed out — the thumbnail of an erased meme can
+                        // survive in browser caches and in any intermediary (CDN, corporate
+                        // proxy) for up to an hour after the server forgot it. That is a
+                        // deliberate trade: the gallery scrolls over thumbnails, and an hour of
+                        // caching is what keeps it cheap. The erasure obligation is met at the
+                        // source (row, blob and both variants go in the delete's transaction);
+                        // what remains is a bounded, decaying tail. Should a purge ever need to
+                        // be harder than that, this is the line to change — "private" keeps
+                        // shared caches out of it, and no-store makes erasure immediate at the
+                        // cost of a decode-free but round-trip-per-tile gallery.
                         .cacheControl(org.springframework.http.CacheControl
                                 .maxAge(java.time.Duration.ofHours(1)).cachePublic())
                         .body(bytes))

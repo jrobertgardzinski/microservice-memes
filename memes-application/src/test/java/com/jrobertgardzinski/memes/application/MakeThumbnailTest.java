@@ -138,6 +138,23 @@ class MakeThumbnailTest {
                 "the re-check must remove the variant it just wrote for a deleted meme");
     }
 
+    @Test
+    @DisplayName("an orphaned thumbnail — the meme died in the crash window — is never served, and is swept on the way out")
+    void an_orphaned_thumbnail_is_not_served() {
+        // The crash the re-check cannot cover: the JVM died between objects.put and
+        // memeRepository.exists, so the store holds a .thumb whose meme is gone and no later
+        // delete will ever sweep it. Serving it from the cache alone would keep a deleted
+        // person's picture on the wire forever.
+        blobs.put("ghost.thumb", new byte[]{1, 2, 3});
+
+        assertTrue(makeThumbnail.execute("ghost").isEmpty(),
+                "a thumbnail whose meme no longer exists must not be served — the cache hit is"
+                        + " gated on the meme row, not trusted on its own");
+        assertEquals(0, decodes.get(), "and nothing was decoded to find that out");
+        assertTrue(!blobs.containsKey("ghost.thumb"),
+                "the orphan is dropped on the way out — the next request pays a plain miss");
+    }
+
     private static byte[] png(int width, int height) throws Exception {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
