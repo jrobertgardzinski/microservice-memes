@@ -33,6 +33,9 @@ class MemeControllerTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    com.jrobertgardzinski.memes.application.MemeRepository memes;
+
     @Test
     void uploads_and_serves_an_optimized_meme() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "meme.bmp", "image/bmp", bmp());
@@ -75,6 +78,20 @@ class MemeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                         .jsonPath("$.error").exists());
+    }
+
+    @Test
+    void corrupted_stored_bytes_surface_as_a_500_not_a_400() throws Exception {
+        // uploads are validated by the optimizer, so bytes that no longer decode AFTER storage
+        // are the server's data gone bad — the thumbnail must answer 500 (our fault, generic
+        // body), never the 400 the same decoder failure earns a broken UPLOAD
+        memes.save(new com.jrobertgardzinski.memes.domain.Meme(
+                "rotten", "author@example.com", "png", "these were pixels once".getBytes()));
+
+        mockMvc.perform(get("/memes/{id}/thumbnail", "rotten"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.error").value("internal error"));
     }
 
     private static byte[] pngBytes() throws Exception {

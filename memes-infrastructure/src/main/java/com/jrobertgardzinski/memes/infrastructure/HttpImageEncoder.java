@@ -48,6 +48,11 @@ class HttpImageEncoder implements ImageEncoder {
                     request.POST(HttpRequest.BodyPublishers.ofByteArray(png)).build(),
                     HttpResponse.BodyHandlers.ofByteArray());
             return response.statusCode() == 200 ? Optional.of(response.body()) : Optional.empty();
+        } catch (InterruptedException interrupted) {
+            // not "the encoder is down": the CALLER's thread was told to stop. Restore the flag
+            // so the shutdown keeps propagating, and fall back to PNG like any other miss
+            Thread.currentThread().interrupt();
+            return Optional.empty();
         } catch (Exception down) {
             return Optional.empty();
         }

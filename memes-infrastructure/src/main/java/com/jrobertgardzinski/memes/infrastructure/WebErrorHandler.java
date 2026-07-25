@@ -49,4 +49,14 @@ class WebErrorHandler {
         LOG.error("I/O failure while handling a request", failure);
         return ResponseEntity.internalServerError().body(Map.of("error", "internal storage error"));
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    ResponseEntity<Map<String, String>> serverFault(IllegalStateException fault) {
+        // "we broke", by our own admission: use cases raise IllegalStateException for states the
+        // server should never be in — e.g. MakeThumbnail finding STORED bytes that no longer
+        // decode (data corruption, not a bad request). 500 with a generic body; the message may
+        // name meme ids and internals, so it goes to the log, never the wire.
+        LOG.error("server-side invariant broken while handling a request", fault);
+        return ResponseEntity.internalServerError().body(Map.of("error", "internal error"));
+    }
 }

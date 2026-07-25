@@ -87,8 +87,16 @@ class JdbcMemeRepository implements MemeRepository, PublicationLog {
         // exists() re-check still sees our uncommitted row, so it leaves the variant in place
         // too. Sweep once more AFTER the commit: any variant put whose commit lands before ours
         // is caught here; one landing after ours is caught by ServeMeme's re-check (the row is
-        // then visibly gone). On filesystem/S3 the delete above is itself parked after-commit,
-        // so this second registration only repeats an idempotent no-op on a missing key.
+        // then visibly gone). On filesystem/S3 the store's delete would normally PARK itself —
+        // but called from inside our afterCommit it runs inline instead (the phase-aware
+        // re-entry in TransactionAwareDeletes; a plain re-registration would silently never
+        // run, and the second sweep would vanish without a trace).
+        //
+        // On the DB store this after-commit DELETE runs on a FRESH pool connection outside any
+        // Spring transaction, so it only commits because Hikari hands connections out with
+        // autocommit restored — spring.datasource.hikari.auto-commit stays true (the default,
+        // pinned by TransactionAwareDeletesTest). With auto-commit=false this sweep would roll
+        // back silently when the connection returns to the pool.
         TransactionAwareDeletes.afterCommitOrNow(() -> objects.delete(variantKey));
     }
 

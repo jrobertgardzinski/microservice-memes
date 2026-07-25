@@ -73,4 +73,32 @@ class KafkaMemeEventsTransactionTest {
 
         verify(kafka).send(any(ProducerRecord.class));
     }
+
+    @Test
+    @DisplayName("the parked event still carries the cid of the request that deleted the meme")
+    void the_event_carries_the_correlation_id_of_the_deleting_request() {
+        // the P5 goal made a test: the record is built (and its cid header stamped from MDC) at
+        // ANNOUNCE time, while the request thread's context is certainly alive — only the send
+        // waits for the commit. The MDC is cleared before the commit on purpose: a header that
+        // survives proves the eager stamping, not a lucky read at send time.
+        when(kafka.send(any(ProducerRecord.class))).thenReturn(CompletableFuture.completedFuture(null));
+
+        org.slf4j.MDC.put(CorrelationIdFilter.MDC_KEY, "cid-of-the-delete");
+        try {
+            tx.executeWithoutResult(status -> {
+                events.memeDeleted("traced");
+                org.slf4j.MDC.remove(CorrelationIdFilter.MDC_KEY);
+            });
+        } finally {
+            org.slf4j.MDC.remove(CorrelationIdFilter.MDC_KEY);
+        }
+
+        ArgumentCaptor<ProducerRecord<String, String>> sent = ArgumentCaptor.forClass(ProducerRecord.class);
+        verify(kafka).send(sent.capture());
+        org.apache.kafka.common.header.Header cid = sent.getValue().headers().lastHeader(KafkaTracing.HEADER);
+        org.junit.jupiter.api.Assertions.assertNotNull(cid,
+                "the correlation header must ride the MEME_DELETED record");
+        assertEquals("cid-of-the-delete",
+                new String(cid.value(), java.nio.charset.StandardCharsets.UTF_8));
+    }
 }

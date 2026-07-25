@@ -5,6 +5,7 @@ import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,12 +39,12 @@ class RateLimitTest {
         RateLimit limit = new RateLimit(2, clock);
         limit.tryAcquire("alice");
         limit.tryAcquire("bob");
-        assertTrue(limit.trackedKeys() == 2, "both windows are live inside the minute");
+        assertEquals(2, limit.trackedKeys(), "both windows are live inside the minute");
 
         clock.advanceSeconds(61);
         limit.tryAcquire("carol");   // any call sweeps the expired windows out
 
-        assertTrue(limit.trackedKeys() == 1, "only carol's fresh window survives the sweep");
+        assertEquals(1, limit.trackedKeys(), "only carol's fresh window survives the sweep");
     }
 
     @Test
