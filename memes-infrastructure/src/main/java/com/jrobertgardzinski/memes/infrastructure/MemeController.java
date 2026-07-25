@@ -122,6 +122,23 @@ class MemeController {
                         // be harder than that, this is the line to change — "private" keeps
                         // shared caches out of it, and no-store makes erasure immediate at the
                         // cost of a decode-free but round-trip-per-tile gallery.
+                        //
+                        // The OTHER half of the same obligation, and the sharper one: an ORPHAN
+                        // AT REST. MakeThumbnail's self-healing is triggered BY A REQUEST — it
+                        // refuses to serve a .thumb whose meme is gone and sweeps it on the way
+                        // out. A thumbnail nobody ever asks for again is therefore never swept:
+                        // it sits in MinIO indefinitely. The code guarantees that an erased
+                        // meme's thumbnail will not be HANDED OUT; it does not guarantee that it
+                        // has been DELETED, and under GDPR those are two different duties (the
+                        // delete's own transaction covers the normal path — this is only about
+                        // the variant a CRASH stranded between the cache write and its re-check).
+                        // Accepted knowingly: closing it means a periodic sweep that ENUMERATES
+                        // the bucket to find keys with no row, which is a listing of the whole
+                        // store against a window measured in "how often does a JVM die at that
+                        // exact instant". Revisit if that stops being hypothetical — a crash
+                        // that leaves orphans behind, an audit that asks for proof of erasure,
+                        // or a store big enough that stray objects cost real money. todo.md
+                        // carries the same entry.
                         .cacheControl(org.springframework.http.CacheControl
                                 .maxAge(java.time.Duration.ofHours(1)).cachePublic())
                         .body(bytes))

@@ -155,6 +155,67 @@ class MakeThumbnailTest {
                 "the orphan is dropped on the way out — the next request pays a plain miss");
     }
 
+    @Test
+    @DisplayName("the orphan's bytes are never read — the meme row is asked first, the store second")
+    void an_orphan_costs_no_blob_read() {
+        // exists() -> get(), not the other way round: with the store asked first, an orphan (and
+        // every request for an id that is gone) paid a full blob read from S3/MinIO for bytes
+        // that were then thrown away
+        blobs.put("ghost.thumb", new byte[]{1, 2, 3});
+        java.util.List<String> reads = new java.util.ArrayList<>();
+        ObjectStore countingReads = new ObjectStore() {
+            public void put(String key, byte[] data) {
+                blobs.put(key, data);
+            }
+
+            public Optional<byte[]> get(String key) {
+                reads.add(key);
+                return Optional.ofNullable(blobs.get(key));
+            }
+
+            public void delete(String key) {
+                blobs.remove(key);
+            }
+        };
+
+        assertTrue(new MakeThumbnail(memeRepository, countingReads, countingOptimizer, new ThumbnailSize(64))
+                .execute("ghost").isEmpty());
+
+        assertEquals(List.of(), reads,
+                "a meme that does not exist must not cost a single blob read — the cheap, local"
+                        + " question decides, the expensive, remote one is never asked");
+        assertTrue(!blobs.containsKey("ghost.thumb"), "and the orphan is still swept");
+    }
+
+    @Test
+    @DisplayName("a store that fails the sweep still answers 404, not 500")
+    void a_failing_sweep_does_not_become_a_server_error() {
+        // production's store is S3/MinIO and its delete throws SdkException (unchecked) — that
+        // used to ride out of the use case, through the controller, and turn "no such meme" into
+        // a 500. The sweep is an optimisation; the 404 is the answer.
+        blobs.put("ghost.thumb", new byte[]{1, 2, 3});
+        ObjectStore hiccupingStore = new ObjectStore() {
+            public void put(String key, byte[] data) {
+                blobs.put(key, data);
+            }
+
+            public Optional<byte[]> get(String key) {
+                return Optional.ofNullable(blobs.get(key));
+            }
+
+            public void delete(String key) {
+                throw new IllegalStateException("MinIO is having a moment");   // stands in for SdkException
+            }
+        };
+
+        Optional<byte[]> answer = new MakeThumbnail(
+                memeRepository, hiccupingStore, countingOptimizer, new ThumbnailSize(64)).execute("ghost");
+
+        assertTrue(answer.isEmpty(),
+                "the caller gets the 404 it deserves; the orphan that survived is a wasted object,"
+                        + " not a wrong answer — the next request tries the sweep again");
+    }
+
     private static byte[] png(int width, int height) throws Exception {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream out = new ByteArrayOutputStream();

@@ -160,6 +160,34 @@ ZOSTAJE (kolejne kroki tej samej naprawy):
   twardsza: `private` odcina cache współdzielone, `no-store` daje natychmiastowość kosztem
   round-tripu na każdy kafelek galerii. Polityka mieszka w `MemeController#thumbnail` —
   tam komentarz z tym samym rozumowaniem.
+- **Sierota AT REST — drugi, ostrzejszy brzeg tego samego obowiązku (2026-07-25).** Nota
+  o `Cache-Control` mówi o kopiach JUŻ WYDANYCH; osobnym ryzykiem jest wariant, który został
+  W MINIO. Samo-uzdrawianie w `MakeThumbnail` jest **wyzwalane żądaniem**: sierota (`{id}.thumb`
+  po crashu między zapisem cache'u a jego re-checkiem) jest wykrywana dopiero wtedy, gdy ktoś
+  o nią poprosi. O sierotę, o którą nikt już nie zapyta, nikt nie zapyta — leży w buckecie
+  bezterminowo. Kod gwarantuje, że **nie zostanie PODANA**, nie że **zostanie USUNIĘTA**, a to
+  są dwa różne obowiązki RODO (art. 17 mówi o usunięciu, nie o nieudostępnianiu). Wybór
+  świadomy: domknięcie wymaga cyklicznego sweepu, który **ENUMERUJE bucket** (lista wszystkich
+  kluczy vs. wiersze) — przegląd całego magazynu przeciwko oknu wielkości „JVM padł dokładnie
+  w tej milisekundzie". WARUNEK ZMIANY DECYZJI: pierwszy realny crash, który zostawi sieroty,
+  audyt żądający dowodu usunięcia, albo store na tyle duży, że zabłąkane obiekty kosztują.
+  Ścieżka normalnego delete'u jest czysta (wiersz + blob + oba warianty w jednej transakcji) —
+  to jest wyłącznie o oknie crashowym.
+- **Sufit N×5 s w `PurgeUserContent` — dług DO SPISANIA, nie do naprawy dziś (2026-07-25).**
+  `memeRepository.findIdsByAuthor(author)` nie ma limitu, a każdy skasowany mem ogłasza
+  `MEME_DELETED`. Pierwsza próba publikacji jest nieblokująca, ale `send()` czeka do
+  `max.block.ms` (5 s) na metadane — więc przy topicu BEZ LIDERA konto z N memami trzyma wątek
+  listenera N×5 s (300 memów = 1500 s). Nad tym wisi `max.poll.interval.ms` = 300 s: powyżej
+  ~60 memów rebalans, czyli awaria brokera zamienia się w awarię sagi. DZIŚ NIEOSIĄGALNE —
+  Kafka na stacku jest jednobrokerowa, więc „brak lidera" oznacza „brokera nie ma wcale",
+  a wtedy `send()` pada od razu, nie po 5 s. WARUNEK: **przed skalowaniem Kafki >1 brokera
+  dodać cap** (limit na `findIdsByAuthor` + kontynuacja w kolejnym przebiegu, albo circuit
+  breaker po pierwszym timeout'cie publikacji — reszta i tak dojdzie outboxem, bo wiersze
+  zostają). ROZJAZD BUDŻETÓW, wart zapamiętania przy tej samej okazji:
+  `OFFBOARDING_PURGE_TIMEOUT_SEC` = 120 s (proces sagi przestaje czekać na potwierdzenie), a
+  budżet listenera memes to 300 s — memes może więc mielić jeszcze 3 minuty po tym, jak
+  offboarding uznał uczestnika za spóźnionego. Idempotencja to ratuje (ponowiona komenda nie
+  psuje), ale liczby powinny zejść się w jednej tabeli zegarów.
 - ~~Outbox dla MEME_DELETED~~ — ZROBIONE (2026-07-25): tabela `meme_events_outbox` (V5),
   wpis w TEJ SAMEJ transakcji co teardown, after-commit wysyła i markuje `published` dopiero
   po POTWIERDZONYM doręczeniu, `MemeEventsOutboxRepublisher` (co 15s) dosyła niezmarkowane
