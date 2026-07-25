@@ -150,6 +150,12 @@ ZOSTAJE (kolejne kroki tej samej naprawy):
   pin: test z dwoma wątkami na jednej bramce.
 
 ## Otwarte — infra
+- **Outbox dla MEME_DELETED** (2026-07-25) — `KafkaMemeEvents` sprawdza już wynik `send()`
+  (whenComplete + log błędu), ale to tylko uczciwe przyznanie się do straty: event wychodzi
+  w trakcie transakcji kasowania, więc awaria brokera gubi go (comments zostawia wątek),
+  a rollback po udanej wysyłce ogłasza kasowanie, którego nie było. Właściwe domknięcie:
+  wpis do tabeli outbox w TEJ SAMEJ transakcji co teardown + publikacja po commicie
+  (wzorzec jak outbox security przy usuwaniu konta).
 - ~~Default polityki czystki z bazy~~ — ZROBIONE (2026-07-07): port `PurgePolicyOverride`
   + generyczna tabela `settings` (V4, klucz `purge.memes`), rozstrzyganie wizard > baza > env
   w `PurgeUserContent`; REST `GET/PUT/DELETE /admin/purge-policy` (filtr wymaga zalogowania

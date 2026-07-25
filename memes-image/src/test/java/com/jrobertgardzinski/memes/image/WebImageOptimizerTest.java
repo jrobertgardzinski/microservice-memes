@@ -70,6 +70,42 @@ class WebImageOptimizerTest {
         assertEquals(64, read(optimized).getWidth(), "and it is still the same picture");
     }
 
+    @Test
+    @DisplayName("a decompression bomb — tiny file, huge declared dimensions — is refused before decoding")
+    void rejects_a_decompression_bomb_before_decoding() {
+        // a valid PNG signature + IHDR declaring 10000x10000: a handful of bytes on the wire, but
+        // decoding it would allocate ~400 MB — the guard must read the header and refuse, not decode
+        byte[] bomb = pngHeaderDeclaring(10_000, 10_000);
+        assertTrue(bomb.length < 100, "the hostile upload really is tiny");
+
+        // the dedicated type, not a bare IllegalArgumentException — the web boundary maps it to a
+        // 400 whose body may echo this message verbatim
+        InvalidImageException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                InvalidImageException.class, () -> optimizer.optimize(bomb));
+
+        assertTrue(refused.getMessage().contains("image dimensions too large"), refused.getMessage());
+    }
+
+    /** PNG signature + a well-formed IHDR chunk (correct CRC) declaring the given dimensions. */
+    private static byte[] pngHeaderDeclaring(int width, int height) {
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        png.writeBytes(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'});
+        ByteArrayOutputStream chunk = new ByteArrayOutputStream();     // type + payload, CRC-covered
+        chunk.writeBytes("IHDR".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        chunk.writeBytes(java.nio.ByteBuffer.allocate(13)
+                .putInt(width).putInt(height)
+                .put((byte) 8)     // bit depth
+                .put((byte) 2)     // colour type: truecolour
+                .put((byte) 0).put((byte) 0).put((byte) 0)   // compression, filter, interlace
+                .array());
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        crc.update(chunk.toByteArray());
+        png.writeBytes(java.nio.ByteBuffer.allocate(4).putInt(13).array());     // IHDR payload length
+        png.writeBytes(chunk.toByteArray());
+        png.writeBytes(java.nio.ByteBuffer.allocate(4).putInt((int) crc.getValue()).array());
+        return png.toByteArray();
+    }
+
     private static boolean contains(byte[] haystack, byte[] needle) {
         outer:
         for (int i = 0; i <= haystack.length - needle.length; i++) {

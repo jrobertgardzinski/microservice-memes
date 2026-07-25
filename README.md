@@ -52,30 +52,32 @@ and Quarkus (`microservice-email`, BCE).
 
 ## Modules
 
-- **memes-domain** — the entities: `Meme`, `Comment`, `RankedMeme`, `VoteDirection`. Pure Java.
+- **memes-domain** — the entities: `Meme`, `RankedMeme`, `DeletedAccount`. Pure Java.
 - **memes-config** — typed, validated configuration values (`ImageLimits`, `ThumbnailSize`,
-  `ContentPurgePolicy` — what an account deletion does to the leaver's content). Pure Java.
+  `TagLimits`, `RateLimit`, `PurgeRule` — what an account deletion does to the leaver's
+  content). Pure Java.
 - **memes-image** — `WebImageOptimizer`: re-encodes any ImageIO-readable image (BMP, JPEG, …) to a
   browser-friendly PNG (which also drops EXIF), bounded by the configured limits. Pure JDK
   (`java.desktop`).
-- **memes-application** — use cases (`PublishMeme`, `ViewMeme`, `MakeThumbnail`, `AddComment`,
-  `ListComments`, `CastVote`, `RankMemes`) + the ports (`MemeRepository`, `CommentRepository`,
-  `VoteRepository`, `MemeContentIndex`). No framework.
+- **memes-tags** — the `Tag` value object (normalisation and validation). Pure Java.
+- **memes-application** — use cases (`PublishMeme`, `ServeMeme`, `MakeThumbnail`, `CastVote`,
+  `RankMemes`, `TagMeme`, `DeleteMeme`, `PurgeUserContent`, …) + the ports (`MemeRepository`,
+  `VoteRepository`, `MemeContentIndex`, `TagRepository`, `ObjectStore`). No framework.
 - **memes-ui** — the gallery UI: React + TypeScript + Material UI, built by Vite through
   frontend-maven-plugin (own pinned Node) and packed as `META-INF/resources`, so the service jar
   serves it at `/`. UI development: `cd memes-ui && npm run dev` (proxies `/memes` to :8083).
 - **memes-infrastructure** — the Spring Boot app: web boundaries (`MemeController`,
-  `CommentController`, `VoteController`), the sign-in gate (`RequireSignInFilter` +
-  `HttpSecurityAuthenticationGate`, which confirms bearer tokens against
-  `microservice-security`'s `GET /me`), in-memory adapters. Cucumber features (`src/test/resources/features/`) document
-  the flows; results feed Allure.
+  `VoteController`, `TagController`, `AdminController`), the sign-in gate (`RequireSignInFilter`
+  + `HttpSecurityAuthenticationGate`, which confirms bearer tokens against
+  `microservice-security`'s `GET /me`), the JDBC adapters and the three blob stores. Cucumber
+  features (`src/test/resources/features/`) document the flows; results feed Allure.
 
 ## Security integration
 
 Browsing is public; **contributing requires signing in**. Every `POST` under `/memes` must carry
 `Authorization: Bearer <access token issued by microservice-security>`; the gate confirms it via
-`GET /me` (config: `security.url` / `SECURITY_URL`) and the confirmed identity becomes e.g. the
-comment's author — the request body cannot impersonate anyone. Anonymous writes get
+`GET /me` (config: `security.url` / `SECURITY_URL`) and the confirmed identity becomes the
+meme's author — the request body cannot impersonate anyone. Anonymous writes get
 `401 {"status": "SIGN_IN_REQUIRED"}`.
 
 ## Account deletion (the saga's memes side)
@@ -105,26 +107,29 @@ back to the defaults (logged), never wedging the saga.
 ## Contract
 
 ```
-GET  /                          the gallery UI (single-file React, no build step)
+GET  /                          the gallery UI (React, served from the jar)
 
 # public reads
-GET  /memes                     -> 200 [ { "id" }, ... ]  (newest first)
-GET  /memes/{id}                -> 200 image/png (optimised bytes) | 404
+GET  /memes[?tag=...]           -> 200 [ { "id", "nsfw" }, ... ]  (newest first)
+GET  /memes/{id}                -> 200 image/png — or image/webp when Accept allows it | 404
 GET  /memes/{id}/thumbnail      -> 200 image/png (small preview) | 404
-GET  /memes/{id}/comments       -> 200 [ { "id", "author", "text" }, ... ]
+GET  /memes/{id}/meta           -> 200 { "id", "author", "nsfw" } | 404
+GET  /memes/{id}/tags           -> 200 [ "tag", ... ]
+GET  /memes/{id}/votes          -> 200 { "score": n, "myVote": ... } | 404
 GET  /memes/hot                 -> 200 [ { "memeId", "score" }, ... ]  (highest score first)
 
 # writes: Authorization: Bearer <security access token>, else 401 SIGN_IN_REQUIRED
 POST /memes                     multipart/form-data, field "file"
                                 -> 201 { "id": "..." }, Location: /memes/{id}
                                    (uploading the same image twice returns the existing id)
-POST /memes/{id}/comments       { "text": "..." }               -> 201 { "id": "..." } | 400 | 404
-                                   (author = the signed-in identity)
-POST /memes/{id}/votes          { "direction": "UP" | "DOWN" }  -> 200 { "score": n } | 400 | 404
-POST /memes/{id}/comments/{cid}/votes   same body/answers — votes on a comment
+POST   /memes/{id}/votes        { "direction": "UP" | "DOWN" }  -> 200 { "score": n } | 400 | 404
+POST   /memes/{id}/tags         { "tags": [ ... ] }  — the author replaces the whole set
+PUT    /memes/{id}/nsfw         { "nsfw": true|false }  — MODERATOR/ADMIN only
+DELETE /memes/{id}              the author or a moderator takes the meme down
 
-One vote per user per meme/comment: voting again replaces your previous vote (never stacks);
-comment listings include each comment's current score.
+One vote per user per meme: voting again replaces your previous vote (never stacks).
+Comment threads live in microservice-comments (GET/POST /memes/{id}/comments over there);
+a deleted meme announces MEME_DELETED and the thread goes with it.
 ```
 
 ## Which runtime am I actually in?

@@ -68,7 +68,10 @@ class S3ObjectStore implements ObjectStore {
 
     @Override
     public void delete(String key) {
-        s3.deleteObject(b -> b.bucket(bucket).key(key));
+        // the bucket is outside any DB transaction: within the delete/purge seam the object goes
+        // only after the DB part commits, so a rollback never resurrects a meme row whose bytes
+        // are already gone (same reasoning as the filesystem adapter)
+        TransactionAwareDeletes.afterCommitOrNow(() -> s3.deleteObject(b -> b.bucket(bucket).key(key)));
     }
 
     private static String required(Environment env, String property) {

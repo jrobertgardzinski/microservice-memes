@@ -26,7 +26,16 @@ class HttpSecurityAuthenticationGate implements SecurityAuthenticationGate {
     private final RestClient securityService;
 
     HttpSecurityAuthenticationGate(@Value("${security.url}") String securityUrl) {
-        this.securityService = RestClient.create(securityUrl);
+        // bounded waits: this gate sits on EVERY write request, so a hung security service must
+        // surface as a quick 401 (fail-closed via the catch below), not as request threads piling
+        // up behind a connect that never finishes
+        var requestFactory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(2));
+        requestFactory.setReadTimeout(java.time.Duration.ofSeconds(5));
+        this.securityService = RestClient.builder()
+                .baseUrl(securityUrl)
+                .requestFactory(requestFactory)
+                .build();
     }
 
     @Override

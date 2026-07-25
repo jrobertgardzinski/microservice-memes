@@ -36,11 +36,16 @@ class HttpImageEncoder implements ImageEncoder {
             return Optional.empty();
         }
         try {
-            HttpResponse<byte[]> response = client.send(
+            String cid = org.slf4j.MDC.get(CorrelationIdFilter.MDC_KEY);
+            HttpRequest.Builder request =
                     HttpRequest.newBuilder(URI.create(baseUrl + "/encode?format=webp&quality=" + quality))
                             .timeout(Duration.ofSeconds(3))
-                            .header("Content-Type", "application/octet-stream")
-                            .POST(HttpRequest.BodyPublishers.ofByteArray(png)).build(),
+                            .header("Content-Type", "application/octet-stream");
+            if (cid != null) {
+                request.header(CorrelationIdFilter.HEADER, cid);   // trace across services
+            }
+            HttpResponse<byte[]> response = client.send(
+                    request.POST(HttpRequest.BodyPublishers.ofByteArray(png)).build(),
                     HttpResponse.BodyHandlers.ofByteArray());
             return response.statusCode() == 200 ? Optional.of(response.body()) : Optional.empty();
         } catch (Exception down) {

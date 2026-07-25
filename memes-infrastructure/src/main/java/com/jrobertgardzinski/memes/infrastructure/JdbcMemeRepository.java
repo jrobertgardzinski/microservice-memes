@@ -49,6 +49,17 @@ class JdbcMemeRepository implements MemeRepository, PublicationLog {
     }
 
     @Override
+    public boolean exists(String id) {
+        // row lookup only — the port's default would drag the blob out of the ObjectStore just to
+        // throw it away; ServeMeme calls this on every WebP cache write to spot a concurrent delete
+        return jdbc.sql("SELECT 1 FROM memes WHERE id = ?")
+                .params(id)
+                .query((rs, n) -> 1)
+                .optional()
+                .isPresent();
+    }
+
+    @Override
     public List<String> allIds() {
         return jdbc.sql("SELECT id FROM memes ORDER BY published_at DESC, id DESC")
                 .query((rs, n) -> rs.getString("id")).list();
@@ -66,6 +77,19 @@ class JdbcMemeRepository implements MemeRepository, PublicationLog {
     public void deleteById(String memeId) {
         jdbc.sql("DELETE FROM memes WHERE id = ?").params(memeId).update();
         objects.delete(memeId);
+        // ServeMeme caches a WebP variant under this derived key (see its webpKey); without this
+        // the encoded copy of a deleted image would sit in the store forever. Every adapter's
+        // delete is a no-op on a missing key, so "never encoded" costs nothing.
+        String variantKey = memeId + ".webp";
+        objects.delete(variantKey);
+        // On the DB store the sweep above runs INSIDE this transaction, so it misses a variant
+        // that a concurrent ServeMeme writes between it and our commit — and that serve's own
+        // exists() re-check still sees our uncommitted row, so it leaves the variant in place
+        // too. Sweep once more AFTER the commit: any variant put whose commit lands before ours
+        // is caught here; one landing after ours is caught by ServeMeme's re-check (the row is
+        // then visibly gone). On filesystem/S3 the delete above is itself parked after-commit,
+        // so this second registration only repeats an idempotent no-op on a missing key.
+        TransactionAwareDeletes.afterCommitOrNow(() -> objects.delete(variantKey));
     }
 
     @Override

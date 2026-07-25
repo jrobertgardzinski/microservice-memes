@@ -54,8 +54,9 @@ class MemesConfig {
     }
 
     @Bean
-    PublishMeme publishMeme(WebImageOptimizer optimizer, MemeRepository repository, MemeContentIndex contentIndex) {
-        return new PublishMeme(optimizer, repository, contentIndex);
+    PublishMeme publishMeme(WebImageOptimizer optimizer, MemeRepository repository, MemeContentIndex contentIndex,
+                            com.jrobertgardzinski.memes.application.ObjectStore objectStore) {
+        return new PublishMeme(optimizer, repository, contentIndex, objectStore);
     }
 
     @Bean
@@ -72,8 +73,9 @@ class MemesConfig {
     }
 
     @Bean
-    RateLimit uploadRate(@Value("${memes.upload.rate-limit-per-minute:12}") int perMinute) {
-        return new RateLimit(perMinute);
+    RateLimit uploadRate(@Value("${memes.upload.rate-limit-per-minute:12}") int perMinute,
+                         java.time.Clock clock) {
+        return new RateLimit(perMinute, clock);   // the shared clock bean, same as the hot ranking
     }
 
     @Bean
@@ -85,9 +87,12 @@ class MemesConfig {
     @Bean
     com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme(
             MemeRepository memeRepository, VoteRepository voteRepository, MemeContentIndex contentIndex,
-            TagRepository tagRepository, com.jrobertgardzinski.memes.application.MemeEvents memeEvents) {
-        return new com.jrobertgardzinski.memes.application.DeleteMeme(
-                memeRepository, voteRepository, contentIndex, tagRepository, memeEvents);
+            TagRepository tagRepository, com.jrobertgardzinski.memes.application.MemeEvents memeEvents,
+            org.springframework.transaction.support.TransactionTemplate tx) {
+        // the transactional decorator, not the plain use case: the DB part of a teardown is atomic
+        // (the use case itself stays framework-free — the seam lives here, in infrastructure)
+        return new TransactionalDeleteMeme(
+                memeRepository, voteRepository, contentIndex, tagRepository, memeEvents, tx);
     }
 
     @Bean
@@ -130,9 +135,11 @@ class MemesConfig {
                                       MemeContentIndex contentIndex, TagRepository tagRepository,
                                       MemeEvents memeEvents,
                                       com.jrobertgardzinski.memes.application.PurgePolicyOverride override,
-                                      PurgeRule defaultMemesPurgeRule) {
-        return new PurgeUserContent(memeRepository, voteRepository, contentIndex, tagRepository,
-                memeEvents, override, defaultMemesPurgeRule);
+                                      PurgeRule defaultMemesPurgeRule,
+                                      org.springframework.transaction.support.TransactionTemplate tx) {
+        // transactional decorator — a purge that dies halfway must not strand half the leaver's memes
+        return new TransactionalPurgeUserContent(memeRepository, voteRepository, contentIndex,
+                tagRepository, memeEvents, override, defaultMemesPurgeRule, tx);
     }
 
     @Bean

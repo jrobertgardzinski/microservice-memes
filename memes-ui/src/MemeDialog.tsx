@@ -162,7 +162,7 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
              sx={{ width: '100%', borderRadius: 2 }} />
         <Stack direction="row" spacing={1} alignItems="center" sx={{ my: 1 }}>
           <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
-          <Chip data-testid="meme-score" label={tally.score} size="small" />
+          <Chip data-testid="meme-score" label={tally.score ?? 'n/a'} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
           {nsfw && <Chip label="NSFW" size="small" color="warning" />}
           {isModerator && (
@@ -212,7 +212,7 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
                 </Box>
               )}
             </Typography>
-            <Chip label={c.score} size="small" variant="outlined" />
+            <Chip label={c.score ?? 'n/a'} size="small" variant="outlined" />
             <VoteButtons myVote={c.myVote} onVote={(d) => voteComment(c.id, d)} />
             {isModerator && (
               <IconButton size="small" aria-label={c.hidden ? 'reveal comment' : 'hide comment'}
@@ -221,9 +221,12 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
                 {c.hidden ? <VisibilityIcon fontSize="inherit" /> : <VisibilityOffIcon fontSize="inherit" />}
               </IconButton>
             )}
-            {(isModerator || c.author === user) && (
+            {/* c.own, not author === user: the listing masks authors (a***@…), so only the
+                server's own flag can say "yours"; === true keeps the button from strangers
+                on an older comments API that does not send the field yet */}
+            {(isModerator || c.own === true) && (
               <IconButton size="small" aria-label="delete comment"
-                          title={c.author === user ? 'delete your comment' : 'delete (moderator)'}
+                          title={c.own === true ? 'delete your comment' : 'delete (moderator)'}
                           onClick={() => removeComment(c.id)}>
                 <DeleteOutlineIcon fontSize="inherit" />
               </IconButton>

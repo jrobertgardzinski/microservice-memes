@@ -22,3 +22,14 @@ Feature: Uploading a meme
   Scenario: an anonymous upload is refused
     When an anonymous user tries to upload a BMP image
     Then the request is refused as sign-in required
+
+  Scenario: a file that is not an image is turned away, not crashed on
+    Given a signed-in user
+    When the user uploads a text file pretending to be an image
+    Then the upload is turned away with a polite explanation
+
+  Scenario: an image declaring absurd dimensions is refused before it does any harm
+    Given a signed-in user
+    When the user uploads a tiny file declaring absurd image dimensions
+    Then the upload is turned away with a polite explanation
+    And the gallery still welcomes the next honest upload

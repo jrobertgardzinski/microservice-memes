@@ -26,6 +26,13 @@ Feature: Moderating memes
     When an anonymous user tries to delete it
     Then the deletion is refused as sign-in required
 
+  Scenario: after deletion not a byte of the meme remains
+    Given a meme uploaded by its author
+    And a browser has already been served its WebP variant
+    When a moderator deletes it
+    Then the deletion succeeds as a moderator
+    And not a byte of the meme remains, in any form
+
   Scenario: a moderator flags a meme NSFW and the gallery carries the flag
     Given a meme uploaded by its author
     When a moderator flags it NSFW

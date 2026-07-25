@@ -1,11 +1,13 @@
 package com.jrobertgardzinski.memes.infrastructure.cucumber;
 
+import com.jrobertgardzinski.memes.application.ObjectStore;
 import com.jrobertgardzinski.memes.infrastructure.TestAuthConfig;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
 import javax.imageio.ImageIO;
@@ -14,16 +16,24 @@ import java.io.ByteArrayOutputStream;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * HTTP glue for {@code moderate-meme.feature}: the author (alice) uploads; a stranger (bob), a
  * moderator (mod) and an anonymous caller each try to delete. Deletion authority comes from the
- * roles microservice-security reports, stubbed by {@link TestAuthConfig}.
+ * roles microservice-security reports, stubbed by {@link TestAuthConfig}. The "not a byte remains"
+ * step peeks into the {@link ObjectStore} on top of the observable 404s — over HTTP a 404 only
+ * proves the meme's ROW is gone, not that no orphaned bytes linger in storage; the glue already
+ * reaches into the application for such truths (see {@code AdminPolicySteps}), the scenarios stay
+ * business-worded.
  */
 public class ModerationSteps {
 
     @LocalServerPort
     int port;
+
+    @Autowired
+    ObjectStore objects;
 
     private String memeId;
     private Response lastDelete;
@@ -93,6 +103,31 @@ public class ModerationSteps {
     @Then("the meme is gone")
     public void memeGone() {
         assertEquals(404, RestAssured.given().port(port).get("/memes/{id}", memeId).statusCode());
+    }
+
+    @Given("a browser has already been served its WebP variant")
+    public void aBrowserHasBeenServedItsWebpVariant() {
+        Response webp = RestAssured.given().port(port)
+                .header("Accept", "image/webp,image/*")
+                .get("/memes/{id}", memeId);
+        assertEquals(200, webp.statusCode());
+        assertEquals("image/webp", webp.contentType(),
+                "the WebP variant really was minted (and thereby cached) before the deletion");
+    }
+
+    @Then("not a byte of the meme remains, in any form")
+    public void notAByteRemains() {
+        // observable over HTTP: both representations answer gone
+        assertEquals(404, RestAssured.given().port(port).get("/memes/{id}", memeId).statusCode(),
+                "the original is gone");
+        assertEquals(404, RestAssured.given().port(port)
+                        .header("Accept", "image/webp,image/*")
+                        .get("/memes/{id}", memeId).statusCode(),
+                "asking for WebP finds nothing either");
+        // and behind the curtain: the storage holds neither the original nor the WebP variant —
+        // a 404 alone would also be true of orphaned bytes whose row was deleted
+        assertTrue(objects.get(memeId).isEmpty(), "no original bytes linger in storage");
+        assertTrue(objects.get(memeId + ".webp").isEmpty(), "no WebP variant lingers in storage");
     }
 
     @When("a moderator flags it NSFW")

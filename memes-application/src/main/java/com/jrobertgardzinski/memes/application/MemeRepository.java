@@ -15,6 +15,14 @@ public interface MemeRepository {
 
     Optional<Meme> find(String id);
 
+    /**
+     * Whether a meme with this id is currently stored — a light check that loads no image bytes
+     * (adapters override it with a row lookup; this fallback keeps hand-rolled fakes working).
+     */
+    default boolean exists(String id) {
+        return find(id).isPresent();
+    }
+
     /** Ids of every stored meme, newest first. */
     List<String> allIds();
 

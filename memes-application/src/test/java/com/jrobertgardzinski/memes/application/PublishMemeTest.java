@@ -26,6 +26,21 @@ class PublishMemeTest {
 
     private final Map<String, Meme> store = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String, String> idByContent = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, byte[]> blobs = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private final ObjectStore objects = new ObjectStore() {
+        public void put(String key, byte[] data) {
+            blobs.put(key, data);
+        }
+
+        public Optional<byte[]> get(String key) {
+            return Optional.ofNullable(blobs.get(key));
+        }
+
+        public void delete(String key) {
+            blobs.remove(key);   // like every real adapter: a no-op on a missing key
+        }
+    };
 
     private final MemeRepository repository = new MemeRepository() {
         public void save(Meme meme) {
@@ -67,7 +82,7 @@ class PublishMemeTest {
         }
     };
     private final PublishMeme publishMeme =
-            new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), repository, contentIndex);
+            new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), repository, contentIndex, objects);
 
     @Test
     @DisplayName("publishes an optimized meme")
@@ -97,6 +112,99 @@ class PublishMemeTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(image, "bmp", out);
         return out.toByteArray();
+    }
+
+    @Test
+    @DisplayName("a failed save releases the content claim — no ghost for future identical uploads")
+    void a_failed_save_releases_the_claim() throws Exception {
+        MemeRepository failing = new MemeRepository() {
+            public void save(Meme meme) {
+                throw new IllegalStateException("store is down");
+            }
+
+            public Optional<Meme> find(String id) { return Optional.empty(); }
+            public List<String> allIds() { return List.of(); }
+            public List<String> findIdsByAuthor(String author) { return List.of(); }
+            public void deleteById(String memeId) { }
+            public void reassignAuthor(String memeId, String newAuthor) { }
+        };
+        PublishMeme publish =
+                new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), failing, contentIndex, objects);
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> publish.execute(bmp(), "alice@example.com"));
+
+        assertTrue(idByContent.isEmpty(),
+                "the orphaned claim must be compensated, or identical re-uploads dedup into a ghost");
+    }
+
+    @Test
+    @DisplayName("a save that dies AFTER uploading the bytes leaves no orphaned blob behind")
+    void a_failed_save_compensates_the_uploaded_blob() throws Exception {
+        // mimics JdbcMemeRepository over S3/filesystem: the bytes reach the ObjectStore from inside
+        // the DB transaction, then the transaction fails — the row rolls back, the blob would stay
+        MemeRepository failingAfterUpload = new MemeRepository() {
+            public void save(Meme meme) {
+                objects.put(meme.id(), meme.data());
+                throw new IllegalStateException("commit failed after the bytes went up");
+            }
+
+            public Optional<Meme> find(String id) { return Optional.empty(); }
+            public List<String> allIds() { return List.of(); }
+            public List<String> findIdsByAuthor(String author) { return List.of(); }
+            public void deleteById(String memeId) { }
+            public void reassignAuthor(String memeId, String newAuthor) { }
+        };
+        PublishMeme publish =
+                new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), failingAfterUpload, contentIndex, objects);
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> publish.execute(bmp(), "alice@example.com"));
+
+        assertTrue(blobs.isEmpty(),
+                "no blob (nor any variant) may survive a failed publish — nothing references it, ever");
+        assertTrue(idByContent.isEmpty(), "and the content claim is compensated as before");
+    }
+
+    @Test
+    @DisplayName("when the claim compensation ALSO fails, the original failure surfaces and the blob still goes")
+    void a_failing_claim_compensation_neither_masks_the_cause_nor_stops_the_blob_cleanup() throws Exception {
+        // the usual shape of this disaster: the DB died, so save fails AND the content-index
+        // remove fails the same way — the caller must still see the save's exception (with the
+        // remove's pinned as suppressed), and the blob compensation must still run
+        MemeRepository failingAfterUpload = new MemeRepository() {
+            public void save(Meme meme) {
+                objects.put(meme.id(), meme.data());
+                throw new IllegalStateException("commit failed after the bytes went up");
+            }
+
+            public Optional<Meme> find(String id) { return Optional.empty(); }
+            public List<String> allIds() { return List.of(); }
+            public List<String> findIdsByAuthor(String author) { return List.of(); }
+            public void deleteById(String memeId) { }
+            public void reassignAuthor(String memeId, String newAuthor) { }
+        };
+        MemeContentIndex failingRemove = new MemeContentIndex() {
+            public String claim(byte[] data, String candidateId) {
+                return contentIndex.claim(data, candidateId);
+            }
+
+            public void remove(String memeId) {
+                throw new IllegalStateException("content index is down too");
+            }
+        };
+        PublishMeme publish = new PublishMeme(
+                new WebImageOptimizer(new ImageLimits(1024)), failingAfterUpload, failingRemove, objects);
+
+        IllegalStateException surfaced = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalStateException.class, () -> publish.execute(bmp(), "alice@example.com"));
+
+        assertEquals("commit failed after the bytes went up", surfaced.getMessage(),
+                "the SAVE's failure is the story — the failed compensation must not replace it");
+        assertEquals(1, surfaced.getSuppressed().length, "…but it is not swallowed either");
+        assertEquals("content index is down too", surfaced.getSuppressed()[0].getMessage());
+        assertTrue(blobs.isEmpty(),
+                "the blob compensation must run even though the claim compensation failed");
     }
 
     @Test

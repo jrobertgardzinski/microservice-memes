@@ -20,20 +20,27 @@ export interface HotEntry {
 
 export interface MemeComment {
   id: string;
+  /** masked in the public listing (a***@example.com) — display it, never compare it to an identity */
   author: string;
   /** null for a reader when a moderator has hidden the comment (the author still sees their own) */
   text: string | null;
-  score: number;
+  /** null when the backend has no tally to report — render "n/a", never a made-up 0 */
+  score: number | null;
   myVote: VoteDirection | null;
   /** a moderator's soft flag: the comment shows as a tombstone rather than being deleted */
   hidden?: boolean;
+  /** the server's word that the signed-in viewer wrote this — the ONLY basis for "your comment"
+   *  affordances, since the masked author no longer equals anyone's e-mail (absent on older APIs) */
+  own?: boolean;
 }
 
 export type VoteDirection = 'UP' | 'DOWN';
 
 /** A target's score plus the caller's own current vote (null = not voted). */
 export interface VoteTally {
-  score: number;
+  /** the JSON field is nullable on the wire (the backend builds it with map.put) — a null must
+   *  surface as "n/a" in the UI, not silently coerce into a numeric-looking 0 */
+  score: number | null;
   myVote: VoteDirection | null;
 }
 

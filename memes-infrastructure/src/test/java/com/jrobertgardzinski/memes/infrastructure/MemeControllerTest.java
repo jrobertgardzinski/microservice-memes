@@ -51,6 +51,39 @@ class MemeControllerTest {
         assertEquals((byte) 0x89, png[0]); // PNG magic
     }
 
+    @Test
+    void refuses_a_non_image_upload_with_400_not_500() throws Exception {
+        MockMultipartFile garbage = new MockMultipartFile("file", "not-an-image.pdf",
+                "application/pdf", "%PDF-1.4 definitely not pixels".getBytes());
+
+        mockMvc.perform(multipart("/memes").file(garbage)
+                        .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.error").exists());
+    }
+
+    @Test
+    void refuses_a_truncated_image_upload_with_400_not_500() throws Exception {
+        // a real PNG cut short after its header — dies mid-parse (InvalidImageException), which
+        // is still the caller's broken upload, not a server error
+        byte[] truncated = java.util.Arrays.copyOf(pngBytes(), 24);
+        MockMultipartFile broken = new MockMultipartFile("file", "broken.png", "image/png", truncated);
+
+        mockMvc.perform(multipart("/memes").file(broken)
+                        .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN))
+                .andExpect(status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.error").exists());
+    }
+
+    private static byte[] pngBytes() throws Exception {
+        BufferedImage image = new BufferedImage(5, 5, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
+    }
+
     private static byte[] bmp() throws Exception {
         BufferedImage image = new BufferedImage(5, 5, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream out = new ByteArrayOutputStream();

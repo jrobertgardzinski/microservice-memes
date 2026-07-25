@@ -51,11 +51,17 @@ class FilesystemObjectStore implements ObjectStore {
 
     @Override
     public void delete(String key) {
-        try {
-            Files.deleteIfExists(resolve(key));
-        } catch (IOException e) {
-            throw new UncheckedIOException("cannot delete " + key, e);
-        }
+        Path path = resolve(key);   // validate the key now, not in an after-commit callback
+        // files are outside any DB transaction: inside one (the delete/purge seam), removing the
+        // file eagerly would leave a meme row restored by rollback pointing at nothing — so the
+        // file goes only once the DB part has committed
+        TransactionAwareDeletes.afterCommitOrNow(() -> {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException e) {
+                throw new UncheckedIOException("cannot delete " + key, e);
+            }
+        });
     }
 
     private Path resolve(String key) {

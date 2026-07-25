@@ -80,6 +80,14 @@ class PurgeCommandsListener {
             return;
         }
         String email = command.path("email").asText();
+        if (email.isBlank()) {
+            // a purge keyed by NOBODY would "succeed" instantly and confirm a deletion that never
+            // happened — the saga would advance on a lie. Drop it WITHOUT confirming: the command
+            // is malformed at the source, and the orchestrator's timeout is the honest signal.
+            LOG.warn("dropping PURGE_USER_CONTENT without an email (saga {})",
+                    command.path("sagaId").asText());
+            return;
+        }
         purgeUserContent.execute(email, requestedPolicy(command));
         LOG.info("purged content of {} (saga {})", email, command.path("sagaId").asText());
         // forward the cid on the confirmation so security's listener continues the same trace
