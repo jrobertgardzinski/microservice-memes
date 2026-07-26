@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.Meme;
-import com.jrobertgardzinski.memes.domain.RankedMeme;
+import com.jrobertgardzinski.memes.domain.ScoredMeme;
 import com.jrobertgardzinski.voting.VoteDirection;
 import com.jrobertgardzinski.voting.VoteTally;
 import io.qameta.allure.Epic;
@@ -95,8 +95,10 @@ class CastVoteTest {
                     .mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
         }
 
-        public List<RankedMeme> allScores() {
-            return votes.keySet().stream().map(id -> new RankedMeme(id, scoreOf(id))).toList();
+        public List<ScoredMeme> allScores() {
+            return votes.keySet().stream()
+                    .map(id -> new ScoredMeme(id, scoreOf(id), Optional.<java.time.Instant>empty()))
+                    .toList();
         }
 
         public void purgeMeme(String memeId) {

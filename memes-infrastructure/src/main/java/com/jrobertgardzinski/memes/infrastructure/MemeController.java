@@ -28,6 +28,15 @@ import java.util.Map;
 @RequestMapping("/memes")
 class MemeController {
 
+    /**
+     * Server policy: one page of the wall is at most this many memes — the same ceiling the
+     * comment thread uses. The gallery is public and unauthenticated, so "give me everything"
+     * has to be a request the server declines: one viral week is all it takes for the listing
+     * to become the most expensive anonymous call in the product.
+     */
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final int DEFAULT_PAGE_SIZE = 50;
+
     private final PublishMeme publishMeme;
     private final MakeThumbnail makeThumbnail;
     private final ListMemes listMemes;
@@ -73,15 +82,22 @@ class MemeController {
     }
 
     @GetMapping
-    ResponseEntity<?> all(@org.springframework.web.bind.annotation.RequestParam(name = "tag",
-            required = false) String tag) {
+    ResponseEntity<?> all(@RequestParam(name = "tag", required = false) String tag,
+                          @RequestParam(name = "page", defaultValue = "0") int page,
+                          @RequestParam(name = "size", defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
+        int limit = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+        // long arithmetic on purpose: page * limit in ints overflows for an absurd page number,
+        // and a NEGATIVE offset reaches the database as a broken statement (a bare 500) instead
+        // of the empty page an out-of-range page honestly is
+        long offset = (long) Math.max(0, page) * limit;
         java.util.Set<String> nsfw = contentFlags.nsfwIds();
         if (tag == null || tag.isBlank()) {
-            return ResponseEntity.ok(listMemes.execute().stream()
+            return ResponseEntity.ok(listMemes.execute(offset, limit).stream()
                     .map(id -> Map.of("id", id, "nsfw", nsfw.contains(id))).toList());
         }
         try {
-            return ResponseEntity.ok(searchMemesByTag.execute(com.jrobertgardzinski.memes.tags.Tag.of(tag))
+            return ResponseEntity.ok(searchMemesByTag
+                    .execute(com.jrobertgardzinski.memes.tags.Tag.of(tag), offset, limit)
                     .stream().map(id -> Map.of("id", id, "nsfw", nsfw.contains(id))).toList());
         } catch (IllegalArgumentException illegalTag) {
             return ResponseEntity.badRequest().body(Map.of("status", "INVALID_TAG"));
@@ -145,14 +161,44 @@ class MemeController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /** A meme's public metadata (who uploaded it) — the gallery uses it to offer the author the
-     *  delete control on their own memes. The bytes are served separately. */
+    /**
+     * A meme's public metadata — the gallery uses it to offer the uploader the delete control on
+     * their own memes. The bytes are served separately.
+     *
+     * <p>This endpoint is PUBLIC (reads need no token), so it answers the question the UI actually
+     * asks ("is this mine?") with a boolean computed from the caller's token, and shows the
+     * uploader only masked. It used to return the raw e-mail: two anonymous GETs — the gallery
+     * listing, then one {@code /meta} per id — were a complete address dump of everyone who ever
+     * uploaded. A signed-out caller simply gets {@code own: false}.
+     */
     @GetMapping("/{id}/meta")
-    ResponseEntity<Map<String, Object>> meta(@PathVariable("id") String id) {
+    ResponseEntity<Map<String, Object>> meta(@PathVariable("id") String id,
+                                             @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER,
+                                                     required = false) String viewer) {
         return viewMeme.execute(id)
                 .map(meme -> ResponseEntity.ok(Map.<String, Object>of(
-                        "id", meme.id(), "author", meme.author(), "nsfw", contentFlags.isNsfw(id))))
+                        "id", meme.id(),
+                        "author", maskAuthor(meme.author()),
+                        // the full author never leaves the service, so the UI cannot compare it
+                        // against the signed-in user any more — "own" carries that answer instead
+                        "own", meme.author().equals(viewer),
+                        "nsfw", contentFlags.isNsfw(id))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * The public face of an uploader: first character, then {@code ***}, then the domain — the
+     * same representation {@code CommentController.maskAuthor} gives a comment's author, so the
+     * two halves of one dialog speak about people the same way. Internally (authorisation, the
+     * account purge) the full e-mail still flows; only this representation masks. Non-e-mail
+     * authors (the "deleted account" placeholder) pass through untouched.
+     */
+    private static String maskAuthor(String author) {
+        int at = author.indexOf('@');
+        if (at <= 0) {
+            return author;
+        }
+        return author.charAt(0) + "***" + author.substring(at);
     }
 
     /** Flag a meme NSFW (or take the flag back): a MODERATOR-only judgement — authors may label

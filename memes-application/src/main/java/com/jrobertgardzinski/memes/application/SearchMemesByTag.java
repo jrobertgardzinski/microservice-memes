@@ -19,8 +19,12 @@ public class SearchMemesByTag {
         this.tags = tags;
     }
 
-    public List<String> execute(Tag tag) {
+    /** One page of the tag's memes, in gallery order — same paging contract as the whole wall. */
+    public List<String> execute(Tag tag, long offset, int limit) {
         Set<String> tagged = tags.memesTagged(tag);
-        return memes.allIds().stream().filter(tagged::contains).toList();
+        // still a full listing intersected in memory (the tag index and the gallery live in
+        // different tables); the page bound at least keeps the RESPONSE from growing without end
+        return memes.allIds().stream().filter(tagged::contains)
+                .skip(Math.max(0, offset)).limit(Math.max(0, limit)).toList();
     }
 }

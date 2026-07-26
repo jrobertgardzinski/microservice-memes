@@ -77,7 +77,8 @@ gallery (memes-ui)                    security                     offboarding  
   archive is current and Spring Boot's `repackage` then wraps the old one — the container serves
   yesterday's gallery bundle while your source shows today's fix. `clean package` settles it.
 - **A shared gallery is full of other people's memes.** "The first tile on the wall" is not
-  yours; ask the service which meme carries your author (`GET /memes/{id}/meta`).
+  yours; ask the service whether a meme is yours (`GET /memes/{id}/meta` WITH your bearer token
+  and read `own` — the endpoint is public, so it masks the uploader and never answers "who").
 - **Codes are one-shot on both sides.** A scenario (or a person) that signs in twice must read
   two different mails; re-typing the first code fails with a confusing "wrong code".
 

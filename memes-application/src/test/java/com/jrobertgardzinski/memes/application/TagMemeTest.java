@@ -114,8 +114,8 @@ class TagMemeTest {
         tagMeme.execute("m3", "alice@x", List.of("cats", "dogs"));
 
         assertEquals(memes.allIds().stream().filter(Set.of("m1", "m3")::contains).toList(),
-                search.execute(Tag.of("cats")), "the gallery's own order, narrowed");
-        assertEquals(List.of("m3"), search.execute(Tag.of("dogs")));
-        assertEquals(List.of(), search.execute(Tag.of("nobody")));
+                search.execute(Tag.of("cats"), 0, 50), "the gallery's own order, narrowed");
+        assertEquals(List.of("m3"), search.execute(Tag.of("dogs"), 0, 50));
+        assertEquals(List.of(), search.execute(Tag.of("nobody"), 0, 50));
     }
 }

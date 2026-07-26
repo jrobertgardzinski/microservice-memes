@@ -22,7 +22,6 @@ import {
 interface Props {
   memeId: string;
   token: string | null;
-  user: string;
   isModerator: boolean;
   onVoted: () => void;
   onRequireSignIn: () => void;
@@ -49,7 +48,7 @@ function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote:
   );
 }
 
-export default function MemeDialog({ memeId, token, user, isModerator, onVoted, onRequireSignIn, onTagClick, onDeleted, onClose }: Props) {
+export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequireSignIn, onTagClick, onDeleted, onClose }: Props) {
   const [tally, setTally] = useState<VoteTally>({ score: 0, myVote: null });
   const [comments, setComments] = useState<MemeComment[]>([]);
   const [text, setText] = useState('');
@@ -57,14 +56,17 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
   const [editingTags, setEditingTags] = useState(false);
   const [tagDraft, setTagDraft] = useState('');
   const [tagError, setTagError] = useState<string | null>(null);
-  const [author, setAuthor] = useState<string | null>(null);
+  // the server's word that the signed-in viewer uploaded this meme — the ONLY basis for the
+  // Delete affordance, since /meta masks the uploader and no longer hands out an address to
+  // compare against (same contract as a comment's `own`)
+  const [own, setOwn] = useState(false);
   const [nsfw, setNsfw] = useState(false);
 
   const load = useCallback(() => {
     void memeTally(memeId, token).then(setTally);
     void listComments(memeId, token).then(setComments);
     void memeTags(memeId).then(setTags);
-    void memeMeta(memeId).then((m) => { setAuthor(m.author); setNsfw(m.nsfw ?? false); });
+    void memeMeta(memeId, token).then((m) => { setOwn(m.own === true); setNsfw(m.nsfw ?? false); });
   }, [memeId, token]);
   useEffect(load, [load]);
 
@@ -170,9 +172,12 @@ export default function MemeDialog({ memeId, token, user, isModerator, onVoted, 
               {nsfw ? 'Unflag NSFW' : 'Flag NSFW'}
             </Button>
           )}
-          {(isModerator || (author !== null && author === user)) && (
+          {/* own, not author === user: /meta masks the uploader (a***@…), so only the server's
+              own flag can say "yours"; === true keeps the button from strangers on an older
+              memes API that does not send the field yet */}
+          {(isModerator || own) && (
             <Button size="small" color="error" sx={{ ml: isModerator ? 0 : 'auto' }} onClick={removeMeme}>
-              {author === user ? 'Delete' : 'Delete (moderator)'}
+              {own ? 'Delete' : 'Delete (moderator)'}
             </Button>
           )}
         </Stack>

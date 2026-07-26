@@ -11,15 +11,19 @@ When('they favourite their own meme', async function () {
   // the wall holds other scenarios' memes too — star exactly the one this account uploaded
   // (poll: the UI's upload fires and forgets, the server may still be writing)
   let mine;
+  // /meta masks the uploader, so "is this mine?" is a question only a TOKEN can answer — the
+  // server compares the identities and replies with own
+  const token = await this.apiToken();
   for (let attempt = 0; attempt < 20 && !mine; attempt++) {
     const memes = await (await fetch(`${MEMES}/memes`)).json();
     for (const meme of memes) {
       // a shared wall changes under us: a meme another scenario just purged answers 404 with an
       // empty body, and json() on that is a crash, not a miss
-      const metaResponse = await fetch(`${MEMES}/memes/${meme.id}/meta`);
+      const metaResponse = await fetch(`${MEMES}/memes/${meme.id}/meta`,
+        { headers: { Authorization: `Bearer ${token}` } });
       if (!metaResponse.ok) continue;
       const meta = await metaResponse.json();
-      if (meta.author === this.account.email) { mine = meme.id; break; }
+      if (meta.own) { mine = meme.id; break; }
     }
     if (!mine) await new Promise((r) => setTimeout(r, 250));
   }
@@ -45,12 +49,14 @@ Then('the favourites wall is empty', async function () {
 // the ref outlives the meme on purpose: deletion happens server-side (the author's own DELETE),
 // the gallery is none the wiser until it hydrates
 When("the meme is deleted behind the gallery's back", async function () {
-  // services persist across scenarios, so find THIS account's meme by authorship, not position
+  // services persist across scenarios, so find THIS account's meme by ownership, not position
   const memes = await (await fetch(`${MEMES}/memes`)).json();
   const token = await this.apiToken();
   for (const meme of memes) {
-    const meta = await (await fetch(`${MEMES}/memes/${meme.id}/meta`)).json();
-    if (meta.author === this.account.email) {
+    // own, not the address: /meta is public and hands out no e-mails (the token makes it answer)
+    const meta = await (await fetch(`${MEMES}/memes/${meme.id}/meta`,
+      { headers: { Authorization: `Bearer ${token}` } })).json();
+    if (meta.own) {
       const r = await fetch(`${MEMES}/memes/${meme.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },

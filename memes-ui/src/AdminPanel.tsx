@@ -31,9 +31,11 @@ export default function AdminPanel({ token, open, onClose }: {
   const load = () => void getPurgePolicy(token).then((p) => {
     setPolicy(p);
     if (p) {
-      const [k, n] = p.effective.split(':');
-      setKind(k);
-      if (n) setMinScore(Number(n));
+      // a split always yields a first part, but the compiler has no way to know that (indexing a
+      // string[] is `string | undefined` under noUncheckedIndexedAccess) — so the default is stated
+      const [rule = 'DELETE', threshold] = p.effective.split(':');
+      setKind(rule);
+      if (threshold) setMinScore(Number(threshold));
     }
   });
   useEffect(() => { if (open) { setNotice(null); load(); } }, [open]);   // eslint-disable-line react-hooks/exhaustive-deps

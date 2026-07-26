@@ -62,12 +62,16 @@ class ModerationTest {
     }
 
     @Test
-    @DisplayName("the meta endpoint reports the uploader, so the UI can offer them delete")
-    void meta_reports_the_author() throws Exception {
+    @DisplayName("the meta endpoint tells the caller whether the meme is theirs, so the UI can offer delete")
+    void meta_reports_ownership() throws Exception {
         String id = upload(TestAuthConfig.VALID_TOKEN);
-        mockMvc.perform(get("/memes/{id}/meta", id))
+        mockMvc.perform(get("/memes/{id}/meta", id)
+                        .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.author").value(TestAuthConfig.SIGNED_IN_USER));
+                .andExpect(jsonPath("$.own").value(true))
+                // masked even for the uploader themselves: the UI reads own, never an address
+                // (what the public sees is pinned by MemeMetaPrivacyTest)
+                .andExpect(jsonPath("$.author").value("a***@example.com"));
         mockMvc.perform(get("/memes/{id}/meta", "ghost")).andExpect(status().isNotFound());
     }
 

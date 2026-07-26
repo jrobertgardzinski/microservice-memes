@@ -110,13 +110,27 @@ back to the defaults (logged), never wedging the saga.
 GET  /                          the gallery UI (React, served from the jar)
 
 # public reads
-GET  /memes[?tag=...]           -> 200 [ { "id", "nsfw" }, ... ]  (newest first)
+GET  /memes[?tag=...][&page=0&size=50]
+                                -> 200 [ { "id", "nsfw" }, ... ]  (newest first)
+                                   one PAGE, never the whole wall: size is capped at 100,
+                                   an out-of-range page is an empty list
 GET  /memes/{id}                -> 200 image/png — or image/webp when Accept allows it | 404
 GET  /memes/{id}/thumbnail      -> 200 image/png (small preview) | 404
-GET  /memes/{id}/meta           -> 200 { "id", "author", "nsfw" } | 404
+GET  /memes/{id}/meta           -> 200 { "id", "author", "own", "nsfw" } | 404
+                                   author is MASKED (a***@domain) — a public endpoint hands out
+                                   no addresses; "own" answers "is this mine?" from the bearer
+                                   token if one is sent (false for anonymous callers)
 GET  /memes/{id}/tags           -> 200 [ "tag", ... ]
 GET  /memes/{id}/votes          -> 200 { "score": n, "myVote": ... } | 404
-GET  /memes/hot                 -> 200 [ { "memeId", "score" }, ... ]  (highest score first)
+GET  /memes/hot                 -> 200 [ { "memeId", "score" }, ... ]  (hottest first, top 100)
+                                   a RANKING, i.e. an ORDER — not a lookup table of scores:
+                                   everything past the cap is missing from it, so a client
+                                   reading it as a dictionary sees "no entry" (which is not 0)
+GET  /memes/scores?ids=a,b,c    -> 200 [ { "memeId", "score" }, ... ] | 400 TOO_MANY_IDS
+                                   the scores of the memes a client is SHOWING, at most 100 ids
+                                   per call. An id that comes back has a real score (0 included);
+                                   an id that does NOT come back has no tally to report — this
+                                   service has no such meme. UIs must render those differently
 
 # writes: Authorization: Bearer <security access token>, else 401 SIGN_IN_REQUIRED
 POST /memes                     multipart/form-data, field "file"

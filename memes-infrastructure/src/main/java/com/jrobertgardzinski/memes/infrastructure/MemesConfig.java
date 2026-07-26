@@ -8,11 +8,11 @@ import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.MemeEvents;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
-import com.jrobertgardzinski.memes.application.PublicationLog;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.SearchMemesByTag;
 import com.jrobertgardzinski.memes.application.TagMeme;
 import com.jrobertgardzinski.memes.application.TagRepository;
+import com.jrobertgardzinski.memes.application.ShowMemeScores;
 import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
 import com.jrobertgardzinski.memes.application.VoteRepository;
@@ -132,6 +132,11 @@ class MemesConfig {
     }
 
     @Bean
+    ShowMemeScores showMemeScores(MemeRepository memeRepository, VoteRepository voteRepository) {
+        return new ShowMemeScores(memeRepository, voteRepository);
+    }
+
+    @Bean
     PurgeRule defaultMemesPurgeRule(@Value("${memes.purge.memes:DELETE}") String rule) {
         return PurgeRule.parse(rule);
     }
@@ -149,8 +154,8 @@ class MemesConfig {
     }
 
     @Bean
-    RankMemes rankMemes(VoteRepository voteRepository, PublicationLog publicationLog, java.time.Clock clock) {
-        return new RankMemes(voteRepository, publicationLog, clock);
+    RankMemes rankMemes(VoteRepository voteRepository, java.time.Clock clock) {
+        return new RankMemes(voteRepository, clock);
     }
 
     @Bean

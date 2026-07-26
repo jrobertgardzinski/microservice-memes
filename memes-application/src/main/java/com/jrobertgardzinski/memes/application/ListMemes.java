@@ -3,7 +3,9 @@ package com.jrobertgardzinski.memes.application;
 import java.util.List;
 
 /**
- * Lists the ids of all stored memes, newest first — the public gallery view.
+ * One page of the gallery, newest first — the public wall. Paged, not "all": the caller says
+ * where to start and how many rows it can take, and the store never has to materialise a gallery
+ * that has outgrown the screen.
  */
 public class ListMemes {
 
@@ -13,7 +15,7 @@ public class ListMemes {
         this.repository = repository;
     }
 
-    public List<String> execute() {
-        return repository.allIds();
+    public List<String> execute(long offset, int limit) {
+        return repository.allIds(offset, limit);
     }
 }

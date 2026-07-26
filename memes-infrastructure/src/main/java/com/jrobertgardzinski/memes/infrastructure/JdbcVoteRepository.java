@@ -1,14 +1,18 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.VoteRepository;
-import com.jrobertgardzinski.memes.domain.RankedMeme;
+import com.jrobertgardzinski.memes.domain.ScoredMeme;
 import com.jrobertgardzinski.voting.VoteDirection;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Postgres-backed {@link VoteRepository} (H2 in dev/tests): one row per (meme, voter); cast is
@@ -54,11 +58,41 @@ class JdbcVoteRepository implements VoteRepository {
     }
 
     @Override
-    public List<RankedMeme> allScores() {
-        return jdbc.sql("SELECT meme_id, SUM(CASE WHEN direction = 'UP' THEN 1 ELSE -1 END) AS score "
-                        + "FROM meme_votes GROUP BY meme_id")
-                .query((rs, n) -> new RankedMeme(rs.getString("meme_id"), rs.getInt("score")))
+    public List<ScoredMeme> allScores() {
+        // published_at rides along on the aggregate instead of being fetched per meme: the hot
+        // page needs score AND age, and asking for the age one meme at a time (from inside a
+        // comparator, no less) cost more round-trips than the table has rows.
+        //
+        // LEFT, not INNER: a ballot whose meme row is gone still reaches the ranking, with no
+        // publication time — the use case decides what an unknown age means, the adapter does
+        // not quietly drop rows the ranking never learns about.
+        return jdbc.sql("SELECT v.meme_id, "
+                        + "SUM(CASE WHEN v.direction = 'UP' THEN 1 ELSE -1 END) AS score, "
+                        + "m.published_at "
+                        + "FROM meme_votes v LEFT JOIN memes m ON m.id = v.meme_id "
+                        + "GROUP BY v.meme_id, m.published_at")
+                .query((rs, n) -> {
+                    Timestamp published = rs.getTimestamp("published_at");
+                    return new ScoredMeme(rs.getString("meme_id"), rs.getInt("score"),
+                            published == null ? null : published.toInstant());
+                })
                 .list();
+    }
+
+    @Override
+    public Map<String, Integer> scoresOf(Collection<String> memeIds) {
+        if (memeIds.isEmpty()) {
+            return Map.of();   // "IN ()" is not valid SQL, and an empty question needs no round trip
+        }
+        // ONE aggregate for a whole page of tiles: the port's per-id default would be a query per
+        // thumbnail. A meme with no ballot rows is not in this answer — the use case is what turns
+        // that into a score of 0, and only for memes it has confirmed exist.
+        return jdbc.sql("SELECT meme_id, SUM(CASE WHEN direction = 'UP' THEN 1 ELSE -1 END) AS score "
+                        + "FROM meme_votes WHERE meme_id IN (:ids) GROUP BY meme_id")
+                .param("ids", memeIds.stream().distinct().toList())
+                .query((rs, n) -> Map.entry(rs.getString("meme_id"), rs.getInt("score")))
+                .list().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     @Override

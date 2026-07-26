@@ -121,14 +121,20 @@ class GalleryWorld {
   /** The id of the meme THIS account uploaded — asked of the service, not guessed from the wall
    *  (a shared stack's gallery is full of other scenarios' memes, and "the first tile" is a lie). */
   async captureOwnMeme() {
+    // /meta hands out no addresses any more, so "which one is mine?" is a question only a TOKEN
+    // can ask — taken ONCE, outside the retry: signing in per attempt would burn mailed codes
+    const token = await this.apiToken();
     return this.eventually(async () => {
-      const listing = await (await fetch(`${MEMES}/memes`)).json();
+      // the page is named, not defaulted: the listing is paged server-side, and this search only
+      // works because the wall is newest-first and the upload just happened — page 0 is its page
+      const listing = await (await fetch(`${MEMES}/memes?page=0&size=50`)).json();
       const ids = (Array.isArray(listing) ? listing : listing.memes ?? []).map((m) => m.id);
       for (const id of ids.slice(0, 40)) {
-        const metaResponse = await fetch(`${MEMES}/memes/${id}/meta`);
+        const metaResponse = await fetch(`${MEMES}/memes/${id}/meta`,
+          { headers: { Authorization: `Bearer ${token}` } });
         if (!metaResponse.ok) continue;          // purged under us by a neighbouring scenario
         const meta = await metaResponse.json();
-        if (meta.author === this.account.email) {
+        if (meta.own) {
           this.uploadedMemeId = id;
           return id;
         }

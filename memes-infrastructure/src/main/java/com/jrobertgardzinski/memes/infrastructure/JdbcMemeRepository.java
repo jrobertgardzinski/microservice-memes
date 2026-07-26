@@ -2,7 +2,6 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.ObjectStore;
-import com.jrobertgardzinski.memes.application.PublicationLog;
 import com.jrobertgardzinski.memes.domain.Meme;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -15,11 +14,11 @@ import java.util.Optional;
 /**
  * Postgres-backed {@link MemeRepository} (H2 in dev/tests): metadata in the meme row, the image
  * bytes delegated to the {@link ObjectStore} — written and read together, so a meme and its
- * object never drift. Recording publication time on save also makes this the {@link
- * PublicationLog} the hot ranking decays by.
+ * object never drift. The publication time recorded on save is what the hot ranking decays by;
+ * the ranking reads it joined onto the vote aggregate, not one meme at a time.
  */
 @Repository
-class JdbcMemeRepository implements MemeRepository, PublicationLog {
+class JdbcMemeRepository implements MemeRepository {
 
     private final JdbcClient jdbc;
     private final ObjectStore objects;
@@ -60,8 +59,29 @@ class JdbcMemeRepository implements MemeRepository, PublicationLog {
     }
 
     @Override
+    public List<String> existingOf(java.util.Collection<String> ids) {
+        if (ids.isEmpty()) {
+            return List.of();   // "IN ()" is not valid SQL, and an empty question needs no round trip
+        }
+        // one lookup for the whole set: the port's default would be an exists() per id, which for a
+        // page of the wall is a query per tile
+        return jdbc.sql("SELECT id FROM memes WHERE id IN (:ids)")
+                .param("ids", ids.stream().distinct().toList())
+                .query((rs, n) -> rs.getString("id")).list();
+    }
+
+    @Override
     public List<String> allIds() {
         return jdbc.sql("SELECT id FROM memes ORDER BY published_at DESC, id DESC")
+                .query((rs, n) -> rs.getString("id")).list();
+    }
+
+    @Override
+    public List<String> allIds(long offset, int limit) {
+        // the page is cut by the database, not by the JVM: the port's default would fetch the
+        // whole gallery to hand back fifty ids
+        return jdbc.sql("SELECT id FROM memes ORDER BY published_at DESC, id DESC LIMIT ? OFFSET ?")
+                .params(limit, offset)
                 .query((rs, n) -> rs.getString("id")).list();
     }
 
@@ -112,13 +132,5 @@ class JdbcMemeRepository implements MemeRepository, PublicationLog {
     @Override
     public void reassignAuthor(String memeId, String newAuthor) {
         jdbc.sql("UPDATE memes SET author = ? WHERE id = ?").params(newAuthor, memeId).update();
-    }
-
-    @Override
-    public Optional<Instant> publishedAt(String memeId) {
-        return jdbc.sql("SELECT published_at FROM memes WHERE id = ?")
-                .params(memeId)
-                .query((rs, n) -> rs.getTimestamp("published_at").toInstant())
-                .optional();
     }
 }

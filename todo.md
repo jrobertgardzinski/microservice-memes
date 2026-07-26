@@ -126,6 +126,33 @@ ZOSTAJE (kolejne kroki tej samej naprawy):
 - **Onboardingowy „pierwszy dzień"** dla portalu: minimalna ścieżka „postaw stack → zaloguj się →
   wrzuć mema → skasuj konto → zobacz, co zniknęło", z komendami. Dziś każdy składa to sam.
 
+## Regresja po paczce 9: ściana czytała ranking jak słownik (2026-07-26)
+
+**Objaw**: `/memes/hot` dostało twardy TOP-N (100), a `memes-ui` używało tej listy jako SŁOWNIKA
+wyników kafelków (`scores[m.id] ?? 0`). Mem poza pierwszą setką pokazywałby „▲ 0" mimo realnych
+głosów — cicha nieprawda w interfejsie, czekająca tylko na wzrost galerii (dziś 91 memów, 54 z
+głosami, więc czapka jeszcze nie gryzie). Ta sama klasa błędu w drugą stronę: nieudane
+`hotMemes()` (sieć/500) też dawało ścianę pewnych zer.
+
+**Naprawa (wariant „wąski endpoint")**: `GET /memes/scores?ids=a,b,c` (use case `ShowMemeScores`,
+porty `MemeRepository#existingOf` + `VoteRepository#scoresOf` — po jednym odczycie na stronę
+kafelków, nie po jednym na kafelek). Kontrakt trzyma różnicę ZERO vs NIEZNANE: id, które wraca,
+ma prawdziwy wynik (0 to fakt o memie bez głosów); id, które NIE wraca, nie ma wyniku do podania
+(serwis nie ma takiego mema — np. ulubiony, który przeżył swój mem). W UI wynik to
+`ReadonlyMap`, a nie `Record`: `get` zwraca `undefined`, `ScoreChip` renderuje wtedy „▲ n/a"
+(jak dialog dla `score === null`), nigdy zera. Dodatkowo `noUncheckedIndexedAccess` w
+`tsconfig.json` — indeksowanie, które może nie trafić, musi się do tego przyznać w typie, więc
+`?? 0` nie wróci przypadkiem. `/memes/hot` zostaje jako RANKING (kolejność), bez konsumenta w UI.
+
+**Pin**: `ShowMemeScoresTest` (m.in. `REGRESSION: the capped hot ranking cannot answer for a wall
+that outgrew it` — TOP_N+1 zagłosowanych memów, ranking gubi część z nich, nowy odczyt nie),
+`MemeScoresBatchTest` (kształt odpowiedzi: 0 obecne, nieznane id NIEOBECNE, duplikaty, sufit 100).
+
+**Druga połowa regresji (e2e)**: `world.wallIds()` w `portal/e2e` — jedno miejsce, które pyta o
+ŚCIANĘ jawną stroną (`?page=0&size=100`); używają go trzy kroki „gone from the gallery"
+(account-deletion, participant-outage, deletion-cascade), bo wcześniej dwa z nich sprawdzały
+tylko bezpośredni GET mema, mówiąc o „galerii". `memes-ui/e2e` też pyta jawnie o `page=0&size=50`.
+
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja
   lowercase/trim, 2..30 znaków [a-z0-9-], pojedyncze myślniki), use case'y `TagMeme` (autor

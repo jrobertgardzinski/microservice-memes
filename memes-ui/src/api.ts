@@ -13,7 +13,8 @@ export interface MemeRef {
   nsfw?: boolean;
 }
 
-export interface HotEntry {
+/** A meme id with its vote score — how the score reads answer on the wire. */
+export interface ScoreEntry {
   memeId: string;
   score: number;
 }
@@ -56,12 +57,26 @@ export const jsonHeaders = { 'Content-Type': 'application/json' };
 export const authHeader = (token: string | null): Record<string, string> =>
   token ? { Authorization: `Bearer ${token}` } : {};
 
-export const listMemes = async (tag?: string): Promise<MemeRef[]> =>
-  (await fetch(tag ? `/memes?tag=${encodeURIComponent(tag)}` : '/memes')).json();
+/** The wall is served one page at a time; the server caps the size, so this is what a page is. */
+export const GALLERY_PAGE_SIZE = 50;
 
-/** A meme's public metadata: who uploaded it. */
-export const memeMeta = async (memeId: string): Promise<{ id: string; author: string; nsfw?: boolean }> =>
-  (await fetch(`/memes/${memeId}/meta`)).json();
+/** How many memes one score call asks about; the server refuses more than a page of the wall, so a
+ *  longer list (a well-stocked favourites collection) goes out as several calls. */
+export const SCORE_BATCH_SIZE = GALLERY_PAGE_SIZE;
+
+export const listMemes = async (tag?: string, page = 0): Promise<MemeRef[]> => {
+  const query = new URLSearchParams({ page: String(page), size: String(GALLERY_PAGE_SIZE) });
+  if (tag) query.set('tag', tag);
+  return (await fetch(`/memes?${query}`)).json();
+};
+
+/** A meme's public metadata. The uploader comes back MASKED (a***@example.com) — display it,
+ *  never compare it to an identity; `own` is the server's answer to "is this mine?", computed
+ *  from the token this call carries (false for a signed-out visitor, who may still read). */
+export const memeMeta = async (
+  memeId: string, token: string | null,
+): Promise<{ id: string; author: string; own?: boolean; nsfw?: boolean }> =>
+  (await fetch(`/memes/${memeId}/meta`, { headers: authHeader(token) })).json();
 
 /** Flag or unflag a meme NSFW — a moderator-only call; the backend is the authority. */
 export const setMemeNsfw = async (memeId: string, nsfw: boolean, token: string | null): Promise<boolean> =>
@@ -88,8 +103,32 @@ export const setMemeTags = async (
   return r.ok ? { ok: true, tags: body.tags } : { ok: false, status: body.status ?? String(r.status) };
 };
 
-export const hotMemes = async (): Promise<HotEntry[]> =>
-  (await fetch('/memes/hot')).json();
+/**
+ * The scores of EXACTLY these memes, keyed by id — the read behind the numbers on the tiles.
+ *
+ * A meme missing from the returned map has an UNKNOWN score: the service had nothing to say about
+ * that id (a favourite that outlived its meme), or a batch never got through. It is NOT a meme with
+ * zero votes — an existing meme nobody voted on comes back with a real 0. That is why this answers
+ * with a Map: `get` returns `undefined`, so a caller has to decide what "no tally" looks like
+ * instead of indexing into an object and writing `?? 0`.
+ *
+ * The wall used to take its numbers from `/memes/hot`. That list is a RANKING capped at the hottest
+ * hundred, so a lookup for anything below the cap found nothing — and `?? 0` printed "▲ 0" under
+ * memes that had votes. Today's gallery is smaller than the cap, which is the only reason nobody
+ * had seen it yet.
+ */
+export const memeScores = async (memeIds: string[]): Promise<Map<string, number>> => {
+  const scores = new Map<string, number>();
+  for (let from = 0; from < memeIds.length; from += SCORE_BATCH_SIZE) {
+    const batch = memeIds.slice(from, from + SCORE_BATCH_SIZE);
+    const r = await fetch(`/memes/scores?ids=${batch.map(encodeURIComponent).join(',')}`);
+    // a batch that did not answer leaves those ids out of the map, which reads as "unknown" —
+    // the one thing we must not do here is fill the gap with zeros
+    if (!r.ok) continue;
+    (await r.json() as ScoreEntry[]).forEach((entry) => scores.set(entry.memeId, entry.score));
+  }
+  return scores;
+};
 
 export const listComments = async (memeId: string, token: string | null): Promise<MemeComment[]> =>
   (await fetch(`${COMMENTS}/memes/${memeId}/comments`, { headers: authHeader(token) })).json();

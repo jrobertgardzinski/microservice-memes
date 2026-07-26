@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.RankedMeme;
+import com.jrobertgardzinski.memes.domain.ScoredMeme;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -19,25 +20,41 @@ public class RankMemes {
     /** How hard age pulls a meme down the page; the classic Reddit exponent. */
     static final double GRAVITY = 1.5;
 
+    /**
+     * Server policy: the hot page is a RANKING, not a dump of everything that ever got a vote.
+     * A hundred rows is more than any client renders, and the endpoint is public and
+     * unauthenticated — the answer's size must not follow the gallery's growth.
+     */
+    public static final int TOP_N = 100;
+
     private final VoteRepository voteRepository;
-    private final PublicationLog publicationLog;
     private final Clock clock;
 
-    public RankMemes(VoteRepository voteRepository, PublicationLog publicationLog, Clock clock) {
+    public RankMemes(VoteRepository voteRepository, Clock clock) {
         this.voteRepository = voteRepository;
-        this.publicationLog = publicationLog;
         this.clock = clock;
     }
 
     public List<RankedMeme> execute() {
         Instant now = clock.instant();
+        // hotness is computed ONCE per meme, then sorted on the materialised key. Sorting with
+        // Comparator.comparingDouble(meme -> hotness(meme, now)) looks equivalent and is not: the
+        // extractor runs at EVERY comparison, so a key that costs anything is paid ~2·n·log2(n)
+        // times instead of n. Here the key used to cost a SELECT.
+        record Hot(RankedMeme meme, double hotness) {}
         return voteRepository.allScores().stream()
-                .sorted(Comparator.comparingDouble((RankedMeme meme) -> hotness(meme, now)).reversed())
+                .map(scored -> new Hot(new RankedMeme(scored.memeId(), scored.score()),
+                        hotness(scored, now)))
+                .sorted(Comparator.comparingDouble(Hot::hotness).reversed())
+                .limit(TOP_N)
+                .map(Hot::meme)
                 .toList();
     }
 
-    private double hotness(RankedMeme meme, Instant now) {
-        double ageHours = publicationLog.publishedAt(meme.memeId())
+    private static double hotness(ScoredMeme meme, Instant now) {
+        // no publication time known: treat the meme as brand new rather than burying it — an
+        // unknown age must not decide the ranking against a meme that may be perfectly current
+        double ageHours = meme.publishedAt()
                 .map(published -> Math.max(0.0, Duration.between(published, now).toMillis() / 3_600_000.0))
                 .orElse(0.0);
         return meme.score() / Math.pow(ageHours + 2.0, GRAVITY);
