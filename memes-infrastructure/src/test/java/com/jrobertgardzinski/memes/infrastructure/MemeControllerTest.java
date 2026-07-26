@@ -55,6 +55,45 @@ class MemeControllerTest {
     }
 
     @Test
+    void an_uploaded_transparent_png_is_STORED_with_its_alpha_channel() throws Exception {
+        // The whole chain, not just the optimizer: the upload is re-encoded and the SERVICE KEEPS
+        // THE RESULT, so this is the only place that can prove the user's transparency survived
+        // storage. 1600 px on the long side is deliberately above memes.image.max-dimension (1024),
+        // because the loss happened in the scaler — an image below the limit was never touched.
+        MockMultipartFile sticker = new MockMultipartFile("file", "sticker.png", "image/png",
+                transparentQuadrantPng(1600, 1200));
+
+        String body = mockMvc.perform(multipart("/memes").file(sticker)
+                        .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String id = objectMapper.readTree(body).get("id").asText();
+
+        byte[] served = mockMvc.perform(get("/memes/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_PNG))
+                .andReturn().getResponse().getContentAsByteArray();
+
+        BufferedImage stored = ImageIO.read(new java.io.ByteArrayInputStream(served));
+        assertEquals(1024, stored.getWidth(), "it really was scaled down on the way in");
+        assertEquals(0, stored.getRGB(2, 2) >>> 24,
+                "the transparent corner survived the upload — this is the byte-loss the store cannot undo");
+    }
+
+    /** Opaque red with a fully transparent top-left quadrant — see WebImageOptimizerTest. */
+    private static byte[] transparentQuadrantPng(int width, int height) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                image.setRGB(x, y, x < width / 2 && y < height / 2 ? 0x00000000 : 0xffff0000);
+            }
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
+    }
+
+    @Test
     void refuses_a_non_image_upload_with_400_not_500() throws Exception {
         MockMultipartFile garbage = new MockMultipartFile("file", "not-an-image.pdf",
                 "application/pdf", "%PDF-1.4 definitely not pixels".getBytes());

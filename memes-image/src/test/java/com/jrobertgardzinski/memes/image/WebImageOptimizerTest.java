@@ -45,6 +45,54 @@ class WebImageOptimizerTest {
     }
 
     @Test
+    @DisplayName("the UPLOAD path keeps the alpha channel — a transparent PNG is not stored as black")
+    void keeps_alpha_when_the_upload_is_scaled_down() throws Exception {
+        // This is the path that loses DATA, not just looks: optimize() re-encodes the bytes at
+        // upload and the service stores THAT result, so alpha dropped here is gone from the
+        // gallery for good — there is no original left to re-derive it from.
+        byte[] transparent = transparentQuadrantPng(1600, 1200);
+        assertTrue(ImageIO.read(new ByteArrayInputStream(transparent)).getColorModel().hasAlpha(),
+                "the fixture itself really carries an alpha channel — every other fixture here is TYPE_INT_RGB");
+
+        OptimizedImage optimized = optimizer.optimize(transparent);
+
+        BufferedImage back = read(optimized);
+        assertEquals(1024, back.getWidth(), "the image really went through the scaler (1600 -> 1024)");
+        assertTrue(back.getColorModel().hasAlpha(), "the STORED bytes still have an alpha channel");
+        assertEquals(0, back.getRGB(2, 2) >>> 24,
+                "the transparent corner is still transparent — TYPE_INT_RGB made it opaque black");
+        assertEquals(255, back.getRGB(back.getWidth() - 1, back.getHeight() - 1) >>> 24,
+                "and the opaque half stayed opaque");
+    }
+
+    @Test
+    @DisplayName("a thumbnail of a transparent PNG stays transparent — the gallery tile is not a black square")
+    void keeps_alpha_in_a_thumbnail() throws Exception {
+        // the thumbnail path scales practically EVERY meme (the limit is 256 px), so this is the
+        // one a user sees first: a transparent sticker turned into a black tile on the wall
+        OptimizedImage thumbnail = optimizer.toPngWithin(transparentQuadrantPng(600, 400), 256);
+
+        BufferedImage back = read(thumbnail);
+        assertEquals(256, back.getWidth(), "the thumbnail really was scaled down (600 -> 256)");
+        assertEquals(0, back.getRGB(2, 2) >>> 24, "the transparent corner is still transparent");
+        assertEquals(255, back.getRGB(back.getWidth() - 1, back.getHeight() - 1) >>> 24,
+                "and the opaque half stayed opaque");
+    }
+
+    @Test
+    @DisplayName("an opaque source (JPEG) stays flattened to RGB — no alpha channel is invented for it")
+    void keeps_flattening_sources_that_have_no_alpha() throws Exception {
+        // the other half of the bargain: alpha is preserved where it EXISTS, not added everywhere.
+        // A channel of nothing but 0xff would grow every stored JPEG-sourced PNG for no gain.
+        OptimizedImage optimized = optimizer.optimize(image("jpg", 2000, 1000));
+
+        BufferedImage back = read(optimized);
+        assertEquals(1024, back.getWidth(), "it really went through the scaler");
+        assertFalse(back.getColorModel().hasAlpha(), "an opaque photo needs no alpha channel");
+        assertEquals(255, back.getRGB(0, 0) >>> 24, "and it is fully opaque, as a JPEG always is");
+    }
+
+    @Test
     @DisplayName("re-encoding strips embedded metadata — no EXIF (GPS, camera) survives an upload")
     void re_encoding_drops_exif_metadata() throws Exception {
         // a JPEG with an APP1 "Exif" segment carrying something nobody should publish by accident
@@ -117,6 +165,25 @@ class WebImageOptimizerTest {
             return true;
         }
         return false;
+    }
+
+    /**
+     * A PNG that actually HAS an alpha channel: opaque red, except the top-left quadrant, which is
+     * fully transparent. A whole quadrant, not a single pixel, because the scaler interpolates —
+     * one transparent pixel among opaque neighbours would average out to nearly opaque and the
+     * assertion would say nothing. The corner sampled by the tests sits deep inside the quadrant.
+     */
+    private static byte[] transparentQuadrantPng(int width, int height) throws Exception {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                boolean transparentQuadrant = x < width / 2 && y < height / 2;
+                image.setRGB(x, y, transparentQuadrant ? 0x00000000 : 0xffff0000);
+            }
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
     }
 
     private static byte[] image(String format, int width, int height) throws Exception {

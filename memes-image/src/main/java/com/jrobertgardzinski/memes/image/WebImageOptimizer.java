@@ -96,7 +96,18 @@ public class WebImageOptimizer {
         double scale = (double) maxDimension / longestSide;
         int width = Math.max(1, (int) Math.round(image.getWidth() * scale));
         int height = Math.max(1, (int) Math.round(image.getHeight() * scale));
-        BufferedImage scaled = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        // ARGB when the source HAS an alpha channel, RGB when it has not. This buffer used to be
+        // unconditionally TYPE_INT_RGB, which silently destroyed transparency: a transparent pixel
+        // drawn onto a buffer with no alpha composites over its (black) background and comes out as
+        // opaque black. The stakes are not cosmetic — optimize() re-encodes the bytes AT UPLOAD and
+        // the service stores THAT result, so every transparent PNG longer than
+        // memes.image.max-dimension lost its alpha channel PERMANENTLY in the store, not just on
+        // its thumbnail. The output format is PNG, which carries alpha, so nothing is lost by
+        // keeping it. Opaque sources (JPEG, BMP, plain RGB PNG) stay flattened to RGB: they have no
+        // alpha to preserve, and an alpha channel of nothing but 0xff would only make the stored
+        // PNG bigger.
+        int type = image.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB;
+        BufferedImage scaled = new BufferedImage(width, height, type);
         Graphics2D graphics = scaled.createGraphics();
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.drawImage(image, 0, 0, width, height, null);

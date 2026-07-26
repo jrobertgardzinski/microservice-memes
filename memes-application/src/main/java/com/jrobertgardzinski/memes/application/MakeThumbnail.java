@@ -46,8 +46,9 @@ public class MakeThumbnail {
         // CRASH, and the window they leave open is the ugly kind: a JVM that dies between the
         // put and the re-check leaves a .thumb of a meme that is gone, no later delete will
         // ever come for it, and a cache-only hit would keep serving a deleted person's picture
-        // forever. (ServeMeme's .webp variant has no such window: it reaches the store only
-        // through find(), which gates on the row.)
+        // forever. (ServeMeme's .webp variant cannot be SERVED that way either — it now asks the
+        // same exists() gate before touching the store — but it is not swept: no request for a
+        // deleted meme's WebP goes past that gate, so nothing there notices the orphan.)
         //
         // The gate is exists(), not find(): one indexed "SELECT 1 FROM memes WHERE id = ?" that
         // loads no blob. Measured on the DB store (H2, warm): ~21us for the exists, ~12us for the

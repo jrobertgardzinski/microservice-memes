@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.Meme;
+import com.jrobertgardzinski.memes.domain.MemeMetadata;
 
 import java.util.Collection;
 import java.util.List;
@@ -14,6 +15,12 @@ public interface MemeRepository {
 
     void save(Meme meme);
 
+    /**
+     * The meme WITH its bytes — empty when either half is missing. Ask for this only when the
+     * answer is the picture itself ({@link ServeMeme}, {@link MakeThumbnail}); every other question
+     * belongs to {@link #exists} or {@link #findMetadata}, which cost no blob read and — the part
+     * that bit us — do not turn a meme whose object went missing into a meme that does not exist.
+     */
     Optional<Meme> find(String id);
 
     /**
@@ -22,6 +29,24 @@ public interface MemeRepository {
      */
     default boolean exists(String id) {
         return find(id).isPresent();
+    }
+
+    /**
+     * A meme's row without its picture: {@link #exists} for callers that also need to know WHO
+     * uploaded it (deletion and tagging are the author's privileges) or in what format it is kept.
+     *
+     * <p>Two reasons this is not {@code find(id).map(...)}. It loads no bytes, so an authorisation
+     * check stops paying a full image transfer from object storage for one e-mail address. And it
+     * answers about the ROW: {@code find} joins the row to its object, so a meme whose bytes are
+     * absent from the ACTIVE store (a store switch left them behind, an operator removed the
+     * object) used to look deleted to /meta and to DELETE, and its owner could not take it down —
+     * the row was there, the API said 404, and no path led to the leftover bytes.
+     *
+     * <p>Adapters override it with a row-only lookup — they MUST, or the second guarantee is void;
+     * this fallback exists to keep hand-rolled fakes compiling (same bargain as {@link #exists}).
+     */
+    default Optional<MemeMetadata> findMetadata(String id) {
+        return find(id).map(meme -> new MemeMetadata(meme.id(), meme.author(), meme.format()));
     }
 
     /**

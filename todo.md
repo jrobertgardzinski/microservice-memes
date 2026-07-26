@@ -153,6 +153,60 @@ that outgrew it` — TOP_N+1 zagłosowanych memów, ranking gubi część z nich
 (account-deletion, participant-outage, deletion-cascade), bo wcześniej dwa z nich sprawdzały
 tylko bezpośredni GET mema, mówiąc o „galerii". `memes-ui/e2e` też pyta jawnie o `page=0&size=50`.
 
+## 26 memów-widm: wiersz jest, bajtów w AKTYWNYM store nie ma (2026-07-26)
+
+**Objaw**: na żywym stacku 26 z 91 memów miało wiersz w `memes` i bajty w `meme_blobs` — tabeli
+store'a DB, którego bean nawet nie powstaje przy `MEMES_BLOB_STORE=s3`. Galeria je listowała
+(kafelek się renderował), a `/meta`, `/votes`, `/thumbnail`, GET obrazu i DELETE odpowiadały 404:
+ani autor, ani moderator nie mógł takiego mema usunąć. Gorsza połowa jest o RODO — czystka konta
+usuwała wiersz i prosiła S3 o klucz, którego tam nie było (no-op), więc obraz osoby zostawał
+w `meme_blobs` bez ŻADNEJ ścieżki usunięcia, a serwis meldował sukces.
+
+**Naprawa, dwie części (żadna nie wystarcza sama)**: (1) bramki istnienia przestały pytać
+`find()`, które zawsze skleja wiersz z bajtami — `exists()` tam, gdzie pytanie brzmi „czy wiersz
+istnieje" (ServeMeme, FlagMeme, CastVote, ShowMemeVote), i nowy port `MemeRepository#findMetadata`
+(`MemeMetadata` = id/autor/format, bez bajtów) tam, gdzie potrzebny jest autor (DeleteMeme,
+TagMeme, ViewMeme → `/meta` i DELETE). Bajty czytają WYŁĄCZNIE ServeMeme i MakeThumbnail, obie
+po bramce `exists()` (kolejność z MakeThumbnail: tanie pytanie lokalne, potem drogie zdalne).
+Efekt uboczny na gorącej ścieżce: otwarcie dialogu to jeden odczyt obrazu zamiast trzech, DELETE
+zero zamiast dwóch, a trafienie w cache WebP nie ściąga już PNG-a na śmietnik.
+(2) `OrphanedBlobMigration` (ApplicationRunner): gdy `blob-store != db`, a `meme_blobs` nie jest
+puste, przenosi zawartość do AKTYWNEGO store'a i opróżnia tabelę. Idempotentnie (ADR 0006) i per
+obiekt, bez otaczającej transakcji: klucza, który aktywny store już ma, NIE nadpisuje (prawdą jest
+to, co w aktywnym store), a jeden obiekt, którego nie da się skopiować, jest logowany i pomijany —
+jego wiersz zostaje na następny start i nie kosztuje serwisu startu.
+
+**Uruchomione na żywym stacku (2026-07-26)**: 26/26 obiektów do MinIO (65 → 91 originals),
+`meme_blobs` puste, wszystkie 26 dawnych widm odpowiadają `/meta` 200; dawne widmo
+`58494daa` serwuje obraz i miniaturę, a DELETE przez NIE-autora dochodzi do autoryzacji
+(403 NOT_YOURS zamiast 404). Restart bez logu migracji = no-op.
+
+**Pin**: `MemeWithoutItsBytesTest` (mem bez bajtów: galeria listuje, `/meta` i `/votes` 200, obraz
+i miniatura 404, autor USUWA, moderator flaguje i usuwa, obcy nadal 403, nieistniejący nadal 404),
+`OrphanedBlobMigrationTest` (przenosi i opróżnia, idempotentna, przy `db` NIE RUSZA tabeli, jeden
+błąd nie zabiera pozostałych ani startu, nie nadpisuje aktywnego store'a), `ServeMemeTest`
+(trafienie w cache WebP nie czyta obrazu; wiersz bez bajtów serwuje 404).
+
+## Skalowanie gubiło kanał alfa — TRWALE, bo optimize() re-enkoduje przy uploadzie (2026-07-26)
+
+**Objaw**: `WebImageOptimizer.downscaleWithin` rysowało na buforze `TYPE_INT_RGB`, więc piksele
+przezroczyste kompozytowały się na czarnym tle. Miniatura skaluje praktycznie każdy mem (próg
+256 px), więc przezroczysta naklejka była na ścianie czarnym kafelkiem — ale sedno jest gorsze:
+`optimize()` re-enkoduje bajty PRZY UPLOADZIE i serwis przechowuje WYNIK, więc dla każdego
+przezroczystego PNG dłuższego niż 1024 px alfa ginęła bezpowrotnie w magazynie. Bug był
+STRUKTURALNIE niewykrywalny: wszystkie 15 fikstur obrazkowych w repo to `TYPE_INT_RGB`, więc suita
+nie potrafiła wyprodukować wejścia z alfą.
+
+**Naprawa**: bufor `TYPE_INT_ARGB`, gdy źródło ma kanał alfa, `TYPE_INT_RGB`, gdy nie ma —
+wyjściem jest PNG (nosi alfę), a spłaszczanie zostaje dla źródeł nieprzezroczystych (JPEG), żeby
+kanał samych `0xff` nie puchł w magazynie.
+
+**Pin**: `WebImageOptimizerTest` — fikstura ARGB z przezroczystą ćwiartką (cała ćwiartka, nie jeden
+piksel: skaler interpoluje) i asercje `getRGB >>> 24 == 0` po skalowaniu na ścieżce UPLOADU
+(1600→1024) i miniatury (600→256), plus „opaque source stays flattened to RGB";
+`MemeControllerTest` pinuje cały łańcuch (upload → magazyn → serwowanie). Sprawdzone też na żywym
+stacku: 1600×1200 RGBA wgrane przez API wraca jako 1024×768 colourType=6 z przezroczystą ćwiartką.
+
 ## Otwarte — najbliższe (małe moduły, "à la security")
 - ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja
   lowercase/trim, 2..30 znaków [a-z0-9-], pojedyncze myślniki), use case'y `TagMeme` (autor

@@ -20,6 +20,12 @@ public class ShowMemeVote {
     }
 
     public Optional<VoteTally> execute(String memeId, Optional<String> viewer) {
-        return memeRepository.find(memeId).map(meme -> voting.tally(memeId, viewer));
+        // exists(), not find(): the tally is about the row. find() made the anonymous
+        // GET /memes/{id}/votes download the whole image from object storage to return a number,
+        // and answered 404 for a meme whose bytes are missing from the active store.
+        if (!memeRepository.exists(memeId)) {
+            return Optional.empty();
+        }
+        return Optional.of(voting.tally(memeId, viewer));
     }
 }

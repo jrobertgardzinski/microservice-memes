@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
-import com.jrobertgardzinski.memes.domain.Meme;
+import com.jrobertgardzinski.memes.domain.MemeMetadata;
 
 import java.util.Optional;
 
@@ -32,7 +32,12 @@ public class DeleteMeme {
     }
 
     public Result execute(String memeId) {
-        Optional<Meme> meme = memes.find(memeId);
+        // findMetadata(), not find(): a teardown needs the author (the caller is told whose meme
+        // went), never the picture. find() read the full image out of object storage to get one
+        // string — and, worse, reported NO_SUCH_MEME for a meme whose object is missing from the
+        // active store, so its own author could not take it down. Deletion must reach every meme
+        // the gallery lists; the bytes are removed by id further down, present or not.
+        Optional<MemeMetadata> meme = memes.findMetadata(memeId);
         if (meme.isEmpty()) {
             return new Result(Status.NO_SUCH_MEME, null);
         }

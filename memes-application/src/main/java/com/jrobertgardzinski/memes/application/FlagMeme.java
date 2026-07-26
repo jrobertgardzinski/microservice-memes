@@ -22,7 +22,10 @@ public class FlagMeme {
         if (!callerIsModerator) {
             return Result.NOT_A_MODERATOR;
         }
-        if (memes.find(memeId).isEmpty()) {
+        // exists(), not find(): flagging asks about the ROW. find() would pull the whole image out
+        // of object storage to throw it away, and would refuse to flag a meme whose bytes went
+        // missing — moderation must reach exactly the memes the gallery lists.
+        if (!memes.exists(memeId)) {
             return Result.NO_SUCH_MEME;
         }
         flags.setNsfw(memeId, nsfw);

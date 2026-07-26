@@ -3,6 +3,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.ObjectStore;
 import com.jrobertgardzinski.memes.domain.Meme;
+import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -39,12 +40,23 @@ class JdbcMemeRepository implements MemeRepository {
 
     @Override
     public Optional<Meme> find(String id) {
+        // row AND object: empty when either half is missing, which is why callers that only ask
+        // "does it exist" or "who owns it" must use exists()/findMetadata() instead — a meme whose
+        // object is absent from the active store is still a meme, and its author must be able to
+        // delete it
+        return findMetadata(id).flatMap(meta -> objects.get(meta.id()).map(bytes ->
+                new Meme(meta.id(), meta.author(), meta.format(), bytes)));
+    }
+
+    @Override
+    public Optional<MemeMetadata> findMetadata(String id) {
+        // the row alone — no ObjectStore round trip. The port's default would go through find(),
+        // which is exactly the blob read (and the false 404) this method exists to avoid.
         return jdbc.sql("SELECT id, author, format FROM memes WHERE id = ?")
                 .params(id)
-                .query((rs, n) -> new Object[]{rs.getString("id"), rs.getString("author"), rs.getString("format")})
-                .optional()
-                .flatMap(row -> objects.get((String) row[0]).map(bytes ->
-                        new Meme((String) row[0], (String) row[1], (String) row[2], bytes)));
+                .query((rs, n) -> new MemeMetadata(
+                        rs.getString("id"), rs.getString("author"), rs.getString("format")))
+                .optional();
     }
 
     @Override

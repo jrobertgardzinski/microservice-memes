@@ -29,18 +29,31 @@ public class ServeMeme {
     }
 
     public Optional<Image> execute(String memeId, boolean wantsWebp) {
-        Optional<Meme> meme = memes.find(memeId);
+        // The gate is exists(), not find() — the same order MakeThumbnail spells out: the cheap,
+        // indexed row question first, the expensive remote blob only when the RESPONSE needs it.
+        // With find() as the gate, every WebP cache hit still pulled the full PNG out of
+        // MinIO/S3 and threw it away.
+        if (!memes.exists(memeId)) {
+            return Optional.empty();
+        }
+        String webpKey = memeId + ".webp";
+        if (wantsWebp) {
+            Optional<byte[]> cached = objects.get(webpKey);
+            if (cached.isPresent()) {
+                return Optional.of(new Image(cached.get(), "image/webp"));
+            }
+        }
+        Optional<Meme> meme = memes.find(memeId);   // now, and only now, the bytes
         if (meme.isEmpty()) {
+            // The row is there but the active store holds no object for it. 404 is the honest
+            // answer to "give me this picture" — there is no picture to give. Everything that is
+            // NOT the picture (metadata, votes, tags, deletion) is answered from the row and keeps
+            // working, so such a meme can still be moderated and taken down.
             return Optional.empty();
         }
         byte[] png = meme.get().data();
         if (!wantsWebp) {
             return Optional.of(new Image(png, "image/png"));
-        }
-        String webpKey = memeId + ".webp";
-        Optional<byte[]> cached = objects.get(webpKey);
-        if (cached.isPresent()) {
-            return Optional.of(new Image(cached.get(), "image/webp"));
         }
         return encoder.toWebp(png)
                 .map(webp -> {

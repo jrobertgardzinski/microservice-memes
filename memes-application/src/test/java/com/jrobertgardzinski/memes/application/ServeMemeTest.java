@@ -95,13 +95,17 @@ class ServeMemeTest {
         // variants, then serve wrote the freshly encoded WebP — deleteById will never come back for
         // it, so without the re-check the variant would sit in the store forever
         MemeRepository deletedMidFlight = new MemeRepository() {
+            private int existenceChecks = 0;
+
             public Optional<Meme> find(String id) {
                 // the read that started this request — the meme was still there
                 return Optional.of(new Meme("cat", "a@example.com", "png", PNG));
             }
 
             public boolean exists(String id) {
-                return false;   // by the time the cache write lands, the delete has committed
+                // the FIRST question is the request's own gate and the meme was still there; by the
+                // time the cache write lands and asks again, the delete has committed
+                return existenceChecks++ == 0;
             }
 
             public void save(Meme meme) { }
@@ -118,5 +122,58 @@ class ServeMemeTest {
         assertEquals("image/webp", served.orElseThrow().contentType(),
                 "the caller still gets the bytes they were promised");
         assertTrue(blobs.isEmpty(), "but the cache write is undone — nothing will ever delete it otherwise");
+    }
+
+    @Test
+    @DisplayName("a WebP cache hit reads no stored image at all — the row answers, the cache serves")
+    void a_cache_hit_never_fetches_the_stored_png() {
+        // the hot path: with find() as the existence gate, every request a cached WebP could answer
+        // still pulled the full PNG out of MinIO/S3 first and dropped it on the floor
+        java.util.List<String> imageReads = new java.util.ArrayList<>();
+        MemeRepository counting = new MemeRepository() {
+            public Optional<Meme> find(String id) {
+                imageReads.add(id);
+                return Optional.of(new Meme("cat", "a@example.com", "png", PNG));
+            }
+
+            public boolean exists(String id) { return "cat".equals(id); }
+
+            public void save(Meme meme) { }
+            public List<String> allIds() { return List.of("cat"); }
+            public List<String> findIdsByAuthor(String author) { return List.of(); }
+            public void deleteById(String memeId) { }
+            public void reassignAuthor(String memeId, String newAuthor) { }
+        };
+        java.util.Map<String, byte[]> blobs = new java.util.HashMap<>();
+        blobs.put("cat.webp", WEBP);
+        ServeMeme serve = new ServeMeme(counting, mapStore(blobs), png -> Optional.of(WEBP));
+
+        Optional<ServeMeme.Image> served = serve.execute("cat", true);
+
+        assertEquals("image/webp", served.orElseThrow().contentType());
+        assertTrue(imageReads.isEmpty(), "the stored PNG must not be fetched for a hit: " + imageReads);
+    }
+
+    @Test
+    @DisplayName("a meme whose bytes are gone from the active store serves nothing — but still exists")
+    void a_row_without_its_bytes_serves_nothing() {
+        // the store-switch state: the row is there, the object is not. Serving is honestly 404,
+        // while exists() keeps saying yes — that is what lets /meta, moderation and DELETE work.
+        MemeRepository rowWithoutBytes = new MemeRepository() {
+            public Optional<Meme> find(String id) { return Optional.empty(); }
+
+            public boolean exists(String id) { return true; }
+
+            public void save(Meme meme) { }
+            public List<String> allIds() { return List.of("cat"); }
+            public List<String> findIdsByAuthor(String author) { return List.of(); }
+            public void deleteById(String memeId) { }
+            public void reassignAuthor(String memeId, String newAuthor) { }
+        };
+        ServeMeme serve = new ServeMeme(rowWithoutBytes, mapStore(new java.util.HashMap<>()),
+                png -> Optional.of(WEBP));
+
+        assertTrue(serve.execute("cat", false).isEmpty(), "there is no picture to serve");
+        assertTrue(serve.execute("cat", true).isEmpty(), "and no encoder can invent one");
     }
 }

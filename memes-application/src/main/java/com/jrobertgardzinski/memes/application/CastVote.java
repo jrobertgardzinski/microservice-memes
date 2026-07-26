@@ -22,7 +22,9 @@ public class CastVote {
     }
 
     public Optional<VoteTally> execute(String memeId, String voter, VoteDirection direction) {
-        if (memeRepository.find(memeId).isEmpty()) {
+        // exists(), not find(): a vote anchors to the ROW, so the image never has to leave the
+        // store for it (find() would fetch the full PNG and drop it — on a public endpoint)
+        if (!memeRepository.exists(memeId)) {
             return Optional.empty();
         }
         return Optional.of(voting.toggle(memeId, voter, direction));

@@ -34,7 +34,10 @@ public class TagMeme {
 
     /** @throws IllegalArgumentException when any raw tag is not a legal {@link Tag} */
     public Result execute(String memeId, String caller, List<String> rawTags) {
-        var meme = memes.find(memeId);
+        // findMetadata(), not find(): tagging needs to know who the author is, not what the picture
+        // looks like — and a meme whose bytes are missing from the active store must still be
+        // curatable by its owner
+        var meme = memes.findMetadata(memeId);
         if (meme.isEmpty()) {
             return Result.of(Status.NO_SUCH_MEME);
         }
