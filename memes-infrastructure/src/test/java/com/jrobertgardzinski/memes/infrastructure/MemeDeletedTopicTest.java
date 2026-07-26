@@ -57,8 +57,9 @@ class MemeDeletedTopicTest {
     @Test
     @DisplayName("the deletion announcement is published on the topic both consumers subscribe to")
     void the_announcement_goes_to_the_agreed_topic() {
-        // the topic off the REAL ProducerRecord, not the constant: the record travels through the
-        // outbox row, so a topic mangled on the way to the broker would still pass a constant check
+        // the topic off the REAL ProducerRecord, not the constant: the name is written into the
+        // outbox event and only later mapped onto the record, so a topic mangled anywhere on that
+        // way to the broker would still pass a constant check
         ProducerRecord<String, String> announced =
                 MemeDeletedPactProviderTest.realAnnouncement(UUID.randomUUID().toString());
 
@@ -66,7 +67,7 @@ class MemeDeletedTopicTest {
                 "microservice-comments and microservice-user-collections both subscribe here —"
                         + " see the class comment before changing this");
         assertEquals(MEMES_EVENTS, KafkaMemeEvents.TOPIC,
-                "and the constant the outbox row is written with must say the same");
+                "and the constant the outbox event is written with must say the same");
     }
 
     @Test

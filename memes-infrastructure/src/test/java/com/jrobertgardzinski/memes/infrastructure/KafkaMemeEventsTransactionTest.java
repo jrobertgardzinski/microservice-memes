@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.outbox.OutboxTable;
+import com.jrobertgardzinski.outbox.spring.SpringOutbox;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,6 +13,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
+import java.time.Clock;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,6 +33,12 @@ import static org.mockito.Mockito.when;
  * published once delivery is CONFIRMED (the mocks here complete their futures synchronously, so
  * the callback has run by the time the assertions look). A crash between commit and send leaves
  * an unpublished row for the republisher (see MemeEventsOutboxTest).
+ *
+ * <p>Round 10 replaced this service's own outbox classes with the shared kernel library, so every
+ * assertion below is now also a statement about that library — wired exactly as
+ * {@link MemeOutboxConfig} wires it in production, against the real {@code meme_events_outbox}
+ * table V5/V6 created and a real {@code TransactionTemplate}. Nothing here was weakened for the
+ * migration; the class names in the arrangement changed and the promises did not.
  */
 @SpringBootTest(classes = MemesApplication.class)
 class KafkaMemeEventsTransactionTest {
@@ -37,7 +47,10 @@ class KafkaMemeEventsTransactionTest {
     TransactionTemplate tx;
 
     @Autowired
-    MemeEventsOutbox outbox;
+    DataSource dataSource;
+
+    @Autowired
+    Clock clock;
 
     @Autowired
     JdbcClient jdbc;
@@ -49,7 +62,10 @@ class KafkaMemeEventsTransactionTest {
 
     @BeforeEach
     void freshOutbox() {
-        events = new KafkaMemeEvents(kafka, outbox);
+        // the same construction MemeOutboxConfig performs — only the broker is a mock, because a
+        // broker outage is what half of these tests are about
+        events = new KafkaMemeEvents(new SpringOutbox(dataSource,
+                OutboxTable.named("meme_events_outbox"), clock, new KafkaMemeDispatch(kafka)));
         jdbc.sql("DELETE FROM meme_events_outbox").update();
     }
 

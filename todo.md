@@ -226,6 +226,16 @@ tylko bezpośredni GET mema, mówiąc o „galerii". `memes-ui/e2e` też pyta ja
   `KafkaProducerClocksTest`. Retencja kasuje batchami po 500, max 4 batche na pass (pierwszy
   pass na dużej tabeli nie jest jedną wielką transakcją na wątku schedulera);
   `memes.outbox.retention-hours` ≤ 0 = odmowa startu z nazwą i wartością.
+  PRZENIESIONE DO JĄDRA (2026-07-26, paczka 10): `MemeEventsOutbox` i
+  `MemeEventsOutboxRepublisher` **usunięte** — mechanizm to teraz biblioteka
+  `com.jrobertgardzinski:transactional-outbox` + adapter `infrastructure-spring-outbox`
+  (`../../shared/`), wyciągnięta Z TEJ implementacji, więc gwarancja jest tym samym kodem, a nie
+  kopią o tym samym kształcie. Tabela i migracje V5/V6 BEZ ZMIAN (nazwa tabeli jest parametrem
+  biblioteki i kształt zgadza się kolumna w kolumnę, indeks włącznie). Po stronie serwisu zostały
+  trzy rzeczy, których biblioteka nie może zrobić: `KafkaMemeEvents` (nazwa topicu + payload
+  wokół `OutboxEvent.newId()`), `KafkaMemeDispatch` (wysyłka + oba punkty kontraktu `Dispatch`)
+  i `MemeOutboxConfig` (beany, `@EnableScheduling`, nazwa property retencji). Wszystkie 161
+  testów przeszło bez zmiany ani jednej asercji — to był cały dowód, że abstrakcja nic nie zjadła.
 - ~~Default polityki czystki z bazy~~ — ZROBIONE (2026-07-07): port `PurgePolicyOverride`
   + generyczna tabela `settings` (V4, klucz `purge.memes`), rozstrzyganie wizard > baza > env
   w `PurgeUserContent`; REST `GET/PUT/DELETE /admin/purge-policy` (filtr wymaga zalogowania

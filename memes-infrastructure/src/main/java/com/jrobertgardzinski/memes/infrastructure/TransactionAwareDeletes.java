@@ -14,8 +14,16 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * Outside a transaction (e.g. the WebP cache) the delete runs immediately, as before.
  *
  * <p>The same parking serves every commit-dependent side effect of a teardown, not only blob
- * deletes: {@link JdbcMemeRepository} re-sweeps the WebP variant here, and {@link KafkaMemeEvents}
- * parks the outbox publication attempt so it never runs before the commit that made the event true.
+ * deletes: {@link JdbcMemeRepository} re-sweeps the WebP variant here.
+ *
+ * <p>Round 10 moved one user out: the MEME_DELETED publication attempt used to park HERE, and now
+ * parks on the identical mechanism inside the shared outbox library ({@code AfterCommit} in
+ * {@code infrastructure-spring-outbox}, extracted from this class — both traps below included).
+ * Two copies of a transaction-synchronisation subtlety is one more than anybody can keep in step,
+ * but this one cannot simply delegate to the library: a blob store is not an outbox, and a
+ * repository reaching into an outbox library for a filesystem delete would be the worse coupling.
+ * <strong>If you fix a bug in either, fix it in both</strong> — the library's version carries the
+ * same two paragraphs for the next reader.
  *
  * <p>Two traps this class dodges itself. First: a parked runnable may call back into
  * {@link #afterCommitOrNow} — the repository's after-commit variant re-sweep calls
@@ -54,8 +62,9 @@ final class TransactionAwareDeletes {
      * has happened, a failing side effect must neither surface out of {@code tx.execute} nor cut
      * down the OTHER parked runnables (Spring stops invoking synchronizations at the first
      * exception). Throwable, not RuntimeException: an Error (OOM in an image buffer, an assertion)
-     * would otherwise abort the remaining synchronizations too — including the parked MEME_DELETED
-     * publication. Swallowing an Error is normally taboo, but after the commit there is no caller
+     * would otherwise abort the remaining synchronizations too — including the outbox library's own
+     * parked publication, which shares this list. Swallowing an Error is normally taboo, but after
+     * the commit there is no caller
      * left to tell; isolation wins, the log gets the truth (at ERROR — an Error is never routine),
      * and a JVM sick enough for the Error to matter will fail the next request on its own.
      *

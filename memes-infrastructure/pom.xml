@@ -123,6 +123,18 @@
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>offline-jwt</artifactId>
         </dependency>
+        <!-- the MEME_DELETED durability guarantee, now a kernel library: the framework-free core
+             (table, delivered-first marking, republisher, retention) plus the Spring adapter that
+             joins the ambient @Transactional unit of work. This service is where the library was
+             extracted FROM, so nothing about the guarantee changed — only its address. -->
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>transactional-outbox</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>infrastructure-spring-outbox</artifactId>
+        </dependency>
         <!-- consumer-driven contract: the pact test states which saga commands this service
              understands; the generated pact (../pacts, committed) is verified against the REAL
              producer code by microservice-security's provider tests -->

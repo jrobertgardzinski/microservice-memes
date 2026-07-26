@@ -7,6 +7,7 @@ import au.com.dius.pact.provider.junit5.PactVerificationContext;
 import au.com.dius.pact.provider.junit5.PactVerificationInvocationContextProvider;
 import au.com.dius.pact.provider.junitsupport.Provider;
 import au.com.dius.pact.provider.junitsupport.loader.PactFolder;
+import com.jrobertgardzinski.outbox.DispatchOutcome;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -32,8 +33,8 @@ import static org.mockito.Mockito.when;
  * The deletion CASCADE's first hop, provider side: microservice-user-collections' committed pact
  * states which MEME_DELETED fields — and which TOPIC — its cascade consumer depends on, and this
  * test proves the REAL producer emits them. The record under verification is the one
- * {@link KafkaMemeEvents} actually hands to the broker, captured off the Kafka template; nothing
- * here is hand-written JSON.
+ * {@link KafkaMemeEvents} builds and {@link KafkaMemeDispatch} actually hands to the broker,
+ * captured off the Kafka template; nothing here is hand-written JSON.
  *
  * <p><b>Both halves of the record are verified,</b> which is the point of this file. The payload is
  * checked against the pact's body, and {@code record.topic()} is reported as the message's
@@ -89,23 +90,36 @@ class MemeDeletedPactProviderTest {
     /**
      * The record the real producer would hand the broker for a deleted meme.
      *
-     * <p>Two collaborators stand in, for the same reason and in the same spirit as the
-     * {@code KafkaTemplate} mock in {@link PurgeConfirmationPactProviderTest}: they are adapters,
-     * not the code under test. The outbox is a database table, so it is stubbed to hand back the row
-     * it was asked to store; the payload, key and topic in that row are the ones
-     * {@link KafkaMemeEvents#memeDeleted} really built.
+     * <p>One collaborator stands in, for the same reason and in the same spirit as the
+     * {@code KafkaTemplate} mock in {@link PurgeConfirmationPactProviderTest}: it is an adapter, not
+     * the code under test. Everything that decides the record's SHAPE is the real thing — the
+     * payload {@link KafkaMemeEvents#deletionOf} builds (envelope, meme id, the event id the
+     * consumers deduplicate on), and the row-to-record mapping {@link KafkaMemeDispatch} performs
+     * (topic, partition key, correlation header).
+     *
+     * <p>The outbox row in between is not stubbed any more, it is <em>skipped</em>: since round 10
+     * the row IS an {@code OutboxEvent}, so what the shared library would store and hand back is the
+     * very object built here. A database on this path would prove only that the library can INSERT
+     * and SELECT, which is what the library's own tests are for; what this file must prove is that
+     * the bytes and the topic still match a contract living in another repository.
      */
     @SuppressWarnings("unchecked")
     static ProducerRecord<String, String> realAnnouncement(String memeId) {
         KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
         when(kafka.send(any(ProducerRecord.class)))
                 .thenReturn(CompletableFuture.completedFuture(null));
-        MemeEventsOutbox outbox = mock(MemeEventsOutbox.class);
-        when(outbox.append(any(), any(), any(), any(), any(), any())).thenAnswer(stored ->
-                new MemeEventsOutbox.Pending(stored.getArgument(0), stored.getArgument(1),
-                        stored.getArgument(3), stored.getArgument(4), stored.getArgument(5)));
 
-        new KafkaMemeEvents(kafka, outbox).memeDeleted(memeId);
+        new KafkaMemeDispatch(kafka).send(KafkaMemeEvents.deletionOf(memeId), new DispatchOutcome() {
+            @Override
+            public void confirmed() {
+                // the library's business, not this test's: here the send itself is the subject
+            }
+
+            @Override
+            public void failed(Throwable cause) {
+                throw new AssertionError("the stub broker must not refuse the announcement", cause);
+            }
+        });
 
         ArgumentCaptor<ProducerRecord<String, String>> sent =
                 ArgumentCaptor.forClass(ProducerRecord.class);

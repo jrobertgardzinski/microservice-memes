@@ -99,6 +99,19 @@
                 <artifactId>offline-jwt</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
+            <!-- the shared transactional outbox: this service's own implementation (rounds 5-9)
+                 was the one it was extracted from, so the guarantee is the same code now, not a
+                 same-shaped copy — see the kernel's transactional-outbox/README.md -->
+            <dependency>
+                <groupId>com.jrobertgardzinski</groupId>
+                <artifactId>transactional-outbox</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.jrobertgardzinski</groupId>
+                <artifactId>infrastructure-spring-outbox</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>s3</artifactId>

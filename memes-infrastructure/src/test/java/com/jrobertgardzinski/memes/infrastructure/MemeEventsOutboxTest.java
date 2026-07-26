@@ -1,5 +1,11 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.outbox.OutboxEvent;
+import com.jrobertgardzinski.outbox.OutboxRepublisher;
+import com.jrobertgardzinski.outbox.OutboxTable;
+import com.jrobertgardzinski.outbox.RepublisherSettings;
+import com.jrobertgardzinski.outbox.TransactionalOutbox;
+import com.jrobertgardzinski.outbox.spring.SpringOutbox;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -11,6 +17,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
@@ -31,6 +39,14 @@ import static org.mockito.Mockito.when;
  * eventId — the row key, so the redelivery is a recognizable duplicate for comments' idempotent
  * thread-drop); a happy-path event is published exactly once, because the republisher touches
  * neither published rows nor fresh ones still owed a first attempt.
+ *
+ * <p>Round 10 moved the machinery into the shared kernel library and left this file where it was,
+ * asserting the same seven things about the same table. That is the point of keeping it here: the
+ * library has its own tests against a bare H2 and a fake dispatch, but only THIS service can say
+ * whether the guarantee still holds where it is actually used — real Spring transaction manager,
+ * real Flyway schema, real {@code KafkaTemplate} contract, real property names. If a property
+ * hardened in rounds 5-9 had been lost in the extraction, it would have shown up as a failure
+ * here, and the fix would have belonged in the library rather than in this file.
  */
 @SpringBootTest(classes = MemesApplication.class)
 class MemeEventsOutboxTest {
@@ -39,7 +55,10 @@ class MemeEventsOutboxTest {
     TransactionTemplate tx;
 
     @Autowired
-    MemeEventsOutbox outbox;
+    DataSource dataSource;
+
+    @Autowired
+    Clock clock;
 
     @Autowired
     JdbcClient jdbc;
@@ -47,21 +66,32 @@ class MemeEventsOutboxTest {
     @SuppressWarnings("unchecked")
     private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
 
+    private SpringOutbox springOutbox;
+    private TransactionalOutbox outbox;
     private KafkaMemeEvents events;
-    private MemeEventsOutboxRepublisher republisher;
+    private OutboxRepublisher republisher;
 
     private static final long RETENTION_HOURS = 24;
 
+    /** The dials this service runs on, so the assertions below quote the configuration, not magic numbers. */
+    private static final RepublisherSettings SETTINGS =
+            RepublisherSettings.defaults(Duration.ofHours(RETENTION_HOURS));
+
     @BeforeEach
     void freshOutbox() {
-        events = new KafkaMemeEvents(kafka, outbox);
-        republisher = new MemeEventsOutboxRepublisher(outbox, events, RETENTION_HOURS);
+        // exactly MemeOutboxConfig's wiring, with a mock broker: the same table name, the same
+        // dispatch, the same republisher settings the production bean gets
+        springOutbox = new SpringOutbox(dataSource, OutboxTable.named("meme_events_outbox"), clock,
+                new KafkaMemeDispatch(kafka));
+        outbox = springOutbox.outbox();
+        events = new KafkaMemeEvents(springOutbox);
+        republisher = MemeOutboxConfig.republisher(springOutbox, RETENTION_HOURS);
         jdbc.sql("DELETE FROM meme_events_outbox").update();
     }
 
     private void backdateBeyondMinAge(String memeId) {
-        // the row is seconds old; the republisher only touches rows older than MIN_AGE, so age
-        // it artificially — in production the 30s pass by themselves
+        // the row is seconds old; the republisher only touches rows older than its minimum age, so
+        // age it artificially — in production the 30s pass by themselves
         jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('SECOND', -60, created_at)"
                 + " WHERE event_key = ?").params(memeId).update();
     }
@@ -69,6 +99,15 @@ class MemeEventsOutboxTest {
     private boolean published(String memeId) {
         return jdbc.sql("SELECT published FROM meme_events_outbox WHERE event_key = ?")
                 .params(memeId).query(Boolean.class).single();
+    }
+
+    /** A stored row for the retention tests — no send, no transaction, just the row. */
+    private void appendDelivered(String eventId, String memeId, boolean delivered) {
+        springOutbox.append(new OutboxEvent(eventId, KafkaMemeEvents.TOPIC,
+                KafkaMemeEvents.MEME_DELETED, memeId, null, "{}"));
+        if (delivered) {
+            outbox.markPublished(eventId);
+        }
     }
 
     @Test
@@ -85,7 +124,7 @@ class MemeEventsOutboxTest {
         // the broker comes back; the row comes of age; the republisher takes over
         when(kafka.send(any(ProducerRecord.class))).thenReturn(CompletableFuture.completedFuture(null));
         backdateBeyondMinAge("orphan-thread");
-        republisher.republish();
+        republisher.runOnce();
 
         ArgumentCaptor<ProducerRecord<String, String>> redelivered = ArgumentCaptor.forClass(ProducerRecord.class);
         verify(kafka, times(2)).send(redelivered.capture());
@@ -93,7 +132,7 @@ class MemeEventsOutboxTest {
                 "the redelivery must be the SAME event — same payload, same deterministic eventId");
         assertTrue(published("orphan-thread"), "confirmed redelivery must mark the row");
 
-        republisher.republish();
+        republisher.runOnce();
         verifyNoMoreInteractions(kafka);   // delivered means done — no third send
     }
 
@@ -108,7 +147,7 @@ class MemeEventsOutboxTest {
         assertTrue(published("gone"));
 
         backdateBeyondMinAge("gone");   // even old enough to qualify, a published row is not re-sent
-        republisher.republish();
+        republisher.runOnce();
         verifyNoMoreInteractions(kafka);
     }
 
@@ -120,7 +159,7 @@ class MemeEventsOutboxTest {
         tx.executeWithoutResult(status -> events.memeDeleted("just-now"));
         verify(kafka, times(1)).send(any(ProducerRecord.class));
 
-        republisher.republish();   // no backdating: the row is seconds old
+        republisher.runOnce();   // no backdating: the row is seconds old
 
         verifyNoMoreInteractions(kafka);
         assertFalse(published("just-now"), "still waiting for the republisher, once it is old enough");
@@ -129,18 +168,16 @@ class MemeEventsOutboxTest {
     @Test
     @DisplayName("retention: a delivered row past the threshold is reaped; a fresh delivered one and an old undelivered one stay")
     void retention_reaps_only_delivered_rows_past_the_threshold() {
-        outbox.append("e-old-done", "memes-events", "MEME_DELETED", "delivered-long-ago", null, "{}");
-        outbox.append("e-new-done", "memes-events", "MEME_DELETED", "delivered-just-now", null, "{}");
-        outbox.append("e-old-owed", "memes-events", "MEME_DELETED", "still-owed", null, "{}");
-        outbox.markPublished("e-old-done");
-        outbox.markPublished("e-new-done");
+        appendDelivered("e-old-done", "delivered-long-ago", true);
+        appendDelivered("e-new-done", "delivered-just-now", true);
+        appendDelivered("e-old-owed", "still-owed", false);
         backdateBeyondRetention("delivered-long-ago");
         backdateBeyondRetention("still-owed");
         // the pass will also re-try the aged unpublished row — keep the broker down so it stays
         when(kafka.send(any(ProducerRecord.class)))
                 .thenReturn(CompletableFuture.failedFuture(new RuntimeException("broker down")));
 
-        republisher.republish();
+        republisher.runOnce();
 
         assertFalse(rowExists("delivered-long-ago"),
                 "a delivered event past retention has no value left — the row must go");
@@ -156,7 +193,8 @@ class MemeEventsOutboxTest {
     void a_payload_wider_than_the_old_column_survives_intact() {
         String fat = "{\"type\":\"SOME_RICHER_EVENT\",\"blob\":\"" + "x".repeat(4096) + "\"}";
 
-        outbox.append("fat-event", "memes-events", "SOME_RICHER_EVENT", "fat", null, fat);
+        springOutbox.append(new OutboxEvent("fat-event", KafkaMemeEvents.TOPIC, "SOME_RICHER_EVENT",
+                "fat", null, fat));
 
         assertEquals(fat, jdbc.sql("SELECT payload FROM meme_events_outbox WHERE id = ?")
                         .params("fat-event").query(String.class).single(),
@@ -170,23 +208,23 @@ class MemeEventsOutboxTest {
         // ships on a gallery that has been deleting memes for months. One statement over all of
         // them would be a single long transaction on the scheduler thread.
         for (int i = 0; i < 1200; i++) {
-            outbox.append("bulk-" + i, "memes-events", "MEME_DELETED", "bulk", null, "{}");
-            outbox.markPublished("bulk-" + i);
+            appendDelivered("bulk-" + i, "bulk", true);
         }
         backdateBeyondRetention("bulk");
+        int batchRows = SETTINGS.retentionBatchRows();
 
-        int firstPass = outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), 2);
+        int firstPass = outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), batchRows, 2);
 
-        assertEquals(2 * MemeEventsOutbox.RETENTION_BATCH_ROWS, firstPass,
+        assertEquals(2 * batchRows, firstPass,
                 "a capped pass deletes exactly what the cap promises — no more (the point) and no"
                         + " less (or a backlog would never drain)");
-        assertEquals(200, rowCount("bulk"), "the remainder waits for the next pass");
+        assertEquals(1200 - 2 * batchRows, rowCount("bulk"), "the remainder waits for the next pass");
 
-        int secondPass = outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), 2);
+        int secondPass = outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), batchRows, 2);
 
-        assertEquals(200, secondPass, "the next pass takes what is left and stops early");
+        assertEquals(1200 - 2 * batchRows, secondPass, "the next pass takes what is left and stops early");
         assertEquals(0, rowCount("bulk"));
-        assertEquals(0, outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), 2),
+        assertEquals(0, outbox.deletePublishedOlderThan(Duration.ofHours(RETENTION_HOURS), batchRows, 2),
                 "an empty backlog costs one short statement, not a batch loop");
     }
 
@@ -195,8 +233,13 @@ class MemeEventsOutboxTest {
     void a_non_positive_retention_refuses_to_start() {
         for (long broken : new long[]{0, -1, -24}) {
             IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
-                    () -> new MemeEventsOutboxRepublisher(outbox, events, broken));
-            assertTrue(refused.getMessage().contains("memes.outbox.retention-hours"),
+                    () -> MemeOutboxConfig.republisher(springOutbox, broken));
+            // the library owns no configuration namespace, so the name travels from HERE into its
+            // message — a service that forgot to pass it would leave the operator grepping a
+            // codebase they do not have
+            assertEquals("memes.outbox.retention-hours", MemeOutboxConfig.RETENTION_PROPERTY,
+                    "the constant must spell the dial exactly as application.properties does");
+            assertTrue(refused.getMessage().contains(MemeOutboxConfig.RETENTION_PROPERTY),
                     "the operator who set the dial must read its NAME: " + refused.getMessage());
             assertTrue(refused.getMessage().contains(String.valueOf(broken)),
                     "…and the value they set: " + refused.getMessage());
