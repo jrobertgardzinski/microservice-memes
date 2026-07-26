@@ -66,8 +66,9 @@ final class KafkaMemeDispatch implements Dispatch {
     /**
      * The row rebuilt into the record the broker gets. Every field comes from the STORED event, the
      * correlation id included: a republication happens hours later on a scheduler thread whose MDC
-     * is empty, so reading the ambient cid there (what {@link KafkaTracing#withCid} does for the
-     * saga's confirmations) would yield nothing — or worse, someone else's trace.
+     * is empty, so reading the ambient cid there would yield nothing — or worse, someone else's trace.
+     * Since round 11 that covers the saga's confirmations too, which used to be stamped from the MDC
+     * by a helper this class made redundant.
      */
     static ProducerRecord<String, String> toRecord(OutboxEvent event) {
         ProducerRecord<String, String> record =

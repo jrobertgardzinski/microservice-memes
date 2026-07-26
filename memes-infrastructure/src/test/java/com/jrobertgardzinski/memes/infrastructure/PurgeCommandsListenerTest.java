@@ -9,14 +9,17 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -37,10 +40,9 @@ class PurgeCommandsListenerTest {
     private static final String SAGA = "7d9f9e2a-1f0a-4f6e-9a1b-2c3d4e5f6a7b";
 
     private final PurgeUserContent purgeUserContent = mock(PurgeUserContent.class);
-    @SuppressWarnings("unchecked")
-    private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
-    private final PurgeCommandsListener listener =
-            new PurgeCommandsListener(purgeUserContent, kafka, new ObjectMapper());
+    private final PurgeConfirmations confirmations = mock(PurgeConfirmations.class);
+    private final PurgeCommandsListener listener = new PurgeCommandsListener(
+            purgeUserContent, confirmations, new ObjectMapper(), NoTransactions.template());
 
     private final Logger listenerLog = (Logger) LoggerFactory.getLogger(PurgeCommandsListener.class);
     private final ListAppender<ILoggingEvent> written = new ListAppender<>();
@@ -63,7 +65,7 @@ class PurgeCommandsListenerTest {
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"sagaId\":\"" + SAGA + "\"}", null);
 
         verifyNoInteractions(purgeUserContent);
-        verifyNoInteractions(kafka);
+        verifyNoInteractions(confirmations);
     }
 
     @Test
@@ -73,7 +75,7 @@ class PurgeCommandsListenerTest {
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
         verifyNoInteractions(purgeUserContent);
-        verifyNoInteractions(kafka);
+        verifyNoInteractions(confirmations);
     }
 
     @Test
@@ -86,6 +88,35 @@ class PurgeCommandsListenerTest {
         assertNothingLoggedContains(LEAVER);
         assertTrue(logLines().stream().anyMatch(line -> line.contains(SAGA)),
                 "the saga id is what identifies the run in the log: " + logLines());
+    }
+
+    @Test
+    @DisplayName("a completed purge confirms the SAME saga it was commanded for")
+    void a_completed_purge_confirms_its_own_saga() throws Exception {
+        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\"}", null);
+
+        InOrder order = inOrder(purgeUserContent, confirmations);
+        // the erasure first, the promise to report it second, both inside one transaction: a
+        // confirmation announced before the purge would be a lie the outbox then made durable
+        order.verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        order.verify(confirmations).confirm(SAGA, LEAVER);
+    }
+
+    @Test
+    @DisplayName("a purge that fails confirms nothing and lets the failure out — so Kafka redelivers")
+    void a_failed_purge_confirms_nothing() {
+        doThrow(new IllegalStateException("the store is down"))
+                .when(purgeUserContent).execute(LEAVER, Optional.empty());
+
+        assertThrows(IllegalStateException.class, () ->
+                listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                        + "\"sagaId\":\"" + SAGA + "\"}", null));
+
+        // the failure must reach the container: that is what makes SagaRetryBudget retry the record
+        // instead of the offset being committed over a purge that did not happen
+        verifyNoInteractions(confirmations);
+        assertNothingLoggedContains(LEAVER);
     }
 
     @Test
@@ -117,7 +148,7 @@ class PurgeCommandsListenerTest {
         listener.receive(broken, null);
 
         verifyNoInteractions(purgeUserContent);
-        verifyNoInteractions(kafka);
+        verifyNoInteractions(confirmations);
         assertNothingLoggedContains(LEAVER);
         assertTrue(logLines().stream().anyMatch(line -> line.contains(String.valueOf(broken.length()))),
                 "the size is enough to investigate: " + logLines());

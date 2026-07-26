@@ -14,7 +14,6 @@ import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.config.PurgeRule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,10 +35,8 @@ import static org.mockito.Mockito.verify;
 class PurgeCommandsContractTest {
 
     private final PurgeUserContent purgeUserContent = mock(PurgeUserContent.class);
-    @SuppressWarnings("unchecked")
-    private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
-    private final PurgeCommandsListener listener =
-            new PurgeCommandsListener(purgeUserContent, kafka, new ObjectMapper());
+    private final PurgeCommandsListener listener = new PurgeCommandsListener(purgeUserContent,
+            new CapturedConfirmations(), new ObjectMapper(), NoTransactions.template());
 
     @Pact(consumer = "microservice-memes")
     MessagePact purgeCommand(MessagePactBuilder builder) {
