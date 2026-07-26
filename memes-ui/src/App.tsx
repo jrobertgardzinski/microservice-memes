@@ -21,8 +21,8 @@ import AdminPanel from './AdminPanel';
 import AuthPanel from './AuthPanel';
 import MemeDialog from './MemeDialog';
 import {
-  authHeader, GALLERY_PAGE_SIZE, listFavourites, listMemes, MemeRef, memeScores, removeFavourite,
-  saveFavourite, SECURITY,
+  authHeader, bindSession, GALLERY_PAGE_SIZE, listFavourites, listMemes, MemeRef, memeScores,
+  removeFavourite, request, saveFavourite, SECURITY,
 } from './api';
 
 export default function App() {
@@ -45,17 +45,27 @@ export default function App() {
   const [warning, setWarning] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   // favourites live in microservice-user-collections: opaque meme refs this gallery hydrates.
-  // null = signed out or the service is unreachable — the feature degrades, the wall never breaks
+  // null = signed out or not fetched yet. "The service did not answer" is a DIFFERENT state and
+  // lives in favouritesError below — an empty list and an unanswered question must never render
+  // as the same sentence, and they used to
   const [favourites, setFavourites] = useState<string[] | null>(null);
+  const [favouritesError, setFavouritesError] = useState(false);
   const [showFavourites, setShowFavourites] = useState(false);
+  // the wall itself can fail too; then it says so and offers a retry instead of looking empty
+  const [wallError, setWallError] = useState(false);
 
   const refresh = useCallback(() => {
-    void listMemes(tagFilter ?? undefined, 0).then((page) => {
-      setMemes(page);
-      setPagesShown(1);
-      // a full page is the only hint that more may follow — the listing carries no total
-      setMoreToShow(page.length === GALLERY_PAGE_SIZE);
-    });
+    void listMemes(tagFilter ?? undefined, 0)
+      .then((page) => {
+        setMemes(page);
+        setPagesShown(1);
+        setWallError(false);
+        // a full page is the only hint that more may follow — the listing carries no total
+        setMoreToShow(page.length === GALLERY_PAGE_SIZE);
+      })
+      // an unreadable wall is an ERROR, not an empty gallery: "no memes yet — upload the first
+      // one" in front of a service that is merely down is a lie about the whole product
+      .catch(() => setWallError(true));
   }, [tagFilter]);
   useEffect(refresh, [refresh]);
 
@@ -70,8 +80,11 @@ export default function App() {
   // current after every vote and every "Load more".
   useEffect(() => {
     const onScreen = showFavourites ? (favourites ?? []) : memes.map((m) => m.id);
-    void memeScores(onScreen).then((fresh) =>
-      setScores((known) => new Map([...known, ...fresh])));
+    void memeScores(onScreen)
+      .then((fresh) => setScores((known) => new Map([...known, ...fresh])))
+      // scores that never arrive stay UNKNOWN ("▲ n/a") — that is the designed degradation, and
+      // it must not become an unhandled rejection either
+      .catch(() => {});
   }, [memes, favourites, showFavourites]);
 
   const showMore = () => {
@@ -85,14 +98,33 @@ export default function App() {
         setPagesShown((shown) => shown + 1);
         setMoreToShow(page.length === GALLERY_PAGE_SIZE);
       })
+      .catch(() => setWarning('Could not load more memes — try again.'))
       .finally(() => setLoadingMore(false));
   };
 
   const loadFavourites = useCallback((t: string) => {
     void listFavourites(t)
-      .then((refs) => setFavourites(refs.filter((r) => r.itemType === 'meme').map((r) => r.itemId)))
-      .catch(() => setFavourites(null));
+      .then((refs) => {
+        setFavourites(refs.filter((r) => r.itemType === 'meme').map((r) => r.itemId));
+        setFavouritesError(false);
+      })
+      // the list stays whatever it was and the FAILURE is recorded separately: a 5xx from
+      // user-collections must not read as "you have no favourites", and it must not take the
+      // button that leads back to the wall with it
+      .catch(() => setFavouritesError(true));
   }, []);
+
+  // The one place that knows what a 401 means, wired to the one place that holds the token.
+  // `renewed` lands the traded-in token where every later call will pick it up; `expired` says the
+  // word out loud, because four of the most-used interactions in this UI used to answer an expired
+  // session with absolute silence while the chip still read "signed in as …".
+  useEffect(() => bindSession({
+    renewed: setToken,
+    expired: () => {
+      setToken(null);
+      setWarning('Your session expired — sign in again to vote or comment.');
+    },
+  }), []);
 
   useEffect(() => {
     if (!token) {
@@ -100,12 +132,15 @@ export default function App() {
       setIsModerator(false);
       setIsAdmin(false);
       setFavourites(null);
+      setFavouritesError(false);
       setShowFavourites(false);
       localStorage.removeItem('accessToken');
       return;
     }
     localStorage.setItem('accessToken', token);
-    void fetch(`${SECURITY}/me`, { headers: authHeader(token) })
+    // through `request`, so a tab reopened after an hour trades its stale token for a fresh one
+    // instead of throwing the visitor back at the sign-in panel with a live session in the cookie
+    void request(`${SECURITY}/me`, { headers: authHeader(token) })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('expired'))))
       .then((me: { email: string; roles?: string[] }) => {
         setUser(me.email);
@@ -119,22 +154,44 @@ export default function App() {
 
   const requireSignIn = () => setWarning('Sign in first — browsing is public, contributing is not.');
 
+  // one call in flight per meme: a double click used to send a PUT and a DELETE for the same id and
+  // then let whichever answered last decide what the star looks like
+  const [starsInFlight, setStarsInFlight] = useState<ReadonlySet<string>>(new Set());
+
   const toggleFavourite = async (memeId: string) => {
-    if (!token || favourites === null) return;
+    if (!token || favourites === null || starsInFlight.has(memeId)) return;
     const isFavourite = favourites.includes(memeId);
-    // optimistic — the star answers instantly; a failed call rolls back with a notice
-    setFavourites(isFavourite ? favourites.filter((id) => id !== memeId) : [memeId, ...favourites]);
-    const ok = isFavourite ? await removeFavourite(memeId, token) : await saveFavourite(memeId, token);
-    if (!ok) {
-      setFavourites(favourites);
-      setWarning('The favourites service did not answer — try again.');
+    const add = (list: string[]) => (list.includes(memeId) ? list : [memeId, ...list]);
+    const drop = (list: string[]) => list.filter((id) => id !== memeId);
+    // optimistic — the star answers instantly; a failed call rolls back with a notice.
+    // FUNCTIONAL, never a snapshot: `setFavourites(favourites)` on failure restored the list as it
+    // was at click time and wiped every star saved in between, leaving the screen showing a set
+    // the server never had.
+    setFavourites((current) => (current === null ? current
+      : isFavourite ? drop(current) : add(current)));
+    setStarsInFlight((current) => new Set(current).add(memeId));
+    try {
+      const ok = isFavourite ? await removeFavourite(memeId, token)
+                             : await saveFavourite(memeId, token);
+      if (!ok) {
+        // undo THIS id and nothing else
+        setFavourites((current) => (current === null ? current
+          : isFavourite ? add(current) : drop(current)));
+        setWarning('The favourites service did not answer — try again.');
+      }
+    } finally {
+      setStarsInFlight((current) => {
+        const next = new Set(current);
+        next.delete(memeId);
+        return next;
+      });
     }
   };
 
   const upload = async (file: File) => {
     const body = new FormData();
     body.append('file', file);
-    const r = await fetch('/memes', { method: 'POST', headers: authHeader(token), body });
+    const r = await request('/memes', { method: 'POST', headers: authHeader(token), body });
     if (r.status !== 201) setWarning(`Upload refused (${r.status}).`);
     refresh();
   };
@@ -156,7 +213,9 @@ export default function App() {
       <AppBar position="sticky" color="default">
         <Toolbar variant="dense">
           <Typography variant="h6" sx={{ flex: 1 }}>memes</Typography>
-          {token && favourites !== null && (
+          {/* stays put when the favourites service is unwell (favouritesError) — it is the only
+              navigation in this app, and hiding it left the visitor with F5 as the way back */}
+          {token && (favourites !== null || favouritesError) && (
             <Button
               startIcon={showFavourites ? <StarIcon /> : <StarBorderIcon />}
               color={showFavourites ? 'warning' : 'inherit'}
@@ -166,7 +225,7 @@ export default function App() {
               }}
               sx={{ mr: 1 }}
             >
-              Favourites
+              {showFavourites ? 'Back to the wall' : 'Favourites'}
             </Button>
           )}
           {isAdmin && (
@@ -200,13 +259,26 @@ export default function App() {
 
           {showFavourites ? (
             <>
+              {/* "we could not find out" first, and it is NOT the empty-collection sentence:
+                  telling somebody their favourites are gone when the service merely restarted is
+                  a lie that reads like data loss */}
+              {favouritesError && (
+                <Alert
+                  severity="warning"
+                  action={<Button color="inherit" size="small"
+                                  onClick={() => { if (token) loadFavourites(token); }}>Retry</Button>}
+                >
+                  Could not reach the favourites service, so this list may be incomplete — nothing
+                  has been lost.
+                </Alert>
+              )}
               <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
                 {(favourites ?? []).map((id) => (
                   <FavouriteTile key={id} memeId={id} nsfw={memes.find((m) => m.id === id)?.nsfw}
                                  score={scores.get(id)} star={star(id)} onOpen={() => setSelected(id)} />
                 ))}
               </Box>
-              {(favourites ?? []).length === 0 && (
+              {(favourites ?? []).length === 0 && !favouritesError && (
                 <Typography color="text.secondary">
                   No favourites yet — star a meme on the wall and it lands here.
                 </Typography>
@@ -214,6 +286,14 @@ export default function App() {
             </>
           ) : (
             <>
+              {wallError && (
+                <Alert
+                  severity="warning"
+                  action={<Button color="inherit" size="small" onClick={refresh}>Retry</Button>}
+                >
+                  The gallery did not answer — this is a service problem, not an empty wall.
+                </Alert>
+              )}
               <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
                 {memes.map((m) => (
                   <Card key={m.id} sx={{ position: 'relative' }}>
@@ -238,7 +318,7 @@ export default function App() {
                   Load more
                 </Button>
               )}
-              {memes.length === 0 && (
+              {memes.length === 0 && !wallError && (
                 <Typography color="text.secondary">
                   {tagFilter ? `No memes tagged #${tagFilter}.` : 'No memes yet — sign in and upload the first one.'}
                 </Typography>

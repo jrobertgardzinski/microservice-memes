@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
@@ -15,8 +16,9 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
-  authHeader, COMMENTS, deleteComment, deleteMeme, jsonHeaders, listComments, memeMeta, memeTags,
-  memeTally, MemeComment, setCommentHidden, setMemeNsfw, setMemeTags, VoteDirection, VoteTally,
+  COMMENTS_PAGE_SIZE, deleteComment, deleteMeme, listComments, memeMeta, memeTags, memeTally,
+  MemeComment, postComment, setCommentHidden, setMemeNsfw, setMemeTags, voteOnComment, voteOnMeme,
+  VoteDirection, VoteTally,
 } from './api';
 
 interface Props {
@@ -48,9 +50,24 @@ function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote:
   );
 }
 
+/**
+ * How far forward the dialog is willing to walk a thread to find a comment somebody just posted.
+ * A hundred per page, so this covers a two-thousand-comment thread — and it is a CEILING, not an
+ * expectation: the loop stops the moment the comment shows up.
+ */
+const MAX_THREAD_PAGES = 20;
+
 export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequireSignIn, onTagClick, onDeleted, onClose }: Props) {
-  const [tally, setTally] = useState<VoteTally>({ score: 0, myVote: null });
+  // score null renders "n/a" — the honest answer before the first read has landed, and after one
+  // that failed; the old `{ score: 0 }` claimed a tally nobody had reported yet
+  const [tally, setTally] = useState<VoteTally>({ score: null, myVote: null });
   const [comments, setComments] = useState<MemeComment[]>([]);
+  // the thread is served oldest-first, one page at a time — this is how much of it is on screen
+  const [pagesLoaded, setPagesLoaded] = useState(0);
+  const [moreComments, setMoreComments] = useState(false);
+  const [threadError, setThreadError] = useState(false);
+  const [busyThread, setBusyThread] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [editingTags, setEditingTags] = useState(false);
@@ -62,12 +79,69 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
   const [own, setOwn] = useState(false);
   const [nsfw, setNsfw] = useState(false);
 
-  const load = useCallback(() => {
-    void memeTally(memeId, token).then(setTally);
-    void listComments(memeId, token).then(setComments);
-    void memeTags(memeId).then(setTags);
-    void memeMeta(memeId, token).then((m) => { setOwn(m.own === true); setNsfw(m.nsfw ?? false); });
+  /**
+   * The thread from the top, and — when `wantedId` is given — as far forward as it takes to bring
+   * that comment into view.
+   *
+   * The listing is ordered by created_at ASCENDING and paged, so on a long thread page 0 is
+   * ARCHAEOLOGY and a comment posted a second ago sits on a page nobody asked for. The author saw
+   * an empty-looking result, assumed it was lost, and posted it again — real duplicates in the
+   * database, caused entirely by the UI never turning the page.
+   */
+  const loadThread = useCallback(async (wantedId?: string) => {
+    setBusyThread(true);
+    try {
+      let collected: MemeComment[] = [];
+      let page = 0;
+      let full = false;
+      do {
+        const chunk = await listComments(memeId, token, page);
+        collected = [...collected, ...chunk];
+        full = chunk.length === COMMENTS_PAGE_SIZE;
+        page += 1;
+      } while (full && wantedId !== undefined
+               && !collected.some((c) => c.id === wantedId) && page < MAX_THREAD_PAGES);
+      setComments(collected);
+      setPagesLoaded(page);
+      setMoreComments(full);
+      setThreadError(false);
+      return collected;
+    } catch {
+      // the thread is unreadable — say so, and let the meme, its tags and its votes stand.
+      // This catch is why a broken comment database no longer takes the gallery down with it.
+      setThreadError(true);
+      return null;
+    } finally {
+      setBusyThread(false);
+    }
   }, [memeId, token]);
+
+  /** The next page: newer comments, since the server hands them out oldest first. */
+  const loadNewerComments = async () => {
+    if (busyThread) return;
+    setBusyThread(true);
+    try {
+      const chunk = await listComments(memeId, token, pagesLoaded);
+      setComments((current) => [...current, ...chunk]);
+      setPagesLoaded((n) => n + 1);
+      setMoreComments(chunk.length === COMMENTS_PAGE_SIZE);
+    } catch {
+      setNotice('Could not load the rest of the thread — try again.');
+    } finally {
+      setBusyThread(false);
+    }
+  };
+
+  const load = useCallback(() => {
+    // four independent reads, four independent fates: one service having a bad day must cost only
+    // its own part of this dialog
+    void memeTally(memeId, token).then(setTally).catch(() => setTally({ score: null, myVote: null }));
+    void loadThread();
+    void memeTags(memeId).then(setTags).catch(() => setTags([]));
+    void memeMeta(memeId, token)
+      .then((m) => { setOwn(m.own === true); setNsfw(m.nsfw ?? false); })
+      .catch(() => { setOwn(false); setNsfw(false); });
+  }, [memeId, token, loadThread]);
   useEffect(load, [load]);
 
   const startEditing = () =>
@@ -107,8 +181,13 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
 
   const removeComment = (commentId: string) =>
     guard(async () => {
-      if (await deleteComment(memeId, commentId, token)) {
+      const { ok, status } = await deleteComment(memeId, commentId, token);
+      if (ok) {
         setComments((current) => current.filter((c) => c.id !== commentId));
+      } else if (status !== 401) {
+        // a 401 has already been through the refresh attempt inside `request`; if it is still 401
+        // the session is gone and App has said so — anything else needs its own word here
+        setNotice(`Could not delete that comment (${status}).`);
       }
     });
 
@@ -120,40 +199,47 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
 
   const voteMeme = (direction: VoteDirection) =>
     guard(async () => {
-      const r = await fetch(`/memes/${memeId}/votes`, {
-        method: 'POST',
-        headers: { ...jsonHeaders, ...authHeader(token) },
-        body: JSON.stringify({ direction }),
-      });
-      if (r.ok) setTally(await r.json());
+      const { ok, tally: fresh, status } = await voteOnMeme(memeId, direction, token);
+      if (ok && fresh) setTally(fresh);
+      // a vote that did not count used to leave the arrow untouched and the user guessing; the
+      // 401 branch is the whole point — the session dies after an hour and this is the click
+      // people make most
+      else if (status !== 401) setNotice(`Your vote did not go through (${status}).`);
       onVoted();
     });
 
   const voteComment = (commentId: string, direction: VoteDirection) =>
     guard(async () => {
-      const r = await fetch(`${COMMENTS}/memes/${memeId}/comments/${commentId}/votes`, {
-        method: 'POST',
-        headers: { ...jsonHeaders, ...authHeader(token) },
-        body: JSON.stringify({ direction }),
-      });
-      if (r.ok) {
-        const updated: VoteTally = await r.json();
+      const { ok, tally: fresh, status } = await voteOnComment(memeId, commentId, direction, token);
+      if (ok && fresh) {
         setComments((current) => current.map((c) =>
-          c.id === commentId ? { ...c, score: updated.score, myVote: updated.myVote } : c));
+          c.id === commentId ? { ...c, score: fresh.score, myVote: fresh.myVote } : c));
+      } else if (status !== 401) {
+        setNotice(`Your vote did not go through (${status}).`);
       }
     });
 
-  const postComment = () =>
+  const submitComment = () =>
     guard(async () => {
-      if (!text.trim()) return;
-      const r = await fetch(`${COMMENTS}/memes/${memeId}/comments`, {
-        method: 'POST',
-        headers: { ...jsonHeaders, ...authHeader(token) },
-        body: JSON.stringify({ text }),
-      });
-      if (r.ok) {
-        setText('');
-        load();
+      if (!text.trim() || busyThread) return;
+      const result = await postComment(memeId, text, token);
+      if (!result.ok) {
+        // the draft STAYS in the field. It is the only copy, and the old code cleared it before
+        // knowing whether the server had taken it
+        if (result.status !== 401) {
+          setNotice(result.detail === 'COMMENT_TOO_LONG' ? 'That comment is too long.'
+            : result.detail === 'RATE_LIMITED' ? 'You are commenting too fast — wait a minute.'
+            : `Your comment was not saved (${result.status}) — the text is still here, try again.`);
+        }
+        return;
+      }
+      setText('');
+      setNotice(null);
+      // walk the thread to wherever the server put it, so the author actually SEES their comment
+      const thread = await loadThread(result.id);
+      if (result.id !== undefined && thread !== null && !thread.some((c) => c.id === result.id)) {
+        setNotice('Your comment was saved, but this thread is longer than this view — it is '
+          + 'further down.');
       }
     });
 
@@ -205,6 +291,17 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
         )}
 
         <Divider />
+        {/* the thread failed, the meme did not: the image, the votes and the tags above are all
+            still here. This used to be the moment the entire React root came off. */}
+        {threadError && (
+          <Alert
+            severity="warning"
+            sx={{ mt: 1 }}
+            action={<Button color="inherit" size="small" onClick={() => void loadThread()}>Retry</Button>}
+          >
+            Comments are unavailable right now — the meme itself is fine.
+          </Alert>
+        )}
         {comments.map((c) => (
           <Stack key={c.id} direction="row" spacing={1} alignItems="center" sx={{ py: 0.5 }}>
             <Typography variant="body2" sx={{ flex: 1 }}>
@@ -238,14 +335,30 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
             )}
           </Stack>
         ))}
+        {/* the thread is capped by the server and carries no total, so this is the honest wording:
+            how much is on screen, and that there is more — never a silently truncated list */}
+        {moreComments && (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Showing the oldest {comments.length} comments — there are more.
+            </Typography>
+            <Button size="small" onClick={() => void loadNewerComments()} disabled={busyThread}>
+              Load newer
+            </Button>
+          </Stack>
+        )}
+        {notice && (
+          <Alert severity="info" sx={{ mt: 1 }} onClose={() => setNotice(null)}>{notice}</Alert>
+        )}
         <Stack component="form" direction="row" spacing={1} sx={{ mt: 1.5 }}
-               onSubmit={(e) => { e.preventDefault(); postComment(); }}>
+               onSubmit={(e) => { e.preventDefault(); submitComment(); }}>
           <TextField
             size="small" fullWidth
             placeholder={token ? 'add a comment…' : 'sign in to comment'}
             value={text} onChange={(e) => setText(e.target.value)}
           />
-          <Button type="submit" variant="contained" disabled={!token || !text.trim()}>Post</Button>
+          <Button type="submit" variant="contained"
+                  disabled={!token || !text.trim() || busyThread}>Post</Button>
         </Stack>
       </DialogContent>
     </Dialog>

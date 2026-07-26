@@ -137,6 +137,11 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
     const r = await fetch(`${SECURITY}/authenticate`, {
       method: 'POST',
       headers: jsonHeaders,
+      // security answers with the refresh token in an HttpOnly cookie, and this UI is a DIFFERENT
+      // origin from security (8083 vs 8080) — without credentials:'include' the browser drops that
+      // Set-Cookie on the floor, and an hour later there is nothing left to refresh the session
+      // with. CORS is already set up for it (allowed-origins + Allow-Credentials: true).
+      credentials: 'include',
       body: JSON.stringify({ email, password }),
     });
     if (r.status === 200) {
@@ -164,6 +169,7 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
     const r = await fetch(`${SECURITY}/authenticate/factor`, {
       method: 'POST',
       headers: jsonHeaders,
+      credentials: 'include',   // the refresh cookie is issued here too, at the end of the chain
       body: JSON.stringify({ mfaTicket, proof: code }),
     });
     if (r.status === 200) {

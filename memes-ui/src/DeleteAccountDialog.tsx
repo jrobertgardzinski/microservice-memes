@@ -9,7 +9,7 @@ import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { authHeader, jsonHeaders, SECURITY } from './api';
+import { authHeader, jsonHeaders, request, SECURITY } from './api';
 
 type Choice = 'default' | 'wipe' | 'popular';
 
@@ -39,7 +39,7 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
       choice === 'wipe' ? { memes: 'DELETE', comments: 'DELETE' }
       : choice === 'popular' ? { memes: rule, comments: rule }
       : null;
-    const r = await fetch(`${SECURITY}/account/delete`, {
+    const r = await request(`${SECURITY}/account/delete`, {
       method: 'POST',
       headers: { ...jsonHeaders, ...authHeader(token) },
       body: JSON.stringify(purge ? { purge } : {}),
@@ -52,7 +52,7 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
   const submit = async () => {
     setBusy(true);
     setError(null);
-    const r = await fetch(`${SECURITY}/account/step-up`, {
+    const r = await request(`${SECURITY}/account/step-up`, {
       method: 'POST',
       headers: { ...jsonHeaders, ...authHeader(token) },
       body: JSON.stringify({ action: 'delete-account', password }),
@@ -68,7 +68,7 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
   const submitCode = async () => {
     setBusy(true);
     setError(null);
-    const r = await fetch(`${SECURITY}/account/step-up/factor`, {
+    const r = await request(`${SECURITY}/account/step-up/factor`, {
       method: 'POST',
       headers: { ...jsonHeaders, ...authHeader(token) },
       body: JSON.stringify({ stepUpTicket, proof: code }),
