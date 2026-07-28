@@ -134,16 +134,98 @@ class WebImageOptimizerTest {
         assertTrue(refused.getMessage().contains("image dimensions too large"), refused.getMessage());
     }
 
+    @Test
+    @DisplayName("a bomb that stays WITHIN the side limit but declares 16-bit RGBA is refused on its byte cost")
+    void rejects_a_bomb_that_hides_inside_the_side_limit() {
+        // 8000x8000 passes the side check twice over: the comparison is '>' and this is exactly the
+        // ceiling. At the 4 bytes per pixel the guard used to assume that is 244 MiB — survivable.
+        // Declared as 16-bit RGBA it is 8 bytes per pixel, i.e. 488 MiB from a file of a few hundred
+        // kB, and three decode permits would admit ~1.4 GiB against a ~1075 MiB heap. The side alone
+        // cannot see the difference; only the byte budget can.
+        byte[] bomb = pngHeaderDeclaring(8_000, 8_000, 16, 6);
+        assertTrue(bomb.length < 100, "the hostile upload really is tiny");
+
+        InvalidImageException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                InvalidImageException.class, () -> optimizer.optimize(bomb));
+
+        assertTrue(refused.getMessage().contains("too large to decode"), refused.getMessage());
+        assertTrue(refused.getMessage().contains("488 MiB"),
+                "the refusal states what the decode would have cost: " + refused.getMessage());
+    }
+
+    @Test
+    @DisplayName("the cost of a pixel is read from the real layout: 3, 4 and 8 bytes, not a flat guess")
+    void charges_each_layout_what_it_actually_costs() throws Exception {
+        // This is the arithmetic the byte budget rests on, and the one the old guard got wrong by
+        // assuming a flat 4 bytes for everything. Small images on purpose — what is under test is
+        // the price per pixel, and that does not depend on how many of them there are.
+        assertEquals(3, bytesPerPixelOf(image("png", 8, 8)), "8-bit RGB: one byte per channel");
+        assertEquals(4, bytesPerPixelOf(transparentQuadrantPng(8, 8)), "8-bit RGBA: plus alpha");
+        assertEquals(8, bytesPerPixelOf(sixteenBitRgbaPng(8, 8)),
+                "16-bit RGBA: two bytes per channel — the case that used to be charged half price");
+    }
+
+    @Test
+    @DisplayName("a header we cannot interrogate is charged the worst case, not waved through")
+    void charges_the_worst_case_when_the_layout_cannot_be_read() {
+        // A file that is a header and nothing else — no pixel data — makes ImageIO refuse to
+        // describe the layout. The guard must then assume the most expensive pixel it could be
+        // (16-bit RGBA, 8 bytes), because rounding DOWN here is precisely how a bomb gets in.
+        // 8000x8000 is inside the side limit, so only the byte budget can turn this away.
+        byte[] headerOnly = pngHeaderDeclaring(8_000, 8_000, 8, 2);
+
+        InvalidImageException refused = org.junit.jupiter.api.Assertions.assertThrows(
+                InvalidImageException.class, () -> optimizer.optimize(headerOnly));
+
+        assertTrue(refused.getMessage().contains("488 MiB"),
+                "charged as 8 bytes per pixel despite declaring 8-bit: " + refused.getMessage());
+    }
+
+    /** What {@link WebImageOptimizer} will charge one pixel of this image, straight from its header. */
+    private static int bytesPerPixelOf(byte[] input) throws Exception {
+        try (javax.imageio.stream.ImageInputStream stream =
+                     ImageIO.createImageInputStream(new ByteArrayInputStream(input))) {
+            javax.imageio.ImageReader reader = ImageIO.getImageReaders(stream).next();
+            try {
+                reader.setInput(stream, true, true);
+                return WebImageOptimizer.bytesPerPixel(reader);
+            } finally {
+                reader.dispose();
+            }
+        }
+    }
+
+    /** A real 16-bit-per-channel RGBA PNG — the layout that costs 8 bytes a pixel once decoded. */
+    private static byte[] sixteenBitRgbaPng(int width, int height) throws Exception {
+        java.awt.image.ComponentColorModel model = new java.awt.image.ComponentColorModel(
+                java.awt.color.ColorSpace.getInstance(java.awt.color.ColorSpace.CS_sRGB),
+                true, false, java.awt.Transparency.TRANSLUCENT, java.awt.image.DataBuffer.TYPE_USHORT);
+        BufferedImage image = new BufferedImage(
+                model, model.createCompatibleWritableRaster(width, height), false, null);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
+    }
+
     /** PNG signature + a well-formed IHDR chunk (correct CRC) declaring the given dimensions. */
     private static byte[] pngHeaderDeclaring(int width, int height) {
+        return pngHeaderDeclaring(width, height, 8, 2);     // 8-bit truecolour: 4 bytes per pixel
+    }
+
+    /**
+     * The same, with the pixel layout spelled out. Bit depth and colour type are what decide the
+     * COST of a decode — 16-bit RGBA (depth 16, type 6) lands in a DataBufferUShort with four
+     * bands, so it costs twice per pixel what the truecolour default does.
+     */
+    private static byte[] pngHeaderDeclaring(int width, int height, int bitDepth, int colourType) {
         ByteArrayOutputStream png = new ByteArrayOutputStream();
         png.writeBytes(new byte[]{(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'});
         ByteArrayOutputStream chunk = new ByteArrayOutputStream();     // type + payload, CRC-covered
         chunk.writeBytes("IHDR".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
         chunk.writeBytes(java.nio.ByteBuffer.allocate(13)
                 .putInt(width).putInt(height)
-                .put((byte) 8)     // bit depth
-                .put((byte) 2)     // colour type: truecolour
+                .put((byte) bitDepth)
+                .put((byte) colourType)
                 .put((byte) 0).put((byte) 0).put((byte) 0)   // compression, filter, interlace
                 .array());
         java.util.zip.CRC32 crc = new java.util.zip.CRC32();
