@@ -92,12 +92,12 @@ class MemeEventsOutboxTest {
     private void backdateBeyondMinAge(String memeId) {
         // the row is seconds old; the republisher only touches rows older than its minimum age, so
         // age it artificially — in production the 30s pass by themselves
-        jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('SECOND', -60, created_at)"
+        jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('SECOND', -60, created_at), published_at = DATEADD('SECOND', -60, published_at)"
                 + " WHERE event_key = ?").params(memeId).update();
     }
 
     private boolean published(String memeId) {
-        return jdbc.sql("SELECT published FROM meme_events_outbox WHERE event_key = ?")
+        return jdbc.sql("SELECT published_at IS NOT NULL FROM meme_events_outbox WHERE event_key = ?")
                 .params(memeId).query(Boolean.class).single();
     }
 
@@ -144,6 +144,12 @@ class MemeEventsOutboxTest {
         tx.executeWithoutResult(status -> events.memeDeleted("gone"));
 
         verify(kafka, times(1)).send(any(ProducerRecord.class));
+        // the confirmation is recorded on the producer's I/O thread and written by the pass — the
+        // mark is JDBC, and doing it there froze every send the service made when the pool was full
+        assertFalse(published("gone"), "not from the producer's I/O thread");
+
+        republisher.runOnce();
+
         assertTrue(published("gone"));
 
         backdateBeyondMinAge("gone");   // even old enough to qualify, a published row is not re-sent
@@ -252,8 +258,11 @@ class MemeEventsOutboxTest {
     }
 
     private void backdateBeyondRetention(String memeId) {
-        jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('HOUR', ?, created_at)"
-                + " WHERE event_key = ?").params(-(RETENTION_HOURS + 1), memeId).update();
+        // published_at moves too: retention measures its window from the DELIVERY now
+        jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('HOUR', ?, created_at),"
+                        + " published_at = DATEADD('HOUR', ?, published_at)"
+                + " WHERE event_key = ?")
+                .params(-(RETENTION_HOURS + 1), -(RETENTION_HOURS + 1), memeId).update();
     }
 
     private boolean rowExists(String memeId) {

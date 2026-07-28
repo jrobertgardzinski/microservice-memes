@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -59,14 +60,28 @@ class KafkaMemeEventsTransactionTest {
     private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
 
     private KafkaMemeEvents events;
+    private SpringOutbox outbox;
 
     @BeforeEach
     void freshOutbox() {
         // the same construction MemeOutboxConfig performs — only the broker is a mock, because a
         // broker outage is what half of these tests are about
-        events = new KafkaMemeEvents(new SpringOutbox(dataSource,
-                OutboxTable.named("meme_events_outbox"), clock, new KafkaMemeDispatch(kafka)));
+        outbox = new SpringOutbox(dataSource,
+                OutboxTable.named("meme_events_outbox"), clock, new KafkaMemeDispatch(kafka));
+        events = new KafkaMemeEvents(outbox);
         jdbc.sql("DELETE FROM meme_events_outbox").update();
+    }
+
+    /**
+     * What the republisher's pass does with the confirmations the producer's I/O thread recorded.
+     *
+     * <p>The mark used to happen inside that callback, and it is JDBC: a connection pool with
+     * nothing free blocks there for thirty seconds and freezes every Kafka send this service makes,
+     * which turns a struggling database into a broker outage. So the callback records and the pass
+     * writes — and these tests have to run the pass to see the mark.
+     */
+    private void runThePassThatWritesTheMarks() {
+        outbox.publisher().drainConfirmations();
     }
 
     private int outboxRows() {
@@ -74,7 +89,7 @@ class KafkaMemeEventsTransactionTest {
     }
 
     private boolean published(String memeId) {
-        return jdbc.sql("SELECT published FROM meme_events_outbox WHERE event_key = ?")
+        return jdbc.sql("SELECT published_at IS NOT NULL FROM meme_events_outbox WHERE event_key = ?")
                 .params(memeId).query(Boolean.class).single();
     }
 
@@ -106,6 +121,8 @@ class KafkaMemeEventsTransactionTest {
         assertEquals("memes-events", sent.getValue().topic());
         assertEquals("gone-for-good", sent.getValue().key());
         assertTrue(sent.getValue().value().contains("MEME_DELETED"));
+        assertFalse(published("gone-for-good"), "not from the producer's I/O thread");
+        runThePassThatWritesTheMarks();
         assertTrue(published("gone-for-good"),
                 "a CONFIRMED delivery must mark the outbox row, or the republisher would duplicate it");
     }
@@ -146,8 +163,10 @@ class KafkaMemeEventsTransactionTest {
                         + heldMillis + " ms");
         assertTrue(!published("slow-broker"), "no ack yet — the row must not be marked");
 
-        pendingAck.complete(null);   // the ack finally arrives; the callback runs synchronously here
-        assertTrue(published("slow-broker"), "the completion callback must mark the row");
+        pendingAck.complete(null);   // the ack finally arrives, on the producer's thread
+        assertTrue(!published("slow-broker"), "recorded, not written — the callback may not do JDBC");
+        runThePassThatWritesTheMarks();
+        assertTrue(published("slow-broker"), "and the pass turns that record into the mark");
     }
 
     @Test
@@ -158,6 +177,7 @@ class KafkaMemeEventsTransactionTest {
         events.memeDeleted("already-committed");
 
         verify(kafka).send(any(ProducerRecord.class));
+        runThePassThatWritesTheMarks();
         assertTrue(published("already-committed"));
     }
 

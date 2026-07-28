@@ -96,7 +96,7 @@ class PurgeConfirmationOutboxTest {
     }
 
     private boolean published() {
-        return jdbc.sql("SELECT published FROM meme_events_outbox WHERE event_key = ?")
+        return jdbc.sql("SELECT published_at IS NOT NULL FROM meme_events_outbox WHERE event_key = ?")
                 .params(SAGA).query(Boolean.class).single();
     }
 
@@ -116,7 +116,7 @@ class PurgeConfirmationOutboxTest {
 
         // the broker comes back and the row comes of age
         when(kafka.send(any(ProducerRecord.class))).thenReturn(CompletableFuture.completedFuture(null));
-        jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('SECOND', -60, created_at)").update();
+        jdbc.sql("UPDATE meme_events_outbox SET created_at = DATEADD('SECOND', -60, created_at), published_at = DATEADD('SECOND', -60, published_at)").update();
         republisher.runOnce();
 
         ArgumentCaptor<ProducerRecord<String, String>> redelivered =
