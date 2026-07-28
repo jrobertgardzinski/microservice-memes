@@ -46,8 +46,9 @@ Then('the favourites wall is empty', async function () {
   await expect(this.page.getByText('No favourites yet')).toBeVisible();
 });
 
-// the ref outlives the meme on purpose: deletion happens server-side (the author's own DELETE),
-// the gallery is none the wiser until it hydrates
+// deletion happens server-side (the author's own DELETE) and the gallery is none the wiser until
+// it hydrates — but it is not the last word: MEME_DELETED then travels to user-collections, which
+// drops the ref without anyone asking the browser
 When("the meme is deleted behind the gallery's back", async function () {
   // services persist across scenarios, so find THIS account's meme by ownership, not position
   const memes = await (await fetch(`${MEMES}/memes`)).json();
@@ -68,6 +69,22 @@ When("the meme is deleted behind the gallery's back", async function () {
   throw new Error('no meme by this account found to delete');
 });
 
-Then('the favourites wall shows an unavailable keepsake', async function () {
-  await expect(this.page.getByText('unavailable')).toBeVisible();
+Then('the cascade eventually sweeps it off the favourites wall', async function () {
+  // This scenario used to assert the "unavailable" keepsake. That tile is REAL and App.tsx still
+  // renders it — but it only exists in the window between the author's DELETE and MEME_DELETED
+  // reaching user-collections, and since the cascade landed (44e8616 in user-collections) that
+  // window closes in seconds. A browser cannot reliably be looking during it, which is why the
+  // scenario went permanently red instead of flaky. What IS deterministic is where the cascade
+  // ends up, and portal/e2e/deletion-cascade.feature asserts the same outcome one layer down.
+  // The transient tile belongs in a UI unit test against a mocked 404; memes-ui has no unit
+  // suite yet, so that state is currently uncovered — see PLAN-P13.md.
+  await this.eventually(async () => {
+    // App.tsx:223 refetches only on the way IN (`if (!showFavourites && token)`), so the wall has
+    // to be left and re-entered to ask collections again — otherwise this loop would re-read one
+    // stale render for twenty seconds and then fail on it. The one button carries both labels
+    // (App.tsx:228), so leaving and returning are two different names, not two clicks on one.
+    await this.page.getByRole('button', { name: 'Back to the wall' }).click();
+    await this.page.getByRole('button', { name: 'Favourites' }).click();
+    await expect(this.page.getByText('No favourites yet')).toBeVisible({ timeout: 1_000 });
+  });
 });
