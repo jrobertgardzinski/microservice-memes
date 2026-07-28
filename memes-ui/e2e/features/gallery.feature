@@ -1,7 +1,10 @@
 Feature: The meme gallery in a real browser
   The gallery is public to browse; uploading, voting and commenting need a signed-in identity
-  from microservice-security. These scenarios drive the React UI with Playwright against real
-  memes + comments + security services (in-memory stores).
+  from microservice-security. These scenarios drive the React UI with Playwright against the LIVE
+  compose stack — real services on real Postgres, real Kafka, real mailbox — which run-e2e.sh
+  brings up. The header used to say "(in-memory stores)", a leftover from the old four-jar
+  harness; the sibling features already describe the live stack correctly, and overstating or
+  understating what a suite proves is the one thing living documentation must not do.
 
   Scenario: An anonymous visitor browses the gallery
     Given a meme has been uploaded by someone
