@@ -368,11 +368,16 @@ function ScoreChip({ score }: { score: number | undefined }) {
 }
 
 /**
- * A tile on the favourites wall: a hydrated ref. The ref outlives its meme by design — the
- * collections service stores opaque ids and never checks back — so a thumbnail that no longer
- * loads renders as an "unavailable" keepsake, with the star still there to let it go.
+ * A tile on the favourites wall: a hydrated ref. The ref outlives its meme — collections stores
+ * opaque ids and never checks back — so a thumbnail that no longer loads renders as an
+ * "unavailable" keepsake, with the star still there to let it go.
+ *
+ * <p>That state is TRANSIENT: MEME_DELETED reaches user-collections seconds later and the ref is
+ * swept, which is why the browser suite cannot assert it without racing the broker (it tried, and
+ * spent its life red — see e2e/steps/favourites.steps.mjs). Exported for the unit suite, which can
+ * hold the moment still: App.test.tsx fires the image's own onError and looks.
  */
-function FavouriteTile({ memeId, nsfw, score, star, onOpen }: {
+export function FavouriteTile({ memeId, nsfw, score, star, onOpen }: {
   memeId: string;
   nsfw: boolean | undefined;
   score: number | undefined;

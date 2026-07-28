@@ -18,7 +18,15 @@
       localhost:8083).
     -->
     <properties>
-        <node.version>v22.12.0</node.version>
+        <!-- v22.12.0 until 2026-07-28, bumped because jsdom (the unit suite's DOM) declares
+             ^22.13.0 and npm was only warning about it — a build that runs on an engine its own
+             dependency says it does not support is a silent breakage waiting for a bad day.
+             Same LTS line, so nothing else about the build changes. -->
+        <node.version>v22.23.1</node.version>
+        <!-- declared so -DskipTests can override it: frontend-maven-plugin has no notion of the
+             surefire switch, so the vitest execution below reads this property by hand. Without a
+             default here the expression would reach the plugin unresolved. -->
+        <skipTests>false</skipTests>
     </properties>
 
     <build>
@@ -46,6 +54,21 @@
                         <goals><goal>npm</goal></goals>
                         <phase>generate-resources</phase>
                         <configuration><arguments>run build</arguments></configuration>
+                    </execution>
+                    <!--
+                      The UI's unit suite (vitest + Testing Library), in the `test` phase like any
+                      other module's. It covers the states e2e/ cannot hold still: e2e drives a real
+                      stack, so anything that exists only BETWEEN two events races the broker there.
+                      The favourites keepsake is the case that forced this — see App.test.tsx.
+                    -->
+                    <execution>
+                        <id>npm-test</id>
+                        <goals><goal>npm</goal></goals>
+                        <phase>test</phase>
+                        <configuration>
+                            <arguments>test</arguments>
+                            <skip>${skipTests}</skip>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
