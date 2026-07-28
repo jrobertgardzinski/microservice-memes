@@ -48,6 +48,16 @@ class MemesConfig {
     }
 
     @Bean
+    UploadAdmission uploadAdmission(
+            @Value("${memes.upload.concurrency:8}") int uploadConcurrency) {
+        // Sized WITH the container's memory, not guessed: 8 x the 10 MB multipart ceiling is 80 MB
+        // of raw uploads at worst, which fits beside the decode budget inside the heap that
+        // k8s/base/memes.yaml grants. It used to be Tomcat's default thread count — 200 — which at
+        // the same 10 MB is 2000 MB against a ~1075 MiB heap.
+        return new UploadAdmission(uploadConcurrency, java.time.Duration.ofSeconds(5));
+    }
+
+    @Bean
     ThumbnailSize thumbnailSize(@Value("${memes.image.thumbnail-max-dimension:256}") int maxDimension) {
         return new ThumbnailSize(maxDimension);
     }

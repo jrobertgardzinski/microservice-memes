@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ class MemeController {
     private final com.jrobertgardzinski.memes.application.FlagMeme flagMeme;
     private final com.jrobertgardzinski.memes.application.ContentFlags contentFlags;
     private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
+    private final UploadAdmission uploadAdmission;
 
     MemeController(PublishMeme publishMeme, MakeThumbnail makeThumbnail,
                    ListMemes listMemes,
@@ -56,7 +58,8 @@ class MemeController {
                    com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme,
                    com.jrobertgardzinski.memes.application.FlagMeme flagMeme,
                    com.jrobertgardzinski.memes.application.ContentFlags contentFlags,
-                   com.jrobertgardzinski.memes.config.RateLimit uploadRate) {
+                   com.jrobertgardzinski.memes.config.RateLimit uploadRate,
+                   UploadAdmission uploadAdmission) {
         this.publishMeme = publishMeme;
         this.makeThumbnail = makeThumbnail;
         this.listMemes = listMemes;
@@ -67,6 +70,7 @@ class MemeController {
         this.flagMeme = flagMeme;
         this.contentFlags = contentFlags;
         this.uploadRate = uploadRate;
+        this.uploadAdmission = uploadAdmission;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -77,7 +81,17 @@ class MemeController {
             return ResponseEntity.status(429).header("Retry-After", "60")
                     .body(Map.of("status", "RATE_LIMITED", "detail", "you are uploading too fast"));
         }
-        String id = publishMeme.execute(file.getBytes(), uploader);
+        // getBytes() is where the heap is spent — up to spring.servlet.multipart.max-file-size per
+        // request — and until now nothing bounded how many requests could stand here at once. The
+        // permit is held across execute() as well, because the bytes stay reachable for its whole
+        // duration; releasing before that would bound nothing.
+        String id = uploadAdmission.admit(() -> {
+            try {
+                return publishMeme.execute(file.getBytes(), uploader);
+            } catch (IOException unreadableUpload) {
+                throw new UncheckedIOException(unreadableUpload);
+            }
+        });
         return ResponseEntity.created(URI.create("/memes/" + id)).body(Map.of("id", id));
     }
 
