@@ -99,6 +99,7 @@
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <version>${rest-assured.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -110,11 +111,13 @@
             <!-- a real MinIO for the S3 adapter's round-trip; skipped where docker is absent -->
             <groupId>org.testcontainers</groupId>
             <artifactId>minio</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <!-- the shared offline verification of security's access tokens (was a local copy;
