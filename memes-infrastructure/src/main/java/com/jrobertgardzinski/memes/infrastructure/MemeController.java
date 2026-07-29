@@ -131,8 +131,32 @@ class MemeController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /** The query the favourites wall marks its thumbnail requests with — see {@link #thumbnail}. */
+    static final String FAVOURITES_WALL = "favourites";
+
+    /**
+     * @param wall which surface is asking. Absent for the gallery, {@code favourites} for the
+     *             favourites wall — and that difference decides the caching, which is the only
+     *             reason the parameter exists.
+     *
+     *             <p>The wall renders a deleted meme as a KEEPSAKE: the tile 404s, {@code onError}
+     *             fires, and the user gets a tile they can still unfavourite. That read-repair is
+     *             what covers the window between a meme's deletion and the MEME_DELETED sweep
+     *             reaching user-collections. It only works if the browser actually ASKS.
+     *
+     *             <p>The UI already sent a distinct URL for it, with a comment promising "a distinct
+     *             URL forces a real answer" — but every thumbnail response, query included, was
+     *             stamped {@code public, max-age=3600}, so the distinct URL bought a distinct CACHE
+     *             ENTRY and nothing more. Open the wall at 12:00, delete the meme at 12:05, come
+     *             back at 12:10: the tile is painted from cache without a single request, onError
+     *             never fires, and clicking it opens a dialog whose every fetch 404s. The one hour
+     *             of caching that makes a scrolling gallery cheap is exactly wrong for a wall whose
+     *             job is to notice that something is gone.
+     */
     @GetMapping("/{id}/thumbnail")
-    ResponseEntity<byte[]> thumbnail(@PathVariable("id") String id) {
+    ResponseEntity<byte[]> thumbnail(@PathVariable("id") String id,
+                                     @RequestParam(name = "wall", required = false) String wall) {
+        boolean mustAsk = FAVOURITES_WALL.equals(wall);
         return makeThumbnail.execute(id)
                 .map(bytes -> ResponseEntity.ok()
                         .contentType(MediaType.IMAGE_PNG)
@@ -169,8 +193,15 @@ class MemeController {
                         // that leaves orphans behind, an audit that asks for proof of erasure,
                         // or a store big enough that stray objects cost real money. todo.md
                         // carries the same entry.
-                        .cacheControl(org.springframework.http.CacheControl
-                                .maxAge(java.time.Duration.ofHours(1)).cachePublic())
+                        //
+                        // …and none of that applies to the favourites wall, which is asking in
+                        // order to find out whether the meme is still there. no-store, so the
+                        // question is actually put to the server. It costs one request per tile on
+                        // one small, per-user surface; the gallery below keeps its hour.
+                        .cacheControl(mustAsk
+                                ? org.springframework.http.CacheControl.noStore()
+                                : org.springframework.http.CacheControl
+                                        .maxAge(java.time.Duration.ofHours(1)).cachePublic())
                         .body(bytes))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

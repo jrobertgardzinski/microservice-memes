@@ -397,8 +397,9 @@ export function FavouriteTile({ memeId, nsfw, score, star, onOpen }: {
         </Box>
       ) : (
         <CardActionArea onClick={onOpen}>
-          {/* the wall's thumbnail may sit in the browser cache long after the meme is gone —
-              a distinct URL forces a real answer, and a 404 turns the tile into a keepsake */}
+          {/* the wall's thumbnail may sit in the browser cache long after the meme is gone, so the
+              request says WHO is asking: MemeController answers ?wall=favourites with no-store,
+              which is what forces a real answer — and a 404 turns the tile into a keepsake */}
           <CardMedia component="img" image={`/memes/${memeId}/thumbnail?wall=favourites`} loading="lazy"
                      onError={() => setGone(true)}
                      sx={{ aspectRatio: '1', objectFit: 'cover',

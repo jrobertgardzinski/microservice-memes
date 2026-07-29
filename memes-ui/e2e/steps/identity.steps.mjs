@@ -128,9 +128,27 @@ Then('the dialog complains about the password', async function () {
 Then('signing in with that account is refused', async function () {
   // the saga has a road to travel (security -> offboarding -> the content services and back),
   // so the front door closes for good within a beat rather than instantly
+  //
+  // What "refused" has to mean, spelled out. This step used to assert only `status !== 200`, and
+  // for an account WITH a second factor that can never fail: a live, healthy account with a factor
+  // answers 202 with an mfaTicket (see world.mjs — the twin step "still works" accepts [200, 202]
+  // as proof of LIFE for exactly that reason). Scenario 5, "A second factor is asked for on the way
+  // out too", ends on this step as its only evidence that the deletion happened — so the one
+  // scenario covering the MFA exit was the one scenario that could not fail here. A regression in
+  // the step-up path would leave the no-factor scenarios honestly green and this one dishonestly
+  // green beside them.
+  //
+  // So: neither door may open. No access token, and no ticket to walk through either.
   await this.eventually(async () => {
     const r = await this.post(`${SECURITY}/authenticate`, this.account);
     expect(r.status, 'a deleted account cannot come back through the front door').not.toBe(200);
+
+    const body = await r.json().catch(() => ({}));
+    expect(body.accessToken, 'a deleted account gets no access token').toBeFalsy();
+    expect(body.mfaTicket,
+      'and no second-factor ticket either — a 202 with a ticket is what a LIVE account with a'
+      + ' factor answers, so accepting it here would pass for an account that was never deleted')
+      .toBeFalsy();
   });
 });
 

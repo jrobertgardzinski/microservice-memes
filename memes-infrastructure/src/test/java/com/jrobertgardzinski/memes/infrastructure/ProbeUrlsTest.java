@@ -33,17 +33,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>Asserts the group's own component rather than only the status code: a 200 carrying a
  * differently shaped body would still fail the probe's purpose.
+ *
+ * <p><strong>Exactly one property is set here, and it is not one of the ones under test.</strong>
+ * This class used to hand itself the whole management block — the two group definitions AND
+ * {@code exposure.include=health,prometheus} — duplicating
+ * {@code src/main/resources/application.properties} instead of reading it. Annotation properties win
+ * over the file, so the test proved its own five lines: drop {@code health} from the exposure line
+ * that goes into the image and every assertion below still passed, while both probe URLs answered
+ * 404 in the cluster and the pod never went Ready. (The commit that "verified these tests can fail"
+ * verified a deletion from the test's list, not from the file's.) There is no
+ * {@code application.properties} on this module's test classpath, so with the overrides gone the
+ * context boots on the SHIPPED configuration and these three tests exercise it.
+ *
+ * <p>The survivor collapses {@code management.server.port} back onto the main one, because MockMvc
+ * has no ports — that is the one thing this test genuinely cannot exercise, and it says so above.
  */
 @SpringBootTest(classes = MemesApplication.class,
-        properties = {
-                "management.endpoint.health.probes.enabled=true",
-                "management.endpoint.health.group.readiness.include=readinessState,kafkaListeners",
-                "management.endpoint.health.group.liveness.include=livenessState",
-                "management.endpoints.web.exposure.include=health,prometheus",
-                "management.endpoint.health.show-details=always",
-                // MockMvc drives the main context; the real deployment's separate management port is
-                // covered by the compose healthcheck instead
-                "management.server.port="})
+        // MockMvc drives the main context; the real deployment's separate management port is
+        // covered by the compose healthcheck instead
+        properties = "management.server.port=")
 @AutoConfigureMockMvc
 class ProbeUrlsTest {
 

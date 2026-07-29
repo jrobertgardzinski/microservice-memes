@@ -97,6 +97,29 @@ class ThumbnailCacheTest {
     }
 
     @Test
+    @DisplayName("the favourites wall's request is not cacheable — it exists to find out whether the meme is still there")
+    void the_favourites_wall_gets_an_uncacheable_answer() throws Exception {
+        String id = upload();
+
+        // The wall renders a deleted meme as a keepsake off the img's onError, which covers the
+        // window between the delete and the MEME_DELETED sweep reaching user-collections. That
+        // only happens if the browser ASKS. The UI has always sent a distinct URL for it, promising
+        // in a comment that "a distinct URL forces a real answer" — while the server stamped every
+        // thumbnail response, query and all, public/max-age=3600. A distinct URL buys a distinct
+        // CACHE ENTRY: open the wall at 12:00, delete at 12:05, return at 12:10, and the tile is
+        // painted from cache with no request at all, so onError never fires and the tile never
+        // becomes a keepsake. The only test on any of this asserted the src string.
+        mockMvc.perform(get("/memes/{id}/thumbnail", id).param("wall", "favourites"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"));
+
+        // and the gallery, which scrolls over hundreds of these, keeps its hour
+        mockMvc.perform(get("/memes/{id}/thumbnail", id))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=3600, public"));
+    }
+
+    @Test
     @DisplayName("deleting the meme sweeps the cached thumbnail — and the endpoint answers 404, not a ghost image")
     void delete_takes_the_cached_thumbnail_along() throws Exception {
         String id = upload();

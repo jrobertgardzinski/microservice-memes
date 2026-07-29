@@ -20,10 +20,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * tests pin.
  *
  * <p>Driven directly rather than through the application, because that is what it is — a servlet
- * filter with one decision. Writing it as a full {@code @SpringBootTest} taught something useful
- * first, though: {@link RequireSignInFilter} runs BEFORE this one, so an anonymous oversized upload
- * is already refused 401 without anything being spooled anywhere. This filter's job is the
- * authenticated caller — the one who got past the gate and then declared twenty megabytes.
+ * filter with one decision.
+ *
+ * <p><strong>Which filter runs first, corrected.</strong> This javadoc used to state that
+ * {@link RequireSignInFilter} runs BEFORE this one, so that an anonymous oversized upload is
+ * refused 401 — and it explained the absence of a test for the anonymous caller with exactly that.
+ * The chain says the opposite: this filter is {@code @Order(HIGHEST_PRECEDENCE + 10)} and
+ * RequireSignInFilter carries no {@code @Order} at all, which registers it at LOWEST_PRECEDENCE.
+ * An anonymous POST declaring twenty megabytes therefore gets 413, never 401.
+ *
+ * <p>That order is the right one and is now pinned rather than assumed
+ * ({@link FilterOrderTest}): refusing on a declared length costs one integer comparison, while
+ * authenticating costs a token introspection over HTTP to another service, and doing the cheap
+ * refusal first is what keeps a flood of oversized anonymous posts from becoming a flood of
+ * introspection calls. Nothing is leaked by it — 413 to an anonymous caller says only that the
+ * request was too big, which it was.
  */
 class RejectOversizedUploadFilterTest {
 

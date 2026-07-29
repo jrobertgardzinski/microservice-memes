@@ -62,11 +62,14 @@ describe('a favourite whose meme is already gone', () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it('asks for a thumbnail URL the browser cache cannot answer from', () => {
+  it('marks its thumbnail request as the favourites wall, which is what makes it uncacheable', () => {
     const { container } = tile();
 
-    // without the distinct query the wall would keep painting a cached thumbnail of a meme that is
-    // already deleted, and the tile would never learn to become a keepsake at all
+    // The query is not cache-busting by itself — it is a stable URL, so on its own it would only
+    // buy a second cache entry. What it does is TELL THE SERVER who is asking, and MemeController
+    // answers ?wall=favourites with no-store precisely so this tile has to put the question to the
+    // server and can learn that the meme is gone. That half is pinned in ThumbnailCacheTest
+    // (memes-infrastructure); this one pins the half the browser sends.
     expect(container.querySelector('img')).toHaveAttribute(
       'src',
       '/memes/meme-1/thumbnail?wall=favourites',
