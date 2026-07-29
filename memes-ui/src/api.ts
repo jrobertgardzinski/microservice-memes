@@ -1,11 +1,37 @@
 /** Talking to the two services: memes (same origin) and security (CORS, token issuer). */
 
+/**
+ * Addresses handed to the page by whoever DEPLOYED it, ahead of the ones baked into the bundle.
+ *
+ * Vite substitutes `import.meta.env.VITE_*` at build time, so the bundle - and therefore the jar
+ * and the container image that carries it - had exactly one set of API addresses in it: compose's.
+ * Served from a Kubernetes cluster the same page told the browser to call `localhost:8080`, which
+ * is the developer's own laptop, and the gallery came up looking perfectly healthy while nobody
+ * could sign in.
+ *
+ * `window.__PORTAL_CONFIG__` is written by `/ui-config.js`, a classic script in index.html that the
+ * browser runs before this module. The chain falls back to the baked value and then to compose, so
+ * `npm run dev` with no server behind it behaves exactly as it always did.
+ */
+declare global {
+  interface Window {
+    __PORTAL_CONFIG__?: {
+      securityUrl?: string;
+      commentsUrl?: string;
+      collectionsUrl?: string;
+    };
+  }
+}
+
+const deployed = (key: 'securityUrl' | 'commentsUrl' | 'collectionsUrl'): string | undefined =>
+  typeof window === 'undefined' ? undefined : window.__PORTAL_CONFIG__?.[key];
+
 export const SECURITY: string =
-  import.meta.env.VITE_SECURITY_URL ?? 'http://localhost:8080';
+  deployed('securityUrl') ?? import.meta.env.VITE_SECURITY_URL ?? 'http://localhost:8080';
 
 /** Comments live in their own microservice. */
 export const COMMENTS: string =
-  import.meta.env.VITE_COMMENTS_URL ?? 'http://localhost:8085';
+  deployed('commentsUrl') ?? import.meta.env.VITE_COMMENTS_URL ?? 'http://localhost:8085';
 
 export interface MemeRef {
   id: string;
@@ -339,7 +365,7 @@ export const clearPurgePolicy = async (token: string | null): Promise<boolean> =
 
 /** Favourites live in microservice-user-collections: opaque refs, hydrated by THIS gallery. */
 export const COLLECTIONS: string =
-  import.meta.env.VITE_COLLECTIONS_URL ?? 'http://localhost:8092';
+  deployed('collectionsUrl') ?? import.meta.env.VITE_COLLECTIONS_URL ?? 'http://localhost:8092';
 
 export interface FavouriteRef { itemType: string; itemId: string; }
 
