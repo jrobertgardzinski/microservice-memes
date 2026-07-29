@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "pretest": "./require-node.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "tsc && vite build"
