@@ -243,6 +243,15 @@ class GalleryWorld {
   async openGallery() {
     this.context = await browser.newContext();
     this.page = await this.context.newPage();
+    // kept for the After hook: when a scenario fails, what the BROWSER saw is the half of the
+    // evidence the compose logs cannot give, and CI has no screen to look at
+    this.browserLog = [];
+    this.page.on('console', (m) => {
+      if (m.type() === 'error' || m.type() === 'warning') this.browserLog.push(`${m.type()}: ${m.text()}`);
+    });
+    this.page.on('pageerror', (e) => this.browserLog.push(`pageerror: ${e.message}`));
+    this.page.on('requestfailed', (r) =>
+      this.browserLog.push(`requestfailed: ${r.method()} ${r.url()} — ${r.failure()?.errorText}`));
     await this.page.goto(UI);
   }
 
@@ -264,6 +273,31 @@ Before(function () {
   this.readMailIds = new Set();   // codes are one-shot; a scenario never re-reads its own mail
 });
 
-After(async function () {
+/**
+ * On failure, say what the browser saw before throwing the context away.
+ *
+ * <p>Written after 2026-07-29, when seventeen scenarios failed in CI with "element(s) not found"
+ * and the run was undiagnosable from the outside: the same suite passed locally against the same
+ * stack, and the only artefact was an empty compose log. A failing assertion names the locator it
+ * wanted; it never says what the page actually contained, which request failed, or what the console
+ * said - and on CI there is no screen to look at. This prints all three, to stdout, so the evidence
+ * lands in the job log whether or not an artefact upload works.
+ */
+After(async function ({ result }) {
+  if (result?.status === 'FAILED' && this.page && !this.page.isClosed()) {
+    try {
+      const url = this.page.url();
+      const text = (await this.page.locator('body').innerText()).replace(/\s+\n/g, '\n').trim();
+      console.log(`\n--- what the browser saw at ${url} ---`);
+      console.log(text.slice(0, 1500) || '(the page rendered nothing)');
+      if (this.browserLog?.length) {
+        console.log('--- console / network ---');
+        console.log(this.browserLog.slice(0, 20).join('\n'));
+      }
+      console.log('--- end ---\n');
+    } catch (dumpFailed) {
+      console.log(`(could not read the page: ${dumpFailed.message})`);
+    }
+  }
   await this.context?.close();
 });
