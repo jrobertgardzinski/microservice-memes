@@ -13,9 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The refusal an upload gets for ANNOUNCING more than this service accepts.
  *
- * <p>The filter shipped on 2026-07-28 with no test at all, which is worth stating plainly: it exists
- * to turn a "500 internal error" into a truthful 413, and an untested error path is exactly the kind
- * that quietly stops working.
+ * <p>The filter shipped on 2026-07-28 with no test at all, and with a rationale that turned out to
+ * be wrong: it was said to turn an "internal error" into a truthful 413, when Spring answers 413 for
+ * an oversized multipart on its own. What it really buys is that the refusal happens on the
+ * DECLARED length, before the multipart is spooled to the container's disk — which is what these
+ * tests pin.
  *
  * <p>Driven directly rather than through the application, because that is what it is — a servlet
  * filter with one decision. Writing it as a full {@code @SpringBootTest} taught something useful
