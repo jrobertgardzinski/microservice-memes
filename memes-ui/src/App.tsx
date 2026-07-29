@@ -251,7 +251,7 @@ export default function App() {
           <AuthPanel token={token} user={user} onToken={setToken} onLogout={() => setToken(null)} />
 
           {tagFilter && !showFavourites && (
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
               <Typography variant="body2" color="text.secondary">Filtered by tag:</Typography>
               <Chip label={`#${tagFilter}`} color="primary" onDelete={() => setTagFilter(null)} />
             </Stack>

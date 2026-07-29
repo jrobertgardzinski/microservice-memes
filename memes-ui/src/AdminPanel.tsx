@@ -76,7 +76,7 @@ export default function AdminPanel({ token, open, onClose }: {
           </TextField>
           {kind === KEEP_POPULAR && (
             <TextField type="number" label="Minimum score to keep" value={minScore}
-                       inputProps={{ min: 1 }}
+                       slotProps={{ htmlInput: { min: 1 } }}
                        onChange={(e) => setMinScore(Math.max(1, Number(e.target.value) || 1))} />
           )}
           {notice && <Alert severity={notice.startsWith('Refused') ? 'warning' : 'success'}>{notice}</Alert>}

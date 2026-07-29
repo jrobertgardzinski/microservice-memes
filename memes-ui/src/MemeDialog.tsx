@@ -12,7 +12,7 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
@@ -248,7 +248,7 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
       <DialogContent>
         <Box component="img" src={`/memes/${memeId}`} alt="meme"
              sx={{ width: '100%', borderRadius: 2 }} />
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ my: 1 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', my: 1 }}>
           <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
           <Chip data-testid="meme-score" label={tally.score ?? 'n/a'} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
@@ -268,7 +268,7 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
           )}
         </Stack>
 
-        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+        <Stack direction="row" spacing={0.5} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 1 }}>
           {tags.map((t) => (
             <Chip key={t} label={`#${t}`} size="small" variant="outlined" onClick={() => onTagClick(t)} />
           ))}
@@ -277,7 +277,7 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
           )}
         </Stack>
         {editingTags && (
-          <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ mb: 1 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start', mb: 1 }}>
             <TextField
               size="small" fullWidth autoFocus
               label="tags, comma-separated" placeholder="cats, monday-mood"
@@ -303,7 +303,7 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
           </Alert>
         )}
         {comments.map((c) => (
-          <Stack key={c.id} direction="row" spacing={1} alignItems="center" sx={{ py: 0.5 }}>
+          <Stack key={c.id} direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.5 }}>
             <Typography variant="body2" sx={{ flex: 1 }}>
               <Box component="b" sx={{ color: 'primary.light' }}>{c.author}</Box>{' '}
               {c.hidden && c.text === null ? (
@@ -338,7 +338,7 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
         {/* the thread is capped by the server and carries no total, so this is the honest wording:
             how much is on screen, and that there is more — never a silently truncated list */}
         {moreComments && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
             <Typography variant="caption" color="text.secondary">
               Showing the oldest {comments.length} comments — there are more.
             </Typography>

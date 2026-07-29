@@ -84,7 +84,7 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
 
   if (token) {
     return (
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         <Chip
           label={`signed in as ${user || '…'}`}
           color="primary"
@@ -224,8 +224,8 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
   if (mode === 'inbox') {
     return (
       <Paper sx={{ p: 2, maxWidth: 430 }}>
-        <Stack spacing={1.5} alignItems="flex-start">
-          <Stack direction="row" spacing={1} alignItems="center">
+        <Stack spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <MarkEmailReadIcon color="primary" />
             <Typography>
               Almost there — check the mail we sent to <b>{email}</b>.

@@ -99,7 +99,7 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
             size="small" type="number" label="minimum votes to keep" sx={{ mt: 1 }}
             value={minScore}
             onChange={(e) => setMinScore(parseInt(e.target.value, 10) || 1)}
-            inputProps={{ min: 1 }}
+            slotProps={{ htmlInput: { min: 1 } }}
           />
         )}
         <Typography variant="body2" sx={{ mt: 2 }}>Confirm it is you:</Typography>
