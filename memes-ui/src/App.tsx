@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+// imported rather than assumed: @types/react 19 stopped declaring JSX as a global
+// namespace, so it has to come from the package now
+import type { JSX } from 'react';
 import Alert from '@mui/material/Alert';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
