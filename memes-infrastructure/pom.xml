@@ -20,6 +20,17 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!--
+          JACKSON 2, explicitly, since Spring Boot 4. The web starter stopped bundling a JSON mapper,
+          and Boot 4's own default is Jackson 3 under tools.jackson.* - a different package root from
+          the com.fasterxml.jackson.* this service imports. spring-boot-jackson2 is Boot 4's supported
+          module for that and contributes the ObjectMapper bean the outbox announcer wires to.
+          Moving to Jackson 3 is a separate migration, not a side effect of this one.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
+        </dependency>
         <!-- observability: /actuator/prometheus for the workspace's Prometheus+Grafana -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -29,6 +40,16 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <!--
+          The starters carry Spring Boot 4's per-technology AUTO-CONFIGURATION. It used to live in one
+          spring-boot-autoconfigure jar and switch itself on at the sight of the library; Boot 4 split
+          it up, so spring-kafka and flyway-core on their own now sit there unconfigured - no
+          KafkaTemplate bean, and migrations that never run.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
         <dependency>
             <!-- account-deletion saga: consumes purge commands, confirms on memes-events -->
@@ -45,6 +66,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -76,6 +101,13 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Boot 4 broke the catch-all test starter apart: @AutoConfigureMockMvc and the MockMvc
+             auto-configuration behind it arrive through this one now. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.cucumber</groupId>
             <artifactId>cucumber-java</artifactId>
@@ -99,6 +131,8 @@
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <!-- pinned here: Spring Boot 4's BOM no longer manages rest-assured -->
+            <version>${rest-assured.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -110,11 +144,16 @@
             <!-- a real MinIO for the S3 adapter's round-trip; skipped where docker is absent -->
             <groupId>org.testcontainers</groupId>
             <artifactId>minio</artifactId>
+            <!-- pinned here too, and note it is 1.x: testcontainers reorganised its modules in 2.x
+                 and neither minio nor junit-jupiter has a 2.x release at all, so "the testcontainers
+                 version" is no longer one number for the whole set. -->
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <!-- the shared offline verification of security's access tokens (was a local copy;

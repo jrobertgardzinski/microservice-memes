@@ -17,7 +17,11 @@
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>3.5.16</spring-boot.version>
+        <spring-boot.version>4.1.0</spring-boot.version>
+        <!-- Spring Boot 4's BOM no longer manages these two; pinned so the build stays
+             reproducible rather than resolving whatever happens to be newest. -->
+        <rest-assured.version>6.0.1</rest-assured.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <allure.version>2.35.4</allure.version>
         <cucumber.version>7.20.1</cucumber.version>
         <compiler-plugin.version>3.15.0</compiler-plugin.version>

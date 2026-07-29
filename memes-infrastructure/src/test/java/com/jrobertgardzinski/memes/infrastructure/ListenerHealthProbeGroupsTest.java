@@ -3,8 +3,8 @@ package com.jrobertgardzinski.memes.infrastructure;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.health.HealthEndpointGroup;
-import org.springframework.boot.actuate.health.HealthEndpointGroups;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpointGroup;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpointGroups;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
