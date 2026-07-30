@@ -1,10 +1,6 @@
 import { AfterAll, BeforeAll, Before, After, setWorldConstructor, setDefaultTimeout } from '@cucumber/cucumber';
 import { chromium } from 'playwright';
 import zlib from 'node:zlib';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const run = promisify(execFile);
 
 // the harness (run-e2e.sh) points these at the REAL stack — security, the mail chain, the
 // broker, the saga's process manager and every content service, all of them actually running.
@@ -298,28 +294,6 @@ class GalleryWorld {
 }
 
 setWorldConstructor(GalleryWorld);
-
-/**
- * Wipe the brute-force ledger between scenarios — GLOBALLY, on a dev stack, like the saga scripts.
- *
- * A CRUTCH, and worth naming as one. The counter is keyed by the SOURCE ALONE (3 failures / 15 min
- * / IP) and, since P18 poz. 6, a successful sign-in no longer clears it — clearing it turned one
- * known-good credential into a RESET button for the whole address. Several scenarios here mistype a
- * password ON PURPOSE, and on a CI runner every scenario shares one address: three deliberate
- * mistakes and the suite blocks ITSELF halfway through, which is exactly what happened. Cleaning
- * once before the suite was not enough, because the damage accrues DURING it.
- *
- * The real fix is to count per (source, account) so one person's typos cannot lock out the next
- * person behind the same NAT — planned as its own package. Until then this hook keeps the suite
- * honest about what it is testing instead of the policy being loosened to accommodate it. Failures
- * are ignored: no docker, no compose, no problem — the scenarios then simply run as before.
- */
-Before(async function () {
-  await run('docker', ['compose', '-p', 'security', 'exec', '-T', 'postgres',
-    'psql', '-q', '-U', 'postgres', '-d', 'security',
-    '-c', 'DELETE FROM authentication_blocks; DELETE FROM rejected_authentications;'])
-    .catch(() => { /* not a compose stack, or psql unavailable — leave the ledger alone */ });
-});
 
 Before(function () {
   this.memeId = undefined;

@@ -50,16 +50,14 @@ for url in "$SECURITY_URL/health" "$MEMES_URL/memes/hot" \
     done
 done
 
-# Wipe the brute-force ledger before the suite — GLOBALLY, every block and rejection on the stack,
-# the same deliberate dev-stack-only side effect the saga scripts take.
+# A clean slate for the brute-force ledger before the suite — GLOBALLY, every block and rejection
+# on the stack, the same dev-stack-only side effect the saga scripts take.
 #
-# It became necessary with P18 poz. 6: a successful sign-in no longer clears this IP's failures,
-# because clearing them turned one known-good credential (an attacker's own account) into a RESET
-# button for the whole address. The counter is still keyed by IP ALONE, so a suite that mistypes
-# passwords on purpose — several scenarios here do — leaves residue that blocks the scenarios after
-# it, and on a CI runner every scenario shares one address. Narrowing the count to (source, account)
-# is the real fix and is planned; until it lands, the harness cleans up after its own bad passwords
-# rather than the policy being loosened to accommodate a test suite.
+# Scenarios here mistype passwords ON PURPOSE, and blocks are placed on the SOURCE, which every
+# scenario shares on a CI runner. Since failures are counted per (source, account), one scenario's
+# deliberate mistakes no longer bleed into the next — but a block already placed by an earlier run
+# against this same stack would still be waiting, so the suite starts from zero rather than from
+# whatever the previous run left behind.
 docker compose -p security exec -T postgres psql -q -U postgres -d security \
     -c "DELETE FROM authentication_blocks; DELETE FROM rejected_authentications;" >/dev/null 2>&1 || true
 
