@@ -148,6 +148,7 @@ class GalleryWorld {
   async enrolCodeFactor() {
     const token = await this.apiToken();
     const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+    await this.stepUpToEnrol(auth);
     this.markCodeRequested();
     const start = await fetch(`${SECURITY}/account/factors/EMAIL_CODE/enroll/start`,
       { method: 'POST', headers: auth, body: '{}' });
@@ -156,6 +157,34 @@ class GalleryWorld {
     const confirm = await fetch(`${SECURITY}/account/factors/EMAIL_CODE/enroll/confirm`,
       { method: 'POST', headers: auth, body: JSON.stringify({ code }) });
     if (!confirm.ok) throw new Error(`factor confirmation refused: ${confirm.status}`);
+  }
+
+  /**
+   * Enrolling a factor rewrites how the account signs in, so security demands a fresh step-up
+   * first (P18 poz. 2) — a merely-live session, which is all a thief needs, must not be able to
+   * add a factor the thief holds. The seeding path proves it the way a person would: with the
+   * password, since an account without factors has nothing else to prove with.
+   */
+  async stepUpToEnrol(auth) {
+    // mark BEFORE the request: a factored account gets a code mailed by this very call, and
+    // reading the mailbox without the marker races it and finds the previous one
+    this.markCodeRequested();
+    const r = await fetch(`${SECURITY}/account/step-up`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ action: 'enrol-factor', password: this.account.password }),
+    });
+    if (!r.ok) throw new Error(`step-up before enrolment refused: ${r.status}`);
+    const body = await r.json();
+    if (body.status === 'ELEVATED') return;
+    // an account that already carries a factor finishes the chain with the mailed code
+    const code = await this.signInCode(this.account.email);
+    const done = await fetch(`${SECURITY}/account/step-up/factor`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ stepUpTicket: body.stepUpTicket, proof: code }),
+    });
+    if (!done.ok) throw new Error(`step-up factor refused: ${done.status}`);
   }
 
   /** The one-time codes shown exactly once when generated — kept for the scenario that spends one. */
