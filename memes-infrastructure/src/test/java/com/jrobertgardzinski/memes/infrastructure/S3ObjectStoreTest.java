@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class S3ObjectStoreTest {
 
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer("minio/minio:RELEASE.2024-06-13T22-53-53Z");
+    static final MinIOContainer MINIO = new MinIOContainer("minio/minio:RELEASE.2025-09-07T16-13-09Z");
 
     static S3ObjectStore store;
 
@@ -44,8 +44,8 @@ class S3ObjectStoreTest {
                         AwsBasicCredentials.create(MINIO.getUserName(), MINIO.getPassword())))
                 .forcePathStyle(true)
                 .build();
-        store = new S3ObjectStore(s3, "memes");
-        new S3ObjectStore(s3, "memes");   // second startup against an existing bucket must not throw
+        store = new S3ObjectStore(s3, "memes", PendingBlobDeletes.none());
+        new S3ObjectStore(s3, "memes", PendingBlobDeletes.none());   // second startup against an existing bucket must not throw
     }
 
     @Test

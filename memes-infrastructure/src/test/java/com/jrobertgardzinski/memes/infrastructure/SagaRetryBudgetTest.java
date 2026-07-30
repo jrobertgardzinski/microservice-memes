@@ -107,7 +107,8 @@ class SagaRetryBudgetTest {
 
         assertEquals(BackOffExecution.STOP, retrying.nextBackOff(),
                 "an eternal retry would purge the content of an account the saga has already restored"
-                        + " — the orchestrator gives up at ~165s (120s timeout + 3 x 15s)");
+                        + " — the orchestrator gives up at ~480s (120s of patience per delivered"
+                        + " attempt, 1 + 3 attempts)");
     }
 
     @Test

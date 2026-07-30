@@ -31,8 +31,15 @@ class JdbcVoteRepository implements VoteRepository {
     @Transactional
     public void cast(String memeId, String voter, VoteDirection direction) {
         retract(memeId, voter);
-        jdbc.sql("INSERT INTO meme_votes (meme_id, voter, direction) VALUES (?, ?, ?)")
-                .params(memeId, voter, direction.name()).update();
+        // Conditional on the meme row, because CastVote's exists() check and this insert are two
+        // separate transactions: a delete or a GDPR purge that commits in between used to leave an
+        // orphan ballot that nothing ever removed and the hot page promoted to the top (V8 spells
+        // the whole scenario out). V8's foreign key is what GUARANTEES no orphan can exist; the
+        // WHERE EXISTS here decides what the loser of that race sees — a vote that quietly did not
+        // happen on a meme that is gone, rather than a 500 from a constraint violation.
+        jdbc.sql("INSERT INTO meme_votes (meme_id, voter, direction) "
+                        + "SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM memes WHERE id = ?)")
+                .params(memeId, voter, direction.name(), memeId).update();
     }
 
     @Override

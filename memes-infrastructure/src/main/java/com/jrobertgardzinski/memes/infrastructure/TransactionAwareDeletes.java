@@ -49,12 +49,23 @@ final class TransactionAwareDeletes {
     }
 
     static void afterCommitOrNow(Runnable delete) {
-        if (TransactionSynchronizationManager.isActualTransactionActive()
-                && TransactionSynchronizationManager.isSynchronizationActive()) {
+        if (transactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new ParkedSideEffect(delete));
             return;
         }
         delete.run();
+    }
+
+    /**
+     * Whether {@link #afterCommitOrNow} would PARK rather than run inline — asked by
+     * {@link PendingBlobDeletes#deleteDurably}, which has to journal exactly the deletes that get
+     * parked (a parked one can be lost with the JVM; an inline one cannot). Exposed so the condition
+     * exists once: two copies of it drifting apart would journal deletes that never park, or park
+     * deletes that were never journalled.
+     */
+    static boolean transactionActive() {
+        return TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive();
     }
 
     /**

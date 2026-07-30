@@ -41,7 +41,8 @@ import static org.mockito.Mockito.when;
  *       and the saga discovered it 120 seconds later;</li>
  *   <li>a store that is broken for good: the retrying must END. The sibling participant on Helidon
  *       retries forever, which for a participant of THIS saga means purging the content of an account
- *       the orchestrator has already restored to its owner (it capitulates at ≈165s).</li>
+ *       the orchestrator has already restored to its owner (it capitulates at ≈480s: 120s of
+ *       patience per delivered attempt, 1 + 3 attempts).</li>
  * </ul>
  *
  * <p>The budget under test is milliseconds rather than the production 90 seconds — a test nobody waits

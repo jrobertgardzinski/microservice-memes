@@ -133,6 +133,22 @@ class PurgeUserContentTest {
     }
 
     @Test
+    @DisplayName("KEEP_POPULAR: the leaver cannot vote for his own survival")
+    void the_leavers_own_votes_do_not_count_towards_the_threshold() {
+        memes.put("self-liked", new Meme("self-liked", "leaver@example.com", "png", new byte[]{3}));
+        // two votes, one of them the leaver's own — and his is leaving with him, so the community's
+        // verdict on this meme is ONE. Counting his made the threshold of two look met.
+        memeVotes.put("self-liked", new HashMap<>(Map.of(
+                "leaver@example.com", VoteDirection.UP, "a@example.com", VoteDirection.UP)));
+
+        purge.execute("leaver@example.com", Optional.of(new PurgeRule.KeepPopularAnonymized(2)));
+
+        assertFalse(memes.containsKey("self-liked"),
+                "a meme kept only by the leaver's own vote is not what the community liked");
+        assertEquals(List.of("self-liked"), announcedDeletions);
+    }
+
+    @Test
     @DisplayName("the admin's override beats the deployment default")
     void admin_override_beats_the_default() {
         adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());

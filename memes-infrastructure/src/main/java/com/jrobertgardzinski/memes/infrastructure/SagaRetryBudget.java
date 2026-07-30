@@ -23,13 +23,25 @@ import java.time.Duration;
  * copied here, because the orchestrator gives up in finite time:
  *
  * <ul>
- *   <li>{@code OFFBOARDING_PURGE_TIMEOUT_SEC} = 120s — a saga unconfirmed for that long is overdue;</li>
- *   <li>the sweeper wakes every 15s and re-commands while retries remain
- *       ({@code SweepOverdue.DEFAULT_MAX_RETRIES} = 3), so the re-commands land at ≈120s, ≈135s
- *       and ≈150s;</li>
- *   <li>at ≈165s the retries are spent: the saga compensates, microservice-security hands the
+ *   <li>{@code OFFBOARDING_PURGE_TIMEOUT_SEC} = 120s — a saga is overdue when 120s have passed
+ *       since its LAST DELIVERED attempt, not since it started: the sweeper measures the age of
+ *       {@code updated_at}, and {@code retryDelivered} stamps that column when a re-commanded
+ *       PURGE_USER_CONTENT demonstrably reached the broker;</li>
+ *   <li>the sweeper wakes every 15s, so each re-command lands within one interval of its own
+ *       deadline: the first at ≈120s, and because it resets the clock, the next at ≈240s and the
+ *       last at ≈360s ({@code SweepOverdue.DEFAULT_MAX_RETRIES} = 3);</li>
+ *   <li>at ≈480s the retries are spent: the saga compensates, microservice-security hands the
  *       account back and mails the leaver that the deletion FAILED.</li>
  * </ul>
+ *
+ * <p><strong>Why the cadence used to be different, and why that mattered here.</strong> The sweeper
+ * measured overdue-ness from {@code created_at}, so past the threshold EVERY pass re-commanded — the
+ * re-commands landed at ≈120s, ≈135s, ≈150s (15s apart, the sweeper's own interval) and the saga
+ * capitulated at ≈165s, while the record the last one delivered still had ~90s of live budget below.
+ * Two consequences, both fixed by measuring from the last delivered attempt: three re-commands were
+ * spent inside a single participant's first retry window (they were re-asking a participant that was
+ * demonstrably still working on the previous ask), and compensation arrived BEFORE the participant's
+ * budget was even spent.
  *
  * <p>A participant that retried without end would purge whenever its store came back — an hour
  * later, a day later — deleting the content of an account the saga has already restored to its
@@ -42,13 +54,15 @@ import java.time.Duration;
  *       Postgres unreachable, one attempt can spend a whole Hikari {@code connection-timeout} (the
  *       30s default, not overridden in this service) before it even throws. A budget under a minute
  *       would buy a single real attempt, which is the status quo with extra steps.</li>
- *   <li><em>Ceiling = 120s.</em> That is when the orchestrator re-commands. Retrying past it means
- *       competing with the command the sweeper has already sent for the same account: the purge is
- *       idempotent so nothing breaks, but it stops being THIS record's job. Ending first means the
- *       record in hand heals the hiccup, or hands the problem back to the sweeper. (The budget opens
- *       at the FIRST failure, so a record's whole life here is the budget plus that first attempt:
- *       ≈90s when failures are instant, ≈120s when the first one sits out a connection timeout —
- *       either way about the orchestrator's own patience, which is the number it should resemble.)</li>
+ *   <li><em>Ceiling = 120s.</em> That is how long the orchestrator waits for THIS attempt before
+ *       re-commanding — 120s from the delivery of the command in hand, now that overdue-ness is
+ *       measured from the last delivered attempt. Retrying past it means competing with the command
+ *       the sweeper has already sent for the same account: the purge is idempotent so nothing breaks,
+ *       but it stops being THIS record's job. Ending first means the record in hand heals the hiccup,
+ *       or hands the problem back to the sweeper. (The budget opens at the FIRST failure, so a
+ *       record's whole life here is the budget plus that first attempt: ≈90s when failures are
+ *       instant, ≈120s when the first one sits out a connection timeout — either way at most the
+ *       orchestrator's patience for that same attempt, which is the number it should resemble.)</li>
  *   <li><em>90s is between them</em> and admits, concretely: ten attempts when the failure is fast
  *       (pauses 1+2+4+8+15+15+15+15+15 = 90s), and still four spread over two minutes when every
  *       attempt burns a full 30s connection timeout. Four attempts across two minutes is what rides
@@ -60,19 +74,24 @@ import java.time.Duration;
  * </ul>
  *
  * <p><strong>What "bounded" buys at the estate level.</strong> The orchestrator sends at most 1+3
- * commands per saga, the retries block their partition, and the commands of one leaver share a
- * partition (they are keyed by the address), so the re-commands queue behind the record being
- * retried. A permanent outage therefore costs at most 4 × 90s ≈ 6 minutes of retrying per saga and
- * then silence — bounded, logged and counted (see {@link SagaParticipantConfig}), instead of a purge
- * that lands whenever the store happens to return.
+ * commands per saga, and the commands of one leaver share a partition (they are keyed by the
+ * address), so a re-command cannot overtake the record being retried. A permanent outage therefore
+ * costs at most 4 × 90s ≈ 6 minutes of retrying per saga and then silence — bounded, logged and
+ * counted (see {@link SagaParticipantConfig}), instead of a purge that lands whenever the store
+ * happens to return. Each of those four rounds now gets its own 120s window rather than sharing one:
+ * this record's retries end at ≈90s and the next command arrives at ≈120s, so the partition is idle
+ * when it lands instead of the command queueing behind a record still in its budget.
  *
- * <p><strong>The residual window, named rather than hidden.</strong> The last re-command lands at
- * ≈150s and may still complete its purge up to 90s later — up to ≈75s AFTER the saga compensated.
- * That overshoot is deliberate: "some participants purged, others did not" is already an outcome the
- * orchestrator announces (PORTAL_PURGE_FAILED names the participants that DID purge), it stays
- * inside the incident window an operator is already looking at, and it is the price of surviving an
- * outage that the ten-immediate-attempts default drops in a millisecond. What was NOT acceptable is
- * the unbounded version of the same window.
+ * <p><strong>Where the overshoot went.</strong> This class used to name a residual window it could
+ * not close: with re-commands 15s apart the last one landed at ≈150s and could still be purging at
+ * ≈240s, up to ≈75s after the saga had already compensated and handed the account back — content
+ * cleaned after the deletion was declared failed. Measuring overdue-ness from the last delivered
+ * attempt closes it arithmetically: the final re-command lands at ≈360s, its budget is spent by
+ * ≈450s, and the saga capitulates at ≈480s. The participant's 90s is strictly inside the
+ * orchestrator's 120s, once per round, which is the invariant this budget was always trying to
+ * approximate — 90 &lt; 120 is now a fact about every attempt rather than about the first one only.
+ * (The outcome it protected against remains an announced one: PORTAL_PURGE_FAILED names the
+ * participants that DID purge.)
  */
 final class SagaRetryBudget implements BackOff {
 

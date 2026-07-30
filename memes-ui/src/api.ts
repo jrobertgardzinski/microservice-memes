@@ -127,6 +127,19 @@ const renewAccessToken = (): Promise<string | null> => {
   return refreshing;
 };
 
+/**
+ * Ends the session server-side. "Sign out" used to be `setToken(null)` alone (P12 W1 named this
+ * very file), so the rotating HttpOnly refresh cookie stayed valid for ~a day — on a shared
+ * computer one `POST /refresh` handed the next person the previous user's session. The cookie
+ * rides along on credentials:'include' and the whole session family dies; `keepalive` lets the
+ * request outlive the click; a network error is swallowed, because signing out locally must
+ * never hang on the server. Without the cookie it is an idempotent no-op.
+ */
+export const logout = (): void => {
+  void fetch(`${SECURITY}/logout`, { method: 'POST', credentials: 'include', keepalive: true })
+    .catch(() => { /* the local sign-out proceeds regardless */ });
+};
+
 const headersOf = (init: RequestInit): Record<string, string> =>
   ({ ...(init.headers as Record<string, string> | undefined) });
 

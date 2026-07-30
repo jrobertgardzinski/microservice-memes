@@ -17,8 +17,13 @@ import java.util.Set;
 /**
  * The operator's dial: reads and writes the runtime purge-policy override. Every route requires
  * the ADMIN role (as microservice-security reports it); {@link RequireSignInFilter} already
- * refuses anonymous callers on {@code /admin/**}, this controller narrows to admins. The user's
- * wizard choice still wins over whatever is dialled here — see {@code PurgeUserContent}.
+ * refuses anonymous callers on {@code /admin/**}, this controller narrows to admins.
+ *
+ * <p>What is dialled here loses to a purge command that CARRIES a rule, and decides every purge
+ * that arrives without one — see {@code PurgeUserContent}. So this dial is not only a default for
+ * clients that express no preference: it is also the fate of every leaver whose client forgot to
+ * state theirs (the memes-ui wizard's preselected option used to, P18 poz. 18). Setting it is a
+ * decision about other people's content, which is why it is audited.
  */
 @RestController
 @RequestMapping("/admin/purge-policy")

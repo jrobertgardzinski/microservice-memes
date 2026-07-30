@@ -20,8 +20,10 @@ import java.util.Optional;
 class FilesystemObjectStore implements ObjectStore {
 
     private final Path root;
+    private final PendingBlobDeletes pending;
 
-    FilesystemObjectStore(org.springframework.core.env.Environment env) {
+    FilesystemObjectStore(org.springframework.core.env.Environment env, PendingBlobDeletes pending) {
+        this.pending = pending;
         this.root = Path.of(env.getProperty("memes.blob-dir", "/var/lib/memes/blobs"));
         try {
             Files.createDirectories(root);
@@ -54,8 +56,10 @@ class FilesystemObjectStore implements ObjectStore {
         Path path = resolve(key);   // validate the key now, not in an after-commit callback
         // files are outside any DB transaction: inside one (the delete/purge seam), removing the
         // file eagerly would leave a meme row restored by rollback pointing at nothing — so the
-        // file goes only once the DB part has committed
-        TransactionAwareDeletes.afterCommitOrNow(() -> {
+        // file goes only once the DB part has committed. The obligation to make that deferred delete
+        // happen is journalled in the transaction itself, because a parked runnable dies with the JVM
+        // and the key it holds dies with it (PendingBlobDeletes).
+        pending.deleteDurably(key, () -> {
             try {
                 Files.deleteIfExists(path);
             } catch (IOException e) {

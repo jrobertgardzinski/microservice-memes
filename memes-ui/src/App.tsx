@@ -24,8 +24,8 @@ import AdminPanel from './AdminPanel';
 import AuthPanel from './AuthPanel';
 import MemeDialog from './MemeDialog';
 import {
-  authHeader, bindSession, GALLERY_PAGE_SIZE, listFavourites, listMemes, MemeRef, memeScores,
-  removeFavourite, request, saveFavourite, SECURITY,
+  authHeader, bindSession, GALLERY_PAGE_SIZE, listFavourites, listMemes, logout, MemeRef,
+  memeScores, removeFavourite, request, saveFavourite, SECURITY,
 } from './api';
 
 export default function App() {
@@ -124,6 +124,8 @@ export default function App() {
   useEffect(() => bindSession({
     renewed: setToken,
     expired: () => {
+      // the cookie may still be alive (a refresh can fail on a hiccup) — kill the family too
+      logout();
       setToken(null);
       setWarning('Your session expired — sign in again to vote or comment.');
     },
@@ -251,7 +253,10 @@ export default function App() {
 
       <Container maxWidth="md" sx={{ py: 2 }}>
         <Stack spacing={2}>
-          <AuthPanel token={token} user={user} onToken={setToken} onLogout={() => setToken(null)} />
+          {/* sign-out ends the session server-side too — the refresh cookie outlives the token
+              by ~a day, and dropping only the token left it valid for the next person */}
+          <AuthPanel token={token} user={user} onToken={setToken}
+                     onLogout={() => { logout(); setToken(null); }} />
 
           {tagFilter && !showFavourites && (
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>

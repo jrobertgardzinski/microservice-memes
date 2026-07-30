@@ -29,9 +29,10 @@ class S3ObjectStore implements ObjectStore {
 
     private final S3Client s3;
     private final String bucket;
+    private final PendingBlobDeletes pending;
 
     @Autowired   // two constructors: Spring must be told the Environment one is the container's
-    S3ObjectStore(Environment env) {
+    S3ObjectStore(Environment env, PendingBlobDeletes pending) {
         this(S3Client.builder()
                         .endpointOverride(URI.create(required(env, "memes.s3.endpoint")))
                         .region(Region.of(env.getProperty("memes.s3.region", "us-east-1")))
@@ -39,12 +40,14 @@ class S3ObjectStore implements ObjectStore {
                                 required(env, "memes.s3.access-key"), required(env, "memes.s3.secret-key"))))
                         .forcePathStyle(env.getProperty("memes.s3.path-style", Boolean.class, true))
                         .build(),
-                env.getProperty("memes.s3.bucket", "memes"));
+                env.getProperty("memes.s3.bucket", "memes"),
+                pending);
     }
 
-    S3ObjectStore(S3Client s3, String bucket) {
+    S3ObjectStore(S3Client s3, String bucket, PendingBlobDeletes pending) {
         this.s3 = s3;
         this.bucket = bucket;
+        this.pending = pending;
         try {
             s3.createBucket(b -> b.bucket(bucket));
         } catch (BucketAlreadyOwnedByYouException exists) {
@@ -70,8 +73,11 @@ class S3ObjectStore implements ObjectStore {
     public void delete(String key) {
         // the bucket is outside any DB transaction: within the delete/purge seam the object goes
         // only after the DB part commits, so a rollback never resurrects a meme row whose bytes
-        // are already gone (same reasoning as the filesystem adapter)
-        TransactionAwareDeletes.afterCommitOrNow(() -> s3.deleteObject(b -> b.bucket(bucket).key(key)));
+        // are already gone (same reasoning as the filesystem adapter). And because "after the commit"
+        // used to mean "in this JVM's memory, or never", the obligation itself is written into the
+        // transaction — this is the store where losing it means a person's photographs stay in a
+        // bucket after they were told the deletion is done (PendingBlobDeletes).
+        pending.deleteDurably(key, () -> s3.deleteObject(b -> b.bucket(bucket).key(key)));
     }
 
     private static String required(Environment env, String property) {
