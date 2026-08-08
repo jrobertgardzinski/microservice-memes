@@ -106,9 +106,9 @@ And the road NOT taken — the same picture when a participant stays silent:
   timer — deliberately. The closure and the verdict are published and marked announced together,
   so the next sweep re-publishes both; if it never does, `StuckErasureWatch` gauges the backlog
   (`memes_erasure_backlog`) and says in the log that the content is hidden but not erased.
-- **`microservice-user-collections` is not converted yet.** It still erases the leaver's
-  favourites on the mark, so a compensated saga gives back memes and comments but not the saved
-  list. Written down as an open debt in ADR 0007, not overlooked.
+- **All three participants behave this way**, user-collections included. Its own difference is
+  that the refs it saves are opaque, so its closure applies no rule — it deletes exactly the rows
+  the mark reserved, in one statement.
 - **Security's own safety net** (`account-deletion.purge-timeout`, 5 min) sits deliberately
   *after* the portal's timeout, so the portal's failure announcement normally wins the race.
 - **Identity-only deployments** (no portal at all) set `account-deletion.await-portal-purge=false`
