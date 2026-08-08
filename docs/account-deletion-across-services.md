@@ -109,8 +109,10 @@ And the road NOT taken — the same picture when a participant stays silent:
 - **All three participants behave this way**, user-collections included. Its own difference is
   that the refs it saves are opaque, so its closure applies no rule — it deletes exactly the rows
   the mark reserved, in one statement.
-- **Security's own safety net** (`account-deletion.purge-timeout`, 5 min) sits deliberately
-  *after* the portal's timeout, so the portal's failure announcement normally wins the race.
+- **Security's own safety net** (`account-deletion.purge-timeout`, **12 min**) sits deliberately
+  *after* the portal's WORST CASE — `purgeTimeout x (retries + 1)` = 8 minutes — so the portal's
+  failure announcement wins the race and the net is left for what it is for: a coordinator that
+  died. It stood at 5 min until 2026-08-08 and had quietly become the first of the two to fire.
 - **Identity-only deployments** (no portal at all) set `account-deletion.await-portal-purge=false`
   and delete immediately. Handy to know, dangerous to test with: see the trap below.
 
