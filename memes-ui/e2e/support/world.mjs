@@ -164,17 +164,21 @@ class GalleryWorld {
    * first (P18 poz. 2) — a merely-live session, which is all a thief needs, must not be able to
    * add a factor the thief holds. The seeding path proves it the way a person would: with the
    * password, since an account without factors has nothing else to prove with.
+   *
+   * <p>The ACTION is a parameter because the elevation is keyed by token AND action: minting
+   * recovery codes sits behind the same door under its own name, and an elevation bought for
+   * 'enrol-factor' does not open it.
    */
-  async stepUpToEnrol(auth) {
+  async stepUpToEnrol(auth, action = 'enrol-factor') {
     // mark BEFORE the request: a factored account gets a code mailed by this very call, and
     // reading the mailbox without the marker races it and finds the previous one
     this.markCodeRequested();
     const r = await fetch(`${SECURITY}/account/step-up`, {
       method: 'POST',
       headers: auth,
-      body: JSON.stringify({ action: 'enrol-factor', password: this.account.password }),
+      body: JSON.stringify({ action, password: this.account.password }),
     });
-    if (!r.ok) throw new Error(`step-up before enrolment refused: ${r.status}`);
+    if (!r.ok) throw new Error(`step-up for ${action} refused: ${r.status}`);
     const body = await r.json();
     if (body.status === 'ELEVATED') return;
     // an account that already carries a factor finishes the chain with the mailed code
@@ -190,9 +194,13 @@ class GalleryWorld {
   /** The one-time codes shown exactly once when generated — kept for the scenario that spends one. */
   async generateRecoveryCodes() {
     const token = await this.apiToken();
+    const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+    // spare keys that bypass the whole factor chain: security demands a fresh elevation for them
+    // under their own action name, exactly as it does for enrolment
+    await this.stepUpToEnrol(auth, 'generate-recovery-codes');
     const r = await fetch(`${SECURITY}/account/recovery-codes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: auth,
     });
     if (!r.ok) throw new Error(`recovery codes refused: ${r.status}`);
     return (await r.json()).codes;
