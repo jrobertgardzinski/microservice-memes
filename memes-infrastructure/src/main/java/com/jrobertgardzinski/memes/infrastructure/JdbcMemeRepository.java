@@ -17,6 +17,15 @@ import java.util.Optional;
  * bytes delegated to the {@link ObjectStore} — written and read together, so a meme and its
  * object never drift. The publication time recorded on save is what the hot ranking decays by;
  * the ranking reads it joined onto the vote aggregate, not one meme at a time.
+ *
+ * <p><strong>Every SELECT below names {@code active_memes}, never {@code memes}</strong> — the view
+ * V10 created, whose whole body is {@code WHERE status = 'ACTIVE'}. That is the single place the
+ * account-deletion filter is written down in this service: a meme a running saga has marked is
+ * absent from the gallery, from {@code /meta}, from the existence checks that gate votes and
+ * thumbnails, and from the ids the ranking may speak about, without any of those queries knowing
+ * that erasure exists. Writes still name the table, because a view is not what you insert a meme
+ * into — and {@code MemeReadFilterTest} enforces exactly that split, so the next SELECT written
+ * here cannot quietly become the leak.
  */
 @Repository
 class JdbcMemeRepository implements MemeRepository {
@@ -52,7 +61,7 @@ class JdbcMemeRepository implements MemeRepository {
     public Optional<MemeMetadata> findMetadata(String id) {
         // the row alone — no ObjectStore round trip. The port's default would go through find(),
         // which is exactly the blob read (and the false 404) this method exists to avoid.
-        return jdbc.sql("SELECT id, author, format FROM memes WHERE id = ?")
+        return jdbc.sql("SELECT id, author, format FROM active_memes WHERE id = ?")
                 .params(id)
                 .query((rs, n) -> new MemeMetadata(
                         rs.getString("id"), rs.getString("author"), rs.getString("format")))
@@ -63,7 +72,7 @@ class JdbcMemeRepository implements MemeRepository {
     public boolean exists(String id) {
         // row lookup only — the port's default would drag the blob out of the ObjectStore just to
         // throw it away; ServeMeme calls this on every WebP cache write to spot a concurrent delete
-        return jdbc.sql("SELECT 1 FROM memes WHERE id = ?")
+        return jdbc.sql("SELECT 1 FROM active_memes WHERE id = ?")
                 .params(id)
                 .query((rs, n) -> 1)
                 .optional()
@@ -77,14 +86,14 @@ class JdbcMemeRepository implements MemeRepository {
         }
         // one lookup for the whole set: the port's default would be an exists() per id, which for a
         // page of the wall is a query per tile
-        return jdbc.sql("SELECT id FROM memes WHERE id IN (:ids)")
+        return jdbc.sql("SELECT id FROM active_memes WHERE id IN (:ids)")
                 .param("ids", ids.stream().distinct().toList())
                 .query((rs, n) -> rs.getString("id")).list();
     }
 
     @Override
     public List<String> allIds() {
-        return jdbc.sql("SELECT id FROM memes ORDER BY published_at DESC, id DESC")
+        return jdbc.sql("SELECT id FROM active_memes ORDER BY published_at DESC, id DESC")
                 .query((rs, n) -> rs.getString("id")).list();
     }
 
@@ -92,18 +101,19 @@ class JdbcMemeRepository implements MemeRepository {
     public List<String> allIds(long offset, int limit) {
         // the page is cut by the database, not by the JVM: the port's default would fetch the
         // whole gallery to hand back fifty ids
-        return jdbc.sql("SELECT id FROM memes ORDER BY published_at DESC, id DESC LIMIT ? OFFSET ?")
+        return jdbc.sql("SELECT id FROM active_memes ORDER BY published_at DESC, id DESC LIMIT ? OFFSET ?")
                 .params(limit, offset)
                 .query((rs, n) -> rs.getString("id")).list();
     }
 
-    @Override
-    public List<String> findIdsByAuthor(String author) {
-        return jdbc.sql("SELECT id FROM memes WHERE author = ?")
-                .params(author)
-                .query((rs, n) -> rs.getString("id")).list();
-    }
-
+    /**
+     * <strong>The saga's pivot, in the one line that crosses it:</strong> {@code objects.delete}
+     * below removes the image from object storage (MinIO/S3 in the deployed stack), and no
+     * compensation exists for that — which is why the account-deletion saga only ever reaches this
+     * method from the orchestrator's CLOSURE command, once every participant has confirmed its
+     * reversible mark. Past this point the saga has one move left, retrying, and V9's
+     * {@code pending_blob_deletes} is what makes retrying possible after a crash.
+     */
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void deleteById(String memeId) {

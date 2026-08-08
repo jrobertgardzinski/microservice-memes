@@ -207,7 +207,17 @@ piksel: skaler interpoluje) i asercje `getRGB >>> 24 == 0` po skalowaniu na ści
 `MemeControllerTest` pinuje cały łańcuch (upload → magazyn → serwowanie). Sprawdzone też na żywym
 stacku: 1600×1200 RGBA wgrane przez API wraca jako 1024×768 colourType=6 z przezroczystą ćwiartką.
 
-## Otwarte — najbliższe (małe moduły, "à la security")
+## Otwarte
+- **Kompensacja sagi offboardingu (ADR 0007) — WDROŻONE 2026-08-08.** Komenda czyszczenia
+  **oznacza** treści (`PENDING_ERASURE` + `markedForErasureAt`), kasuje dopiero
+  `ERASE_USER_CONTENT`, a `RESTORE_USER_CONTENT` cofa oznaczenie. Filtr `ACTIVE` jest w jednym
+  miejscu — w widoku bazodanowym — a strażnik źródeł wywala build, gdy jakikolwiek SQL poza
+  adapterem wymazywania nazwie tabelę bazową. Otwarte:
+  - **Alarm zaległości nie ma reguły w Prometheusie** — jest gauge (`*_erasure_backlog`) i linia
+    w logu, nie ma alertu. Zgubione domknięcie to problem RODO, więc powinien być.
+  - (opc.) `pendingSince` używa tylko `StuckErasureWatch`; gdyby kiedyś przyszła polityka
+    retencji, to jest miejsce, w którym się ją dopina — ale **nigdy** jako kasowanie z upływu czasu.
+ — najbliższe (małe moduły, "à la security")
 - ~~Tagi + wyszukiwanie~~ — ZROBIONE (2026-07-04): moduł `memes-tags` (VO `Tag`: normalizacja
   lowercase/trim, 2..30 znaków [a-z0-9-], pojedyncze myślniki), use case'y `TagMeme` (autor
   kuratorem — REPLACE całego zestawu, limit `TagLimits` z env `memes.tags.max-per-meme:8`,

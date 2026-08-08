@@ -152,15 +152,35 @@ class MemesConfig {
     }
 
     @Bean
-    PurgeUserContent purgeUserContent(MemeRepository memeRepository, VoteRepository voteRepository,
+    PurgeUserContent purgeUserContent(MemeRepository memeRepository,
+                                      com.jrobertgardzinski.memes.application.MemeErasure erasure,
+                                      VoteRepository voteRepository,
                                       MemeContentIndex contentIndex, TagRepository tagRepository,
                                       MemeEvents memeEvents,
                                       com.jrobertgardzinski.memes.application.PurgePolicyOverride override,
                                       PurgeRule defaultMemesPurgeRule,
                                       org.springframework.transaction.support.TransactionTemplate tx) {
         // transactional decorator — a purge that dies halfway must not strand half the leaver's memes
-        return new TransactionalPurgeUserContent(memeRepository, voteRepository, contentIndex,
+        return new TransactionalPurgeUserContent(memeRepository, erasure, voteRepository, contentIndex,
                 tagRepository, memeEvents, override, defaultMemesPurgeRule, tx);
+    }
+
+    /**
+     * The saga's reversible step and its inverse. Neither gets a transactional decorator of its own:
+     * both are driven exclusively by {@code PurgeCommandsListener}, which already opens ONE
+     * transaction per command so the work and the outbox row that reports it commit together —
+     * a second template inside it would only nest a participation in the same transaction.
+     */
+    @Bean
+    com.jrobertgardzinski.memes.application.MarkUserContentForErasure markUserContentForErasure(
+            com.jrobertgardzinski.memes.application.MemeErasure erasure, java.time.Clock clock) {
+        return new com.jrobertgardzinski.memes.application.MarkUserContentForErasure(erasure, clock);
+    }
+
+    @Bean
+    com.jrobertgardzinski.memes.application.RestoreUserContent restoreUserContent(
+            com.jrobertgardzinski.memes.application.MemeErasure erasure) {
+        return new com.jrobertgardzinski.memes.application.RestoreUserContent(erasure);
     }
 
     @Bean

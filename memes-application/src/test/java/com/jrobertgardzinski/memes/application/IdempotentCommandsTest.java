@@ -84,6 +84,7 @@ class IdempotentCommandsTest {
             }
         };
         final MemeEvents memeEvents = announced::add;
+        final FakeMemeErasure erasure = new FakeMemeErasure(memes);
 
         World() {
             memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
@@ -107,6 +108,10 @@ class IdempotentCommandsTest {
             f.put("tags", Map.copyOf(tags));
             f.put("nsfw", Map.copyOf(nsfw));
             f.put("announced", List.copyOf(announced));
+            // the saga's reservations are state like any other: a mark that a redelivered command
+            // moved (a fresh timestamp on an old obligation) is exactly the kind of drift ADR 0006
+            // forbids, and it would be invisible without this line
+            f.put("marks", erasure.marks());
             return f;
         }
     }
@@ -116,6 +121,10 @@ class IdempotentCommandsTest {
         public void set(PurgeRule rule, String updatedBy) { }
         public void clear() { }
     };
+
+    /** A stopped clock: two runs of the same command must not differ by when they ran. */
+    private static final java.time.Clock CLOCK = java.time.Clock.fixed(
+            java.time.Instant.parse("2026-08-08T10:00:00Z"), java.time.ZoneOffset.UTC);
 
     private static final Map<String, Consumer<World>> COMMANDS = commands();
 
@@ -127,11 +136,22 @@ class IdempotentCommandsTest {
                 w.voteRepository, w.index, w.tagRepository, w.memeEvents).execute("ghost"));
         c.put("flag a meme NSFW (moderator)", w -> new FlagMeme(w.memeRepository, w.flags)
                 .execute("m2", true, true));
+        c.put("mark a leaver's gallery for erasure",
+                w -> new MarkUserContentForErasure(w.erasure, CLOCK).execute("alice@example.com"));
+        c.put("compensate: mark, then restore",
+                w -> {
+                    new MarkUserContentForErasure(w.erasure, CLOCK).execute("alice@example.com");
+                    new RestoreUserContent(w.erasure).execute("alice@example.com");
+                });
         c.put("purge a leaver's gallery (default rule)",
-                w -> new PurgeUserContent(w.memeRepository, w.voteRepository, w.index,
-                        w.tagRepository, w.memeEvents, NO_OVERRIDE,
-                        new PurgeRule.AnonymizeAuthor())
-                        .execute("alice@example.com", Optional.empty()));
+                w -> {
+                    // the whole saga, both phases: the closure erases what the mark reserved
+                    new MarkUserContentForErasure(w.erasure, CLOCK).execute("alice@example.com");
+                    new PurgeUserContent(w.memeRepository, w.erasure, w.voteRepository, w.index,
+                            w.tagRepository, w.memeEvents, NO_OVERRIDE,
+                            new PurgeRule.AnonymizeAuthor())
+                            .execute("alice@example.com", Optional.empty());
+                });
         return c;
     }
 

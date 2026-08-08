@@ -37,8 +37,11 @@ class JdbcVoteRepository implements VoteRepository {
         // the whole scenario out). V8's foreign key is what GUARANTEES no orphan can exist; the
         // WHERE EXISTS here decides what the loser of that race sees — a vote that quietly did not
         // happen on a meme that is gone, rather than a 500 from a constraint violation.
+        // active_memes, not memes: a meme a running account-deletion saga has reserved is not
+        // something the world may vote on either — and the ballot would then have to be restored
+        // (or not) by the compensation, which is a decision nobody should have to make
         jdbc.sql("INSERT INTO meme_votes (meme_id, voter, direction) "
-                        + "SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM memes WHERE id = ?)")
+                        + "SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM active_memes WHERE id = ?)")
                 .params(memeId, voter, direction.name(), memeId).update();
     }
 
@@ -70,13 +73,18 @@ class JdbcVoteRepository implements VoteRepository {
         // page needs score AND age, and asking for the age one meme at a time (from inside a
         // comparator, no less) cost more round-trips than the table has rows.
         //
-        // LEFT, not INNER: a ballot whose meme row is gone still reaches the ranking, with no
-        // publication time — the use case decides what an unknown age means, the adapter does
-        // not quietly drop rows the ranking never learns about.
+        // INNER, and against active_memes — which is a change from the LEFT JOIN this query used
+        // to do, for a reason the erasure status made unavoidable. The use case reads a missing
+        // publication time as "brand new" (an unknown age must not bury a current meme), so a
+        // ballot whose meme is merely RESERVED by a running saga would have arrived here with a
+        // null age and been ranked straight to the top of a public page — the leaver's content,
+        // promoted by the very act of deleting their account. The old tolerance protected against
+        // orphan ballots, which V8's foreign key has made impossible since; the ranking now speaks
+        // only about memes the gallery actually has, exactly like ShowMemeScores.
         return jdbc.sql("SELECT v.meme_id, "
                         + "SUM(CASE WHEN v.direction = 'UP' THEN 1 ELSE -1 END) AS score, "
                         + "m.published_at "
-                        + "FROM meme_votes v LEFT JOIN memes m ON m.id = v.meme_id "
+                        + "FROM meme_votes v JOIN active_memes m ON m.id = v.meme_id "
                         + "GROUP BY v.meme_id, m.published_at")
                 .query((rs, n) -> {
                     Timestamp published = rs.getTimestamp("published_at");

@@ -2,7 +2,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.application.RestoreUserContent;
 import com.jrobertgardzinski.memes.config.PurgeRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,10 +16,31 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The meme service's side of the account-deletion saga: a PURGE_USER_CONTENT command (the command
- * microservice-offboarding publishes) purges the user's content and the confirmation goes back on
- * {@code memes-events}. The purge is idempotent, so at-least-once delivery needs no extra dedup.
- * Enabled only where a broker exists (compose sets KAFKA_ENABLED) — tests exercise the use case
+ * The meme service's side of the account-deletion saga — now a participant in TWO phases, which is
+ * what makes the saga compensatable at all.
+ *
+ * <ul>
+ *   <li>{@code PURGE_USER_CONTENT} — the reversible step: the leaver's memes are MARKED
+ *       ({@link MarkUserContentForErasure}), which takes them out of every public read and destroys
+ *       nothing, and the confirmation goes back on {@code memes-events} exactly as before. The name
+ *       on the wire is unchanged on purpose: the orchestrator's contract with its participants is
+ *       "make this leaver's content go away and tell me when", and the pacts that pin the envelope
+ *       stay green. What changed is what "go away" costs to take back.</li>
+ *   <li>{@code ERASE_USER_CONTENT} — the closure: every participant has confirmed, the saga cannot
+ *       fail any more, and {@link PurgeUserContent} destroys what the rule says to destroy. This is
+ *       the command that crosses the pivot.</li>
+ *   <li>{@code RESTORE_USER_CONTENT} — the compensation: a sibling participant failed, so the marks
+ *       come off ({@link RestoreUserContent}) and the content is back in the gallery.</li>
+ * </ul>
+ *
+ * <p>All three are idempotent, so at-least-once delivery needs no extra dedup. Only the first is
+ * confirmed: the closure and the compensation are the orchestrator ENDING the case, and a
+ * participant answering them would only tell it something it has already decided. What guards them
+ * instead is retrying (the same {@link SagaRetryBudget} as the first phase) and, for a closure lost
+ * beyond it, {@link StuckErasureWatch} — the backlog of marks nobody closed is visible and alarmed
+ * on, never silently swept.
+ *
+ * <p>Enabled only where a broker exists (compose sets KAFKA_ENABLED) — tests exercise the use cases
  * directly and the whole loop runs in the workspace smoke test.
  *
  * <p><strong>The three guarantees this participant used to lack</strong> (the 26.07 audit's second
@@ -30,11 +53,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>a stalled listener loop no longer hides behind a green process — {@link SagaListenersHealth}
  *       turns readiness red;</li>
  *   <li>the confirmation is no longer a bare fire-and-forget send — {@link PurgeConfirmations} writes
- *       it into the outbox, in the SAME transaction as the purge it confirms.</li>
+ *       it into the outbox, in the SAME transaction as the step it confirms.</li>
  * </ul>
  *
- * <p>That last one is why this class opens a transaction: only here are the erasure and its
- * confirmation one unit of work. Either the leaver's memes are gone AND the outbox owes the
+ * <p>That last one is why this class opens a transaction: only here are the mark and its
+ * confirmation one unit of work. Either the leaver's memes are reserved AND the outbox owes the
  * orchestrator a confirmation, or neither happened and the command comes back. The use case's own
  * transactional decorator joins this one (Spring's default propagation), exactly as
  * {@code MemesEventsListener} does for the cascade in microservice-comments.
@@ -45,13 +68,26 @@ class PurgeCommandsListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(PurgeCommandsListener.class);
 
+    /** The reversible mark; its confirmation is what the orchestrator's quorum counts. */
+    static final String MARK = "PURGE_USER_CONTENT";
+    /** The closure: past this command the saga has nothing left to compensate with. */
+    static final String ERASE = "ERASE_USER_CONTENT";
+    /** The compensation: the marks come off and the content is public again. */
+    static final String RESTORE = "RESTORE_USER_CONTENT";
+
+    private final MarkUserContentForErasure markForErasure;
+    private final RestoreUserContent restoreUserContent;
     private final PurgeUserContent purgeUserContent;
     private final PurgeConfirmations confirmations;
     private final ObjectMapper mapper;
     private final TransactionTemplate tx;
 
-    PurgeCommandsListener(PurgeUserContent purgeUserContent, PurgeConfirmations confirmations,
+    PurgeCommandsListener(MarkUserContentForErasure markForErasure,
+                          RestoreUserContent restoreUserContent,
+                          PurgeUserContent purgeUserContent, PurgeConfirmations confirmations,
                           ObjectMapper mapper, TransactionTemplate tx) {
+        this.markForErasure = markForErasure;
+        this.restoreUserContent = restoreUserContent;
         this.purgeUserContent = purgeUserContent;
         this.confirmations = confirmations;
         this.mapper = mapper;
@@ -142,42 +178,65 @@ class PurgeCommandsListener {
                     payload == null ? 0 : payload.length());
             return;
         }
-        if (!"PURGE_USER_CONTENT".equals(command.path("type").asText())) {
+        String type = command.path("type").asText();
+        if (!MARK.equals(type) && !ERASE.equals(type) && !RESTORE.equals(type)) {
             return;
         }
         String sagaId = command.path("sagaId").asText();
         String email = command.path("email").asText();
         if (email.isBlank()) {
-            // a purge keyed by NOBODY would "succeed" instantly and confirm a deletion that never
-            // happened — the saga would advance on a lie. Drop it WITHOUT confirming: the command
-            // is malformed at the source, and the orchestrator's timeout is the honest signal.
-            LOG.warn("dropping PURGE_USER_CONTENT without an email (saga {})", sagaId);
+            // a command keyed by NOBODY would "succeed" instantly — and for the mark it would
+            // confirm a deletion that never happened, advancing the saga on a lie. Drop it WITHOUT
+            // confirming: the command is malformed at the source, and the orchestrator's timeout is
+            // the honest signal.
+            LOG.warn("dropping {} without an email (saga {})", type, sagaId);
             return;
         }
-        // the policy is read OUTSIDE the transaction: it is pure parsing, and its WARN about an
-        // unreadable rule must not be re-logged on every retry of the same command
-        java.util.Optional<PurgeRule> policy = requestedPolicy(command);
-        purgeAndConfirm(sagaId, email, policy);
-        // the saga id identifies the run in logs; the e-mail is PII and stays out of INFO lines —
-        // writing it here would outlive the erasure this very line reports (logs ship to Loki,
-        // which knows nothing about the saga's 30-day retention)
-        LOG.info("purged the memes of one leaver (saga {})", sagaId);
+        switch (type) {
+            case MARK -> {
+                markAndConfirm(sagaId, email);
+                // the saga id identifies the run in logs; the e-mail is PII and stays out of INFO
+                // lines — writing it here would outlive the erasure this very line reports (logs
+                // ship to Loki, which knows nothing about the saga's 30-day retention)
+                LOG.info("marked one leaver's memes for erasure (saga {})", sagaId);
+            }
+            case ERASE -> {
+                // the policy is read OUTSIDE the transaction: it is pure parsing, and its WARN
+                // about an unreadable rule must not be re-logged on every retry of the same
+                // command. It rides the CLOSURE, not the mark, because the rule reads vote scores
+                // and the scores are only final once the leaver's own votes are retracted — which
+                // is part of the erasure itself (see PurgeUserContent)
+                java.util.Optional<PurgeRule> policy = requestedPolicy(command);
+                tx.executeWithoutResult(status -> purgeUserContent.execute(email, policy));
+                LOG.info("erased one leaver's marked memes on the saga's closure (saga {})", sagaId);
+            }
+            case RESTORE -> {
+                tx.executeWithoutResult(status -> restoreUserContent.execute(email));
+                LOG.info("restored one leaver's marked memes: the saga compensated (saga {})", sagaId);
+            }
+            default -> throw new IllegalStateException("unreachable: " + type);
+        }
     }
 
     /**
-     * The erasure and the promise to report it, as ONE transaction. A failure anywhere inside
+     * The mark and the promise to report it, as ONE transaction. A failure anywhere inside
      * propagates out of {@link #receive}, which is what makes the error handler retry the record with
-     * backoff and — the purge being idempotent — run the whole thing again.
+     * backoff and — the mark being idempotent — run the whole thing again.
      *
      * <p>The confirmation is announced INSIDE, not after: announcing after the commit would leave a
-     * window where the memes are gone and nothing owes the orchestrator a word about it, which is the
-     * failure mode that ends with the leaver holding a restored account without their content. The
-     * outbox library parks the actual send on the commit, so nothing is published before the erasure
-     * is real.
+     * window where the memes are hidden and nothing owes the orchestrator a word about it, which is
+     * the failure mode that ends with the leaver holding a restored account and invisible content.
+     * The outbox library parks the actual send on the commit, so nothing is published before the
+     * mark is real.
+     *
+     * <p>Note what this transaction is now worth: before the two phases, the same guarantee still
+     * left the orchestrator holding a confirmation for content that was already destroyed, so a
+     * LATER participant's failure had nothing to undo. Now the confirmation says "reserved", and
+     * reserving is a thing that can be given back.
      */
-    private void purgeAndConfirm(String sagaId, String email, java.util.Optional<PurgeRule> policy) {
+    private void markAndConfirm(String sagaId, String email) {
         tx.executeWithoutResult(status -> {
-            purgeUserContent.execute(email, policy);
+            markForErasure.execute(email);
             confirmations.confirm(sagaId, email);
         });
     }

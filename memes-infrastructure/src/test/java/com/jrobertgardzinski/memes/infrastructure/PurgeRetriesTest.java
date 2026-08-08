@@ -4,7 +4,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.application.RestoreUserContent;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -20,7 +22,6 @@ import org.springframework.kafka.listener.MessageListenerContainer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,8 +58,10 @@ class PurgeRetriesTest {
 
     private final PurgeUserContent purgeUserContent = mock(PurgeUserContent.class);
     private final PurgeConfirmations confirmations = mock(PurgeConfirmations.class);
-    private final PurgeCommandsListener listener = new PurgeCommandsListener(
-            purgeUserContent, confirmations, new ObjectMapper(), NoTransactions.template());
+    private final MarkUserContentForErasure markForErasure = mock(MarkUserContentForErasure.class);
+    private final PurgeCommandsListener listener = new PurgeCommandsListener(markForErasure,
+            mock(RestoreUserContent.class), purgeUserContent, confirmations, new ObjectMapper(),
+            NoTransactions.template());
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final DefaultErrorHandler errorHandler = SagaParticipantConfig.errorHandler(
@@ -112,7 +115,7 @@ class PurgeRetriesTest {
     }
 
     @Test
-    @DisplayName("a store outage that passes: the command is redelivered and the purge then happens")
+    @DisplayName("a store outage that passes: the command is redelivered and the mark then happens")
     void a_transient_outage_is_ridden_out() throws Exception {
         AtomicInteger attempts = new AtomicInteger();
         Mockito.doAnswer(attempt -> {
@@ -120,13 +123,13 @@ class PurgeRetriesTest {
                 throw new org.springframework.dao.QueryTimeoutException("the pool is momentarily empty");
             }
             return null;
-        }).when(purgeUserContent).execute(LEAVER, Optional.empty());
+        }).when(markForErasure).execute(LEAVER);
 
         assertFalse(deliverOnce(), "the first delivery fails — the handler must ask for a redelivery,"
-                + " not commit the offset over a purge that did not happen");
+                + " not commit the offset over a mark that did not happen");
         assertFalse(deliverOnce(), "and the second one succeeds, so nothing is recovered/dropped");
 
-        assertEquals(2, attempts.get(), "the purge ran again on redelivery — it is idempotent by design");
+        assertEquals(2, attempts.get(), "the mark ran again on redelivery — it is idempotent by design");
         Mockito.verify(confirmations).confirm(SAGA, LEAVER);
         assertEquals(0, dropped(), "nothing was dropped, so the counter that alerts stays at zero");
     }
@@ -135,7 +138,7 @@ class PurgeRetriesTest {
     @DisplayName("a store outage that does not pass: the retrying ends with the budget, not never")
     void a_permanent_outage_ends_with_the_budget() throws Exception {
         Mockito.doThrow(new org.springframework.dao.DataAccessResourceFailureException("no database"))
-                .when(purgeUserContent).execute(LEAVER, Optional.empty());
+                .when(markForErasure).execute(LEAVER);
 
         int deliveries = 0;
         long startedAt = System.nanoTime();
@@ -158,10 +161,13 @@ class PurgeRetriesTest {
     void the_drop_is_counted_and_says_nothing_private() throws Exception {
         Mockito.doThrow(new org.springframework.dao.DataAccessResourceFailureException(
                         "FATAL: password authentication failed for user \"" + LEAVER + "\""))
-                .when(purgeUserContent).execute(LEAVER, Optional.empty());
+                .when(markForErasure).execute(LEAVER);
 
+        int deliveries = 0;
         while (!deliverOnce()) {
-            // spend the budget
+            // spend the budget — bounded, because a listener that stops throwing would otherwise
+            // spin here for ever instead of failing (it did, on the day the mark was introduced)
+            assertTrue(deliveries++ < 500, "the retrying is not bounded by anything");
         }
 
         assertEquals(1, dropped(), "one increment = one account deletion this service did not finish;"

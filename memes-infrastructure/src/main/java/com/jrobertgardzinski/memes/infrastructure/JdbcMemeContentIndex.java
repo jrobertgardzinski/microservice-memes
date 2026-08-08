@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 
 /**
  * Postgres-backed {@link MemeContentIndex} (H2 in dev/tests): the SHA-256 is the primary key, so
@@ -31,8 +32,27 @@ class JdbcMemeContentIndex implements MemeContentIndex {
                     .params(hash, candidateId).update();
             return candidateId;
         } catch (DuplicateKeyException alreadyClaimed) {
-            return jdbc.sql("SELECT meme_id FROM content_index WHERE content_hash = ?")
-                    .params(hash).query((rs, n) -> rs.getString("meme_id")).single();
+            // The claim is only worth honouring while the meme holding it is in the gallery — hence
+            // active_memes, the same filter every other read in this service goes through. This is
+            // the read path the erasure work nearly missed: a leaver's meme marked PENDING_ERASURE
+            // still held its hash, so re-uploading that picture answered with the marked meme's id
+            // — a 200 pointing at content the gallery refuses to show, and a way to prove by
+            // experiment that a given image had been posted by the account being deleted.
+            Optional<String> activeOwner = jdbc.sql(
+                            "SELECT c.meme_id FROM content_index c "
+                                    + "JOIN active_memes m ON m.id = c.meme_id WHERE c.content_hash = ?")
+                    .params(hash).query((rs, n) -> rs.getString("meme_id")).optional();
+            if (activeOwner.isPresent()) {
+                return activeOwner.get();
+            }
+            // The holder is reserved (or gone without taking its claim along): the newcomer takes
+            // the hash over, so the upload succeeds as its own meme. If the saga is compensated and
+            // the old meme comes back, the two identical pictures simply both exist — dedup is a
+            // storage economy, never a correctness rule, and one duplicate is a far smaller wrong
+            // than either refusing the upload or pointing it at somebody else's erasure.
+            jdbc.sql("UPDATE content_index SET meme_id = ? WHERE content_hash = ?")
+                    .params(candidateId, hash).update();
+            return candidateId;
         }
     }
 

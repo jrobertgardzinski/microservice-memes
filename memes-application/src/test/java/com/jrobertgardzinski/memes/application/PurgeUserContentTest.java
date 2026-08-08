@@ -100,7 +100,23 @@ class PurgeUserContentTest {
         }
     };
 
-    private final PurgeUserContent purge = new PurgeUserContent(memeRepository, voteRepository, index, tagRepository, memeEvents, override, new PurgeRule.Delete());
+    private final FakeMemeErasure erasure = new FakeMemeErasure(memes);
+    private final java.time.Clock clock =
+            java.time.Clock.fixed(java.time.Instant.parse("2026-08-08T10:00:00Z"), java.time.ZoneOffset.UTC);
+    private final MarkUserContentForErasure mark = new MarkUserContentForErasure(erasure, clock);
+    private final RestoreUserContent restore = new RestoreUserContent(erasure);
+    private final PurgeUserContent purge = new PurgeUserContent(memeRepository, erasure, voteRepository, index, tagRepository, memeEvents, override, new PurgeRule.Delete());
+
+    /**
+     * The saga as the participant sees it when everything goes right: the reversible mark, then the
+     * orchestrator's closure. Every test below that used to call the purge on its own goes through
+     * both phases now, because the erasure acts on what the MARK reserved — a purge that arrives
+     * without one has, correctly, nothing to do.
+     */
+    private void markThenErase(String author, Optional<PurgeRule> rule) {
+        mark.execute(author);
+        purge.execute(author, rule);
+    }
 
     @Test
     @DisplayName("the leaver's memes disappear with their votes; the thread owner is told")
@@ -109,7 +125,7 @@ class PurgeUserContentTest {
         contentIndex.put("leavers-content", "leavers-meme");
         memeVotes.put("leavers-meme", new HashMap<>(Map.of("somebody-else@example.com", VoteDirection.UP)));
 
-        purge.execute("leaver@example.com", Optional.empty());
+        markThenErase("leaver@example.com", Optional.empty());
 
         assertTrue(memes.isEmpty());
         assertTrue(memeVotes.isEmpty());
@@ -125,7 +141,7 @@ class PurgeUserContentTest {
         memeVotes.put("hit", new HashMap<>(Map.of(
                 "a@example.com", VoteDirection.UP, "b@example.com", VoteDirection.UP)));
 
-        purge.execute("leaver@example.com", Optional.of(new PurgeRule.KeepPopularAnonymized(2)));
+        markThenErase("leaver@example.com", Optional.of(new PurgeRule.KeepPopularAnonymized(2)));
 
         assertEquals(DeletedAccount.AUTHOR, memes.get("hit").author());
         assertFalse(memes.containsKey("flop"));
@@ -141,7 +157,7 @@ class PurgeUserContentTest {
         memeVotes.put("self-liked", new HashMap<>(Map.of(
                 "leaver@example.com", VoteDirection.UP, "a@example.com", VoteDirection.UP)));
 
-        purge.execute("leaver@example.com", Optional.of(new PurgeRule.KeepPopularAnonymized(2)));
+        markThenErase("leaver@example.com", Optional.of(new PurgeRule.KeepPopularAnonymized(2)));
 
         assertFalse(memes.containsKey("self-liked"),
                 "a meme kept only by the leaver's own vote is not what the community liked");
@@ -154,7 +170,7 @@ class PurgeUserContentTest {
         adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
         memes.put("kept", new Meme("kept", "leaver@example.com", "png", new byte[]{1}));
 
-        purge.execute("leaver@example.com", Optional.empty());   // default says DELETE
+        markThenErase("leaver@example.com", Optional.empty());   // default says DELETE
 
         assertEquals(DeletedAccount.AUTHOR, memes.get("kept").author());
         assertTrue(announcedDeletions.isEmpty());
@@ -166,7 +182,7 @@ class PurgeUserContentTest {
         adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
         memes.put("gone", new Meme("gone", "leaver@example.com", "png", new byte[]{1}));
 
-        purge.execute("leaver@example.com", Optional.of(new PurgeRule.Delete()));
+        markThenErase("leaver@example.com", Optional.of(new PurgeRule.Delete()));
 
         assertTrue(memes.isEmpty());
         assertEquals(List.of("gone"), announcedDeletions);
@@ -179,8 +195,83 @@ class PurgeUserContentTest {
         memeVotes.put("other", new HashMap<>(Map.of(
                 "leaver@example.com", VoteDirection.UP, "stays@example.com", VoteDirection.UP)));
 
-        purge.execute("leaver@example.com", Optional.empty());
+        markThenErase("leaver@example.com", Optional.empty());
 
         assertEquals(Map.of("stays@example.com", VoteDirection.UP), memeVotes.get("other"));
+    }
+
+    @Test
+    @DisplayName("the mark alone destroys nothing — that is what makes the saga compensatable")
+    void the_mark_is_reversible() {
+        memes.put("reserved", new Meme("reserved", "leaver@example.com", "png", new byte[]{1}));
+        contentIndex.put("leavers-content", "reserved");
+        memeVotes.put("reserved", new HashMap<>(Map.of("fan@example.com", VoteDirection.UP)));
+
+        mark.execute("leaver@example.com");
+
+        assertTrue(erasure.isMarked("reserved"), "the meme is out of the gallery");
+        assertTrue(memes.containsKey("reserved"), "...and still on disk");
+        assertEquals(Map.of("fan@example.com", VoteDirection.UP), memeVotes.get("reserved"));
+        assertFalse(contentIndex.isEmpty());
+        assertTrue(announcedDeletions.isEmpty(), "nobody is told a meme was deleted, because none was");
+    }
+
+    @Test
+    @DisplayName("the compensation puts the leaver's memes back exactly as they were")
+    void restore_undoes_the_mark() {
+        memes.put("reserved", new Meme("reserved", "leaver@example.com", "png", new byte[]{1}));
+        memeVotes.put("reserved", new HashMap<>(Map.of("fan@example.com", VoteDirection.UP)));
+        mark.execute("leaver@example.com");
+
+        restore.execute("leaver@example.com");
+
+        assertFalse(erasure.isMarked("reserved"), "back in the gallery");
+        assertEquals("leaver@example.com", memes.get("reserved").author(), "and still theirs");
+        assertEquals(Map.of("fan@example.com", VoteDirection.UP), memeVotes.get("reserved"));
+    }
+
+    @Test
+    @DisplayName("a meme the rule KEEPS comes back to the gallery anonymised, not hidden for ever")
+    void kept_memes_leave_the_reservation() {
+        adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
+        memes.put("kept", new Meme("kept", "leaver@example.com", "png", new byte[]{1}));
+
+        markThenErase("leaver@example.com", Optional.empty());
+
+        assertEquals(DeletedAccount.AUTHOR, memes.get("kept").author());
+        assertFalse(erasure.isMarked("kept"),
+                "a meme nobody is erasing must not sit in the erasure backlog for ever");
+    }
+
+    @Test
+    @DisplayName("every command arrives twice: marking, erasing and restoring are all idempotent")
+    void the_three_commands_survive_redelivery() {
+        memes.put("gone", new Meme("gone", "leaver@example.com", "png", new byte[]{1}));
+
+        mark.execute("leaver@example.com");
+        mark.execute("leaver@example.com");
+        restore.execute("leaver@example.com");
+        restore.execute("leaver@example.com");
+        assertFalse(erasure.isMarked("gone"));
+
+        mark.execute("leaver@example.com");
+        purge.execute("leaver@example.com", Optional.empty());
+        purge.execute("leaver@example.com", Optional.empty());
+
+        assertTrue(memes.isEmpty());
+        assertEquals(List.of("gone"), announcedDeletions,
+                "the second closure finds nothing reserved, so it announces nothing");
+    }
+
+    @Test
+    @DisplayName("a closure that arrives without a mark erases nothing")
+    void the_closure_only_acts_on_what_the_mark_reserved() {
+        memes.put("never-marked", new Meme("never-marked", "leaver@example.com", "png", new byte[]{1}));
+
+        purge.execute("leaver@example.com", Optional.empty());
+
+        assertTrue(memes.containsKey("never-marked"),
+                "the erasure acts on the reservation, never on 'everything by that author'");
+        assertTrue(announcedDeletions.isEmpty());
     }
 }

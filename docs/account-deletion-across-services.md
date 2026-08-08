@@ -26,14 +26,39 @@ gallery (memes-ui)                    security                     offboarding  
       │            ACCOUNT_DELETION_REQUESTED ─────────────────────────►│                                    │
       │                                  │                              │ content-commands:                  │
       │                                  │                              │ PURGE_USER_CONTENT ───────────────►│
-      │                                  │                              │                     purge per rule │
+      │                                  │                              │        MARK: status=PENDING_ERASURE│
+      │                                  │                              │        (invisible, nothing deleted)│
       │                                  │                              │◄── memes-events ───────────────────┤
       │                                  │                              │◄── comments-events ────────────────┤
       │                                  │                              │◄── usercollections-events ─────────┤
-      │                                  │  offboarding-events:         │ (all participants confirmed)       │
+      │                                  │                              │ (all participants confirmed)       │
+      │                                  │                              │ content-commands:                  │
+      │                                  │                              │ ERASE_USER_CONTENT ───────────────►│
+      │                                  │                              │        apply the rule, delete rows │
+      │                                  │                              │  ╔═════════════════════════════════╗
+      │                                  │                              │  ║ >>> THE PIVOT <<<               ║
+      │                                  │                              │  ║ the image leaves MinIO/S3.      ║
+      │                                  │                              │  ║ Past here: retry only,          ║
+      │                                  │                              │  ║ never compensation.             ║
+      │                                  │                              │  ╚═════════════════════════════════╝
+      │                                  │  offboarding-events:         │                                    │
       │                                  │◄─ PORTAL_CONTENT_PURGED ─────┤                                    │
       │                                  │ deletes the user for good    │                                    │
       │                                  │ mails ACCOUNT_DELETED        │                                    │
+```
+
+And the road NOT taken — the same picture when a participant stays silent:
+
+```
+      │                                  │                              │ (the sweeper gives up)             │
+      │                                  │                              │ content-commands:                  │
+      │                                  │                              │ RESTORE_USER_CONTENT ─────────────►│
+      │                                  │                              │        status back to ACTIVE:      │
+      │                                  │                              │        the content is public again │
+      │                                  │  offboarding-events:         │                                    │
+      │                                  │◄─ PORTAL_PURGE_FAILED ───────┤                                    │
+      │                                  │ unlocks the account          │                                    │
+      │                                  │ mails the apology            │                                    │
 ```
 
 1. **Step-up, not a click.** The danger zone proves it is really you before anything happens: the
@@ -50,18 +75,40 @@ gallery (memes-ui)                    security                     offboarding  
    command on `content-commands` and then waits for every participant it was configured with
    (`OFFBOARDING_PARTICIPANTS`, `name=confirmation-topic` pairs). Participants are configuration:
    a new content service joins the saga there, without a line changing in security.
-5. **Each participant purges on its own terms** and confirms on its own topic. This service's
-   side is `PurgeCommandsListener` → `PurgeUserContent`, and what "purge" means per axis is the
-   rule table in the README (`DELETE` / `ANONYMIZE_AUTHOR` / `KEEP_POPULAR_ANONYMIZED:n`).
-6. **Only then is the account gone.** offboarding announces `PORTAL_CONTENT_PURGED` on
+5. **Each participant MARKS, and marking is not deleting.** This service's side is
+   `PurgeCommandsListener` → `MarkUserContentForErasure`: the leaver's memes get
+   `status = PENDING_ERASURE` and leave the gallery, the tag search, the ranking and every image
+   URL at once — because all of those read through the `active_memes` view — while row, blob,
+   votes and authorship stay exactly where they were. The confirmation therefore means
+   *reserved*, not *destroyed*, and a reservation can be given back. (ADR 0007.)
+6. **The closure is what deletes.** Once every participant has confirmed, offboarding sends
+   `ERASE_USER_CONTENT` on the same topic, and only then does `PurgeUserContent` apply the rule
+   per axis (`DELETE` / `ANONYMIZE_AUTHOR` / `KEEP_POPULAR_ANONYMIZED:n`, the table in the
+   README). The rule is read HERE and not at the mark, because it scores votes and the leaver's
+   own votes are only retracted by the erasure itself. **The pivot is inside this step**: the
+   image leaving object storage is the one act no message can undo, which is why the saga only
+   reaches it when nothing can fail any more, and why the obligation to finish it is durable
+   (`pending_blob_deletes`, V9) rather than a promise in one JVM's memory.
+7. **Only then is the account gone.** offboarding announces `PORTAL_CONTENT_PURGED` on
    `offboarding-events`; security's `OffboardingOutcomeListener` finishes the deletion for real
    and mails the goodbye. The account exists until that message arrives.
 
 ## When it goes wrong
 
-- **A participant never confirms.** offboarding's sweeper gives up after its own timeout and
-  announces `PORTAL_PURGE_FAILED`; security compensates — the account is unlocked and the user
-  gets an apology mail. Nothing is half-deleted.
+- **A participant never confirms.** offboarding's sweeper gives up after its own timeout, sends
+  `RESTORE_USER_CONTENT` to **every** participant — including ones whose confirmation was merely
+  lost, because restoring what was never marked is a no-op — and only then announces
+  `PORTAL_PURGE_FAILED`; security unlocks the account and mails the apology. The leaver gets
+  their account back **with their memes and comments in it**: that is what the mark bought, and
+  before it existed the same path handed back an empty account with an apology for a deletion
+  that had, in fact, happened.
+- **A closure is lost.** The marks stay on, the content stays hidden and nothing deletes it on a
+  timer — deliberately. The closure and the verdict are published and marked announced together,
+  so the next sweep re-publishes both; if it never does, `StuckErasureWatch` gauges the backlog
+  (`memes_erasure_backlog`) and says in the log that the content is hidden but not erased.
+- **`microservice-user-collections` is not converted yet.** It still erases the leaver's
+  favourites on the mark, so a compensated saga gives back memes and comments but not the saved
+  list. Written down as an open debt in ADR 0007, not overlooked.
 - **Security's own safety net** (`account-deletion.purge-timeout`, 5 min) sits deliberately
   *after* the portal's timeout, so the portal's failure announcement normally wins the race.
 - **Identity-only deployments** (no portal at all) set `account-deletion.await-portal-purge=false`
@@ -89,5 +136,7 @@ gallery (memes-ui)                    security                     offboarding  
 | the wizard, the step-up dialog | `memes-ui/src/DeleteAccountDialog.tsx` |
 | the lock, the outbox fact, the final deletion, the mails | `../../shared/microservice-security` (`AccountDeletionOrchestrator`, `OffboardingOutcomeListener`) |
 | the process manager, participants, the sweeper | `../microservice-offboarding` |
-| this service's purge | `memes-infrastructure/.../PurgeCommandsListener`, `memes-application/.../PurgeUserContent` |
+| this service's mark, its compensation and the erasure | `memes-infrastructure/.../PurgeCommandsListener`, `memes-application/.../{MarkUserContentForErasure,RestoreUserContent,PurgeUserContent}` |
+| why it is a status and not a queue table, and where the pivot is | `../../shared/docs/adr/0007-soft-delete-by-status-for-a-compensatable-offboarding-saga.md` |
+| the two-phase road, executable | `memes-infrastructure/src/test/resources/features/account-erasure.feature` |
 | the same road, executable | `memes-ui/e2e/features/account-deletion.feature` (real stack, no stubs) |

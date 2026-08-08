@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure.cucumber;
 
+import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.infrastructure.TestAuthConfig;
@@ -34,6 +35,9 @@ public class AdminPolicySteps {
 
     @Autowired
     PurgeUserContent purgeUserContent;
+
+    @Autowired
+    MarkUserContentForErasure markForErasure;
 
     @Autowired
     PurgePolicyOverride purgePolicyOverride;
@@ -84,6 +88,9 @@ public class AdminPolicySteps {
                 .multiPart("file", "leaving.png", png.toByteArray(), "image/png")
                 .post("/memes")
                 .jsonPath().getString("id");
+        // both halves of the saga: the closure only ever erases what the MARK reserved, so a
+        // purge driven without one would find nothing and this scenario would pass by accident
+        markForErasure.execute(TestAuthConfig.SECOND_USER);
         purgeUserContent.execute(TestAuthConfig.SECOND_USER, Optional.empty());
     }
 

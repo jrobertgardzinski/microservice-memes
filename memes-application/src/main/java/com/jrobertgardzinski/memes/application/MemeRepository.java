@@ -10,6 +10,14 @@ import java.util.Optional;
 /**
  * Port for storing and retrieving memes. Implemented by the infrastructure (in-memory now, a real
  * store later).
+ *
+ * <p><strong>Every read here is a read of the GALLERY.</strong> A meme a running account-deletion
+ * saga has marked ({@link com.jrobertgardzinski.memes.domain.MemeStatus#PENDING_ERASURE}) is
+ * invisible through this port — not "usually", not "in the queries that remembered to say so": the
+ * adapter reads from the {@code active_memes} view, which is where the filter is written down once.
+ * A caller therefore cannot leak a leaver's content by forgetting a condition, because there is no
+ * condition to forget. The one port that CAN see marked memes is {@link MemeErasure}, and its three
+ * callers are the saga's own steps.
  */
 public interface MemeRepository {
 
@@ -73,8 +81,6 @@ public interface MemeRepository {
     default List<String> allIds(long offset, int limit) {
         return allIds().stream().skip(Math.max(0, offset)).limit(Math.max(0, limit)).toList();
     }
-
-    List<String> findIdsByAuthor(String author);
 
     void deleteById(String memeId);
 

@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.MemeContentIndex;
+import com.jrobertgardzinski.memes.application.MemeErasure;
 import com.jrobertgardzinski.memes.application.MemeEvents;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
@@ -24,11 +25,13 @@ class TransactionalPurgeUserContent extends PurgeUserContent {
 
     private final TransactionTemplate tx;
 
-    TransactionalPurgeUserContent(MemeRepository memeRepository, VoteRepository voteRepository,
-                                  MemeContentIndex contentIndex, TagRepository tagRepository,
-                                  MemeEvents memeEvents, PurgePolicyOverride override,
-                                  PurgeRule defaultRule, TransactionTemplate tx) {
-        super(memeRepository, voteRepository, contentIndex, tagRepository, memeEvents, override, defaultRule);
+    TransactionalPurgeUserContent(MemeRepository memeRepository, MemeErasure erasure,
+                                  VoteRepository voteRepository, MemeContentIndex contentIndex,
+                                  TagRepository tagRepository, MemeEvents memeEvents,
+                                  PurgePolicyOverride override, PurgeRule defaultRule,
+                                  TransactionTemplate tx) {
+        super(memeRepository, erasure, voteRepository, contentIndex, tagRepository, memeEvents,
+                override, defaultRule);
         this.tx = tx;
     }
 

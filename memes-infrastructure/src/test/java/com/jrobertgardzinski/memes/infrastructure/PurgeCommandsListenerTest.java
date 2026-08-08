@@ -4,7 +4,9 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.application.RestoreUserContent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,10 +41,13 @@ class PurgeCommandsListenerTest {
     private static final String LEAVER = "leaver@example.com";
     private static final String SAGA = "7d9f9e2a-1f0a-4f6e-9a1b-2c3d4e5f6a7b";
 
+    private final MarkUserContentForErasure markForErasure = mock(MarkUserContentForErasure.class);
+    private final RestoreUserContent restoreUserContent = mock(RestoreUserContent.class);
     private final PurgeUserContent purgeUserContent = mock(PurgeUserContent.class);
     private final PurgeConfirmations confirmations = mock(PurgeConfirmations.class);
-    private final PurgeCommandsListener listener = new PurgeCommandsListener(
-            purgeUserContent, confirmations, new ObjectMapper(), NoTransactions.template());
+    private final PurgeCommandsListener listener = new PurgeCommandsListener(markForErasure,
+            restoreUserContent, purgeUserContent, confirmations, new ObjectMapper(),
+            NoTransactions.template());
 
     private final Logger listenerLog = (Logger) LoggerFactory.getLogger(PurgeCommandsListener.class);
     private final ListAppender<ILoggingEvent> written = new ListAppender<>();
@@ -64,7 +69,7 @@ class PurgeCommandsListenerTest {
     void missing_email_is_dropped_without_confirmation() throws Exception {
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"sagaId\":\"" + SAGA + "\"}", null);
 
-        verifyNoInteractions(purgeUserContent);
+        verifyNoInteractions(markForErasure, restoreUserContent, purgeUserContent);
         verifyNoInteractions(confirmations);
     }
 
@@ -74,40 +79,77 @@ class PurgeCommandsListenerTest {
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
-        verifyNoInteractions(purgeUserContent);
+        verifyNoInteractions(markForErasure, restoreUserContent, purgeUserContent);
         verifyNoInteractions(confirmations);
     }
 
     @Test
-    @DisplayName("a completed purge is logged by saga id — the leaver's address never reaches the log")
+    @DisplayName("a completed mark is logged by saga id — the leaver's address never reaches the log")
     void the_leavers_address_stays_out_of_the_log() throws Exception {
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        verify(markForErasure).execute(LEAVER);
         assertNothingLoggedContains(LEAVER);
         assertTrue(logLines().stream().anyMatch(line -> line.contains(SAGA)),
                 "the saga id is what identifies the run in the log: " + logLines());
     }
 
     @Test
-    @DisplayName("a completed purge confirms the SAME saga it was commanded for")
+    @DisplayName("a completed mark confirms the SAME saga it was commanded for — and erases nothing")
     void a_completed_purge_confirms_its_own_saga() throws Exception {
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
-        InOrder order = inOrder(purgeUserContent, confirmations);
-        // the erasure first, the promise to report it second, both inside one transaction: a
-        // confirmation announced before the purge would be a lie the outbox then made durable
-        order.verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        InOrder order = inOrder(markForErasure, confirmations);
+        // the mark first, the promise to report it second, both inside one transaction: a
+        // confirmation announced before the mark would be a lie the outbox then made durable
+        order.verify(markForErasure).execute(LEAVER);
         order.verify(confirmations).confirm(SAGA, LEAVER);
+        // and the point of the whole two-phase design: the command the orchestrator can still take
+        // back destroys nothing
+        verifyNoInteractions(purgeUserContent);
     }
 
     @Test
-    @DisplayName("a purge that fails confirms nothing and lets the failure out — so Kafka redelivers")
+    @DisplayName("the closure erases, and is NOT confirmed — the orchestrator has already decided")
+    void the_closure_erases_what_the_mark_reserved() throws Exception {
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\"}", null);
+
+        verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        verifyNoInteractions(markForErasure, restoreUserContent);
+        verifyNoInteractions(confirmations);
+        assertNothingLoggedContains(LEAVER);
+    }
+
+    @Test
+    @DisplayName("the compensation restores, erases nothing and is not confirmed either")
+    void the_compensation_restores() throws Exception {
+        listener.receive("{\"type\":\"RESTORE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\"}", null);
+
+        verify(restoreUserContent).execute(LEAVER);
+        verifyNoInteractions(markForErasure, purgeUserContent);
+        verifyNoInteractions(confirmations);
+        assertNothingLoggedContains(LEAVER);
+    }
+
+    @Test
+    @DisplayName("a command type this participant does not know is ignored, not guessed at")
+    void an_unknown_command_type_is_ignored() throws Exception {
+        listener.receive("{\"type\":\"SOMETHING_ELSE\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\"}", null);
+
+        verifyNoInteractions(markForErasure, restoreUserContent, purgeUserContent);
+        verifyNoInteractions(confirmations);
+    }
+
+    @Test
+    @DisplayName("a mark that fails confirms nothing and lets the failure out — so Kafka redelivers")
     void a_failed_purge_confirms_nothing() {
         doThrow(new IllegalStateException("the store is down"))
-                .when(purgeUserContent).execute(LEAVER, Optional.empty());
+                .when(markForErasure).execute(LEAVER);
 
         assertThrows(IllegalStateException.class, () ->
                 listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
@@ -127,11 +169,12 @@ class PurgeCommandsListenerTest {
         // so an operator could be shown a fabricated "ERROR" from the memes service.
         String forged = "DELETE\nERROR memes-service: seized by " + LEAVER + "\n";
         String rule = forged.repeat(100);
-        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        // the policy rides the CLOSURE now — that is the command whose use case reads the rule
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\",\"policy\":{\"memes\":\""
                 + rule.replace("\n", "\\n") + "\"}}", null);
 
-        // the purge still runs, on the deployment default — an unreadable rule must not wedge the saga
+        // the erasure still runs, on the deployment default — an unreadable rule must not wedge the saga
         verify(purgeUserContent).execute(LEAVER, Optional.empty());
         assertNothingLoggedContains(LEAVER);
         assertNothingLoggedContains("seized by");
@@ -147,7 +190,7 @@ class PurgeCommandsListenerTest {
         String broken = "{not json, but it still names " + LEAVER;
         listener.receive(broken, null);
 
-        verifyNoInteractions(purgeUserContent);
+        verifyNoInteractions(markForErasure, restoreUserContent, purgeUserContent);
         verifyNoInteractions(confirmations);
         assertNothingLoggedContains(LEAVER);
         assertTrue(logLines().stream().anyMatch(line -> line.contains(String.valueOf(broken.length()))),

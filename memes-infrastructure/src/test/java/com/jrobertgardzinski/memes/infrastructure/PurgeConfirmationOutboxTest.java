@@ -2,7 +2,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.application.RestoreUserContent;
 import com.jrobertgardzinski.outbox.OutboxRepublisher;
 import com.jrobertgardzinski.outbox.OutboxTable;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
@@ -20,7 +22,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -43,9 +45,10 @@ import static org.mockito.Mockito.when;
  *
  * <p>What the bare {@code kafka.send()} could not promise, and what these tests are about: Spring
  * Kafka commits the command's offset as soon as the listener returns, so a send still sitting in the
- * producer's accumulator when the process dies used to take the confirmation with it — memes deleted,
- * orchestrator none the wiser, three re-commands later the saga compensates and the leaver gets their
- * account back without their content plus an apology mail. The outbox turns that into a row that
+ * producer's accumulator when the process dies takes the confirmation with it — the leaver's memes
+ * marked, the orchestrator none the wiser, three re-commands later the saga compensates. Since the
+ * mark is reversible that no longer costs the leaver their content, but it still costs them a
+ * deletion that silently did not happen. The outbox turns that into a row that
  * outlives the process, and the republisher into a delivery that outlives the outage.
  */
 @SpringBootTest(classes = MemesApplication.class)
@@ -74,6 +77,7 @@ class PurgeConfirmationOutboxTest {
     private final KafkaTemplate<String, String> kafka = mock(KafkaTemplate.class);
 
     private final PurgeUserContent purgeUserContent = mock(PurgeUserContent.class);
+    private final MarkUserContentForErasure markForErasure = mock(MarkUserContentForErasure.class);
 
     private SpringOutbox springOutbox;
     private OutboxRepublisher republisher;
@@ -85,8 +89,8 @@ class PurgeConfirmationOutboxTest {
         springOutbox = new SpringOutbox(dataSource, OutboxTable.named("meme_events_outbox"), clock,
                 new KafkaMemeDispatch(kafka));
         republisher = MemeOutboxConfig.republisher(springOutbox, 24);
-        listener = new PurgeCommandsListener(purgeUserContent,
-                new PurgeConfirmations(springOutbox, mapper), mapper, tx);
+        listener = new PurgeCommandsListener(markForErasure, mock(RestoreUserContent.class),
+                purgeUserContent, new PurgeConfirmations(springOutbox, mapper), mapper, tx);
         jdbc.sql("DELETE FROM meme_events_outbox").update();
     }
 
@@ -108,7 +112,9 @@ class PurgeConfirmationOutboxTest {
 
         listener.receive(COMMAND, "cid-of-the-deletion");
 
-        verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        // the command is the MARK, so the mark is what ran: the erasure waits for the closure
+        verify(markForErasure).execute(LEAVER);
+        verifyNoInteractions(purgeUserContent);
         ArgumentCaptor<ProducerRecord<String, String>> firstTry =
                 ArgumentCaptor.forClass(ProducerRecord.class);
         verify(kafka).send(firstTry.capture());
@@ -181,10 +187,10 @@ class PurgeConfirmationOutboxTest {
     }
 
     @Test
-    @DisplayName("a purge that throws writes nothing at all and lets the failure out to the container")
+    @DisplayName("a mark that throws writes nothing at all and lets the failure out to the container")
     void a_failing_purge_writes_nothing() {
         doThrow(new org.springframework.dao.DataAccessResourceFailureException("no database"))
-                .when(purgeUserContent).execute(LEAVER, Optional.empty());
+                .when(markForErasure).execute(LEAVER);
 
         assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
                 () -> listener.receive(COMMAND, null));
