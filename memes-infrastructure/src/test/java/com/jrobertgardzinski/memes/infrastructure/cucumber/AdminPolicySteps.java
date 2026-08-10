@@ -50,7 +50,7 @@ public class AdminPolicySteps {
         purgePolicyOverride.clear();
     }
 
-    @Given("the admin sets the memes purge policy to {string}")
+    @Given("the ADMIN sets the memes purge policy to {string}")
     public void adminSetsPolicy(String rule) {
         lastChange = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.ADMIN_TOKEN)
@@ -60,7 +60,7 @@ public class AdminPolicySteps {
         assertEquals(200, lastChange.statusCode());
     }
 
-    @When("a plain user tries to set the memes purge policy")
+    @When("a plain USER tries to set the memes purge policy")
     public void plainUserTriesToSetPolicy() {
         lastChange = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN)
@@ -69,7 +69,7 @@ public class AdminPolicySteps {
                 .put("/admin/purge-policy");
     }
 
-    @When("the admin clears the memes purge-policy override")
+    @When("the ADMIN clears the memes purge-policy override")
     public void adminClearsOverride() {
         lastChange = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.ADMIN_TOKEN)
@@ -77,7 +77,7 @@ public class AdminPolicySteps {
         assertEquals(200, lastChange.statusCode());
     }
 
-    @When("a leaver with one meme is purged without a wizard choice")
+    @When("a leaver with one MEME is purged without a wizard choice")
     public void leaverIsPurged() throws Exception {
         BufferedImage image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
         image.setRGB(3, 3, ThreadLocalRandom.current().nextInt(0xFFFFFF));
@@ -94,7 +94,7 @@ public class AdminPolicySteps {
         purgeUserContent.execute(TestAuthConfig.SECOND_USER, Optional.empty());
     }
 
-    @Then("the leaver's meme survives anonymised")
+    @Then("the leaver's MEME survives anonymised")
     public void memeSurvives() {
         assertEquals(200, RestAssured.given().port(port).get("/memes/" + memeId).statusCode());
     }
@@ -109,7 +109,7 @@ public class AdminPolicySteps {
         assertEquals(source, current.jsonPath().getString("source"));
     }
 
-    @Then("the policy change is refused as not-an-admin")
+    @Then("the policy change is refused as not-an-ADMIN")
     public void changeRefused() {
         assertEquals(403, lastChange.statusCode());
         assertEquals("NOT_AN_ADMIN", lastChange.jsonPath().getString("status"));

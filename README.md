@@ -1,14 +1,16 @@
 # microservice-memes
 
 > 👋 **Welcome, and thanks for looking!** This is a meme gallery that looks simple from the
-> browser and is deliberately grown-up underneath. The five specs below are **executable** —
-> Cucumber drives them over real HTTP in every build — so everything they describe is verified,
-> not aspirational:
-> [upload](./memes-infrastructure/src/test/resources/features/upload-meme.feature) ·
-> [vote](./memes-infrastructure/src/test/resources/features/vote-meme.feature) ·
-> [tag](./memes-infrastructure/src/test/resources/features/tag-meme.feature) ·
-> [moderate](./memes-infrastructure/src/test/resources/features/moderate-meme.feature) ·
-> [admin purge policy](./memes-infrastructure/src/test/resources/features/admin-purge-policy.feature)
+> browser and is deliberately grown-up underneath. Start with [`specs/`](./specs) — one Gherkin
+> file per use case, and every one **executable**: Cucumber drives them over real HTTP in every
+> build, so everything they describe is verified, not aspirational:
+> [upload](./specs/upload-meme.feature) ·
+> [vote](./specs/vote-meme.feature) ·
+> [tag](./specs/tag-meme.feature) ·
+> [delete](./specs/delete-meme.feature) ·
+> [flag NSFW](./specs/flag-meme.feature) ·
+> [admin purge policy](./specs/admin-purge-policy.feature) ·
+> [account erasure](./specs/account-erasure.feature)
 
 ## Highlights — what's worth a closer look
 
@@ -69,8 +71,8 @@ and Quarkus (`microservice-email`, BCE).
 - **memes-infrastructure** — the Spring Boot app: web boundaries (`MemeController`,
   `VoteController`, `TagController`, `AdminController`), the sign-in gate (`RequireSignInFilter`
   + `HttpSecurityAuthenticationGate`, which confirms bearer tokens against
-  `microservice-security`'s `GET /me`), the JDBC adapters and the three blob stores. Cucumber
-  features (`src/test/resources/features/`) document the flows; results feed Allure.
+  `microservice-security`'s `GET /me`), the JDBC adapters and the three blob stores. The Cucumber
+  runner drives the top-level `specs/` features here; results feed Allure.
 
 ## Security integration
 
@@ -172,9 +174,9 @@ property, deployments set the env var.
 
 ## Documentation — the living contract
 
-The behaviour contract is the Cucumber features in
-`memes-infrastructure/src/test/resources/features/` (upload, vote, tag, moderate,
-admin-purge-policy) — black-box over HTTP, green in every build. The workspace-level tooling
+The behaviour contract is the Gherkin specs in [`specs/`](./specs) — one file per use case
+(upload, vote, tag, delete, flag-NSFW, admin-purge-policy, account-erasure), black-box over
+HTTP, green in every build. The workspace-level tooling
 (`../create-documentation.sh`) folds this repo into the shared surfaces: the
 Ubiquitous-Language glossary (`../docs/glossary/glossary.md`, scanned from the domain,
 application and infrastructure layers here) and the aggregated Allure summary

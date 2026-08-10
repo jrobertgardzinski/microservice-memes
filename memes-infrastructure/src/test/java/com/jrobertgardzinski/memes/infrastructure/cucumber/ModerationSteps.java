@@ -39,7 +39,7 @@ public class ModerationSteps {
     private Response lastDelete;
     private Response lastFlag;
 
-    @Given("a meme uploaded by its author")
+    @Given("a MEME uploaded by its author")
     public void aMemeUploadedByItsAuthor() throws Exception {
         BufferedImage image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
         image.setRGB(2, 2, ThreadLocalRandom.current().nextInt(0xFFFFFF));   // unique, so dedup never links memes
@@ -52,7 +52,7 @@ public class ModerationSteps {
                 .jsonPath().getString("id");
     }
 
-    @When("another user tries to delete it")
+    @When("another USER tries to delete it")
     public void anotherUserDeletes() {
         lastDelete = delete(TestAuthConfig.SECOND_TOKEN);
     }
@@ -62,12 +62,12 @@ public class ModerationSteps {
         lastDelete = delete(TestAuthConfig.VALID_TOKEN);
     }
 
-    @When("a moderator deletes it")
+    @When("a MODERATOR deletes it")
     public void aModeratorDeletes() {
         lastDelete = delete(TestAuthConfig.MODERATOR_TOKEN);
     }
 
-    @When("an anonymous user tries to delete it")
+    @When("an anonymous visitor tries to delete it")
     public void anAnonymousUserDeletes() {
         lastDelete = RestAssured.given().port(port).delete("/memes/{id}", memeId);
     }
@@ -89,18 +89,18 @@ public class ModerationSteps {
         assertEquals("AUTHOR", lastDelete.jsonPath().getString("by"));
     }
 
-    @Then("the deletion succeeds as a moderator")
+    @Then("the deletion succeeds as a MODERATOR")
     public void succeedsAsModerator() {
         assertEquals(200, lastDelete.statusCode());
         assertEquals("MODERATOR", lastDelete.jsonPath().getString("by"));
     }
 
-    @Then("the meme can still be fetched")
+    @Then("the MEME can still be fetched")
     public void memeStillThere() {
         assertEquals(200, RestAssured.given().port(port).get("/memes/{id}", memeId).statusCode());
     }
 
-    @Then("the meme is gone")
+    @Then("the MEME is gone")
     public void memeGone() {
         assertEquals(404, RestAssured.given().port(port).get("/memes/{id}", memeId).statusCode());
     }
@@ -115,7 +115,7 @@ public class ModerationSteps {
                 "the WebP variant really was minted (and thereby cached) before the deletion");
     }
 
-    @Then("not a byte of the meme remains, in any form")
+    @Then("not a byte of the MEME remains, in any form")
     public void notAByteRemains() {
         // observable over HTTP: both representations answer gone
         assertEquals(404, RestAssured.given().port(port).get("/memes/{id}", memeId).statusCode(),
@@ -130,13 +130,13 @@ public class ModerationSteps {
         assertTrue(objects.get(memeId + ".webp").isEmpty(), "no WebP variant lingers in storage");
     }
 
-    @When("a moderator flags it NSFW")
+    @When("a MODERATOR flags it NSFW")
     public void moderatorFlagsNsfw() {
         lastFlag = flag(TestAuthConfig.MODERATOR_TOKEN, true);
         assertEquals(200, lastFlag.statusCode());
     }
 
-    @When("a moderator takes the NSFW flag back")
+    @When("a MODERATOR takes the NSFW flag back")
     public void moderatorUnflags() {
         lastFlag = flag(TestAuthConfig.MODERATOR_TOKEN, false);
         assertEquals(200, lastFlag.statusCode());
@@ -147,18 +147,18 @@ public class ModerationSteps {
         lastFlag = flag(TestAuthConfig.VALID_TOKEN, true);
     }
 
-    @Then("the flagging is refused as not-a-moderator")
+    @Then("the flagging is refused as not-a-MODERATOR")
     public void flaggingRefused() {
         assertEquals(403, lastFlag.statusCode());
         assertEquals("NOT_A_MODERATOR", lastFlag.jsonPath().getString("status"));
     }
 
-    @Then("the gallery lists the meme as NSFW")
+    @Then("the gallery lists the MEME as NSFW")
     public void listedAsNsfw() {
         assertEquals(true, galleryNsfwOf(memeId), "the listing must carry the flag");
     }
 
-    @Then("the gallery lists the meme as safe")
+    @Then("the gallery lists the MEME as safe")
     public void listedAsSafe() {
         assertEquals(false, galleryNsfwOf(memeId));
     }

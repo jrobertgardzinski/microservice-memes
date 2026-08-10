@@ -118,7 +118,7 @@ memy są małe po optymalizacji); `path-style` bez tego MinIO 400; nie loguj sek
 
 **Cel:** memes ma glosariusz skanujący warstwy; brakuje odpowiednika
 `Documentation.md`/kontraktu cucumber jak w security. Zrób: skrypt/README sekcję,
-która linkuje feature'y (`memes-infrastructure/src/test/resources/features/`) jako
+która linkuje feature'y (`specs/`) jako
 kontrakt zachowania + wygenerowany glosariusz; sprawdź `../create-documentation.sh`
 (workspace) i podepnij memes, jeśli jeszcze nie jest. Wynik: `Documentation.md`
 w korzeniu repo memes, regenerowalny, committowany.

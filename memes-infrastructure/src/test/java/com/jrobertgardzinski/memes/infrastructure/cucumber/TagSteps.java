@@ -31,7 +31,7 @@ public class TagSteps {
     private String memeId;
     private Response lastTagging;
 
-    @Given("an uploaded meme")
+    @Given("an uploaded MEME")
     public void anUploadedMeme() throws Exception {
         BufferedImage image = new BufferedImage(24, 24, BufferedImage.TYPE_INT_RGB);
         image.setRGB(3, 3, ThreadLocalRandom.current().nextInt(0xFFFFFF));
@@ -49,12 +49,12 @@ public class TagSteps {
         lastTagging = tag(TestAuthConfig.VALID_TOKEN, first, second);
     }
 
-    @When("another user tries to tag it with {string}")
+    @When("another USER tries to tag it with {string}")
     public void anotherUserTags(String tag) {
         lastTagging = tag(TestAuthConfig.SECOND_TOKEN, tag);
     }
 
-    @Then("the gallery filtered by {string} contains that meme")
+    @Then("the gallery filtered by {string} contains that MEME")
     public void galleryContains(String tag) {
         assertEquals(200, lastTagging.statusCode());
         assertTrue(galleryIds(tag).contains(memeId));
@@ -71,7 +71,7 @@ public class TagSteps {
         assertEquals("NOT_THE_AUTHOR", lastTagging.jsonPath().getString("status"));
     }
 
-    @Then("the tagging is refused as an invalid tag")
+    @Then("the tagging is refused as an invalid TAG")
     public void refusedAsInvalidTag() {
         assertEquals(400, lastTagging.statusCode());
         assertEquals("INVALID_TAG", lastTagging.jsonPath().getString("status"));

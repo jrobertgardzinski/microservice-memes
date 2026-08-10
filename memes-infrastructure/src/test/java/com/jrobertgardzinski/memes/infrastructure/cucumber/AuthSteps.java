@@ -17,7 +17,7 @@ public class AuthSteps {
     /** The response of the latest anonymous write attempt, checked by the shared refusal step. */
     static Response lastAnonymousAttempt;
 
-    @Given("a signed-in user")
+    @Given("a signed-in USER")
     public void aSignedInUser() {
         // narrative step: the write-steps attach the well-known test token
     }

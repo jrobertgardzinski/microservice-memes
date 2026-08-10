@@ -30,7 +30,7 @@ public class UploadMemeSteps {
     private Response uploadResponse;
     private String memeId;
 
-    @When("the user uploads a BMP image")
+    @When("the USER uploads a BMP image")
     public void theUserUploadsABmpImage() throws Exception {
         uploadResponse = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN)
@@ -39,14 +39,14 @@ public class UploadMemeSteps {
         memeId = uploadResponse.jsonPath().getString("id");
     }
 
-    @When("an anonymous user tries to upload a BMP image")
+    @When("an anonymous visitor tries to upload a BMP image")
     public void anAnonymousUserTriesToUpload() throws Exception {
         AuthSteps.lastAnonymousAttempt = RestAssured.given().port(port)
                 .multiPart("file", "meme.bmp", bmp(), "image/bmp")
                 .post("/memes");
     }
 
-    @Then("the meme is stored")
+    @Then("the MEME is stored")
     public void theMemeIsStored() {
         assertEquals(201, uploadResponse.statusCode());
         assertNotNull(memeId, "no meme id returned");
@@ -76,7 +76,7 @@ public class UploadMemeSteps {
         assertTrue(ids.contains(memeId), "expected " + memeId + " in the gallery, got " + ids);
     }
 
-    @When("the user uploads a text file pretending to be an image")
+    @When("the USER uploads a text file pretending to be an image")
     public void theUserUploadsATextFilePretendingToBeAnImage() {
         uploadResponse = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN)
@@ -84,7 +84,7 @@ public class UploadMemeSteps {
                 .post("/memes");
     }
 
-    @When("the user uploads a tiny file declaring absurd image dimensions")
+    @When("the USER uploads a tiny file declaring absurd image dimensions")
     public void theUserUploadsATinyFileDeclaringAbsurdDimensions() {
         byte[] liar = pngHeaderDeclaring(10_000, 10_000);
         assertTrue(liar.length < 100, "the hostile upload really is tiny on the wire");

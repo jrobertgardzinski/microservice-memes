@@ -34,27 +34,27 @@ public class VoteSteps {
     private String memeB;
     private int lastReportedScore;
 
-    @Given("two uploaded memes A and B")
+    @Given("two uploaded MEMES A and B")
     public void twoUploadedMemes() throws Exception {
         memeA = upload();
         memeB = upload();
     }
 
-    @When("^(\\d+) users? up-votes? meme (\\w+)$")
+    @When("^(\\d+) USERS? up-votes? MEME (\\w+)$")
     public void usersUpVoteMeme(int count, String which) {
         for (int i = 0; i < count; i++) {
             vote(idOf(which), USER_TOKENS.get(i));
         }
     }
 
-    @When("the user up-votes meme {word} {int} times")
+    @When("the USER up-votes MEME {word} {int} times")
     public void theUserUpVotesRepeatedly(String which, int times) {
         for (int i = 0; i < times; i++) {
             vote(idOf(which), TestAuthConfig.VALID_TOKEN);
         }
     }
 
-    @When("an anonymous user tries to up-vote meme {word}")
+    @When("an anonymous visitor tries to up-vote MEME {word}")
     public void anAnonymousUserTriesToUpVote(String which) {
         AuthSteps.lastAnonymousAttempt = RestAssured.given().port(port)
                 .contentType("application/json")
@@ -62,7 +62,7 @@ public class VoteSteps {
                 .post("/memes/" + idOf(which) + "/votes");
     }
 
-    @Then("meme {word} ranks above meme {word} in the hot list")
+    @Then("MEME {word} ranks above MEME {word} in the hot list")
     public void ranksAbove(String higher, String lower) {
         Response hot = RestAssured.given().port(port).get("/memes/hot");
         hot.then().statusCode(200);
@@ -71,12 +71,12 @@ public class VoteSteps {
                 "expected " + higher + " to rank above " + lower + ", order was " + order);
     }
 
-    @Then("meme {word}'s score is {int}")
+    @Then("MEME {word}'s score is {int}")
     public void memeScoreIs(String which, int score) {
         assertEquals(score, lastReportedScore, "score reported by the last vote");
     }
 
-    @Then("meme {word}'s score is {int} and the user's vote is gone")
+    @Then("MEME {word}'s score is {int} and the USER's vote is gone")
     public void memeScoreIsAndVoteGone(String which, int score) {
         assertEquals(score, lastReportedScore, "score reported by the last vote");
         Response tally = RestAssured.given().port(port)

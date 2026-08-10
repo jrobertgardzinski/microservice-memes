@@ -50,7 +50,7 @@ public class ErasureSagaSteps {
 
     private String memeId;
 
-    @Given("a leaver with one meme in the gallery")
+    @Given("a leaver with one MEME in the gallery")
     public void aLeaverWithOneMeme() throws Exception {
         BufferedImage image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
         image.setRGB(3, 3, ThreadLocalRandom.current().nextInt(0xFFFFFF));   // unique: no dedup
@@ -65,14 +65,14 @@ public class ErasureSagaSteps {
                 "the scenario starts from a meme the world can see");
     }
 
-    @When("the orchestrator commands the purge of their content")
+    @When("the ORCHESTRATOR commands the PURGE of their content")
     public void theOrchestratorCommandsThePurge() {
         // PURGE_USER_CONTENT: the reversible half. Written twice by one scenario on purpose —
         // at-least-once delivery means this really does arrive twice
         markForErasure.execute(TestAuthConfig.SECOND_USER);
     }
 
-    @When("the comments service never confirms and the orchestrator compensates")
+    @When("the comments service never confirms and the ORCHESTRATOR compensates")
     public void theOrchestratorCompensates() {
         // RESTORE_USER_CONTENT: what the orchestrator sends when it gives up on a sibling
         // participant. This service is not the one that failed and does not get to decide —
@@ -80,13 +80,13 @@ public class ErasureSagaSteps {
         restoreUserContent.execute(TestAuthConfig.SECOND_USER);
     }
 
-    @When("every participant confirms and the orchestrator closes the saga")
+    @When("every participant confirms and the ORCHESTRATOR closes the SAGA")
     public void theOrchestratorClosesTheSaga() {
         // ERASE_USER_CONTENT: the closure, and the only command that destroys anything
         purgeUserContent.execute(TestAuthConfig.SECOND_USER, Optional.empty());
     }
 
-    @Then("the meme is gone from the gallery")
+    @Then("the MEME is gone from the gallery")
     public void theMemeIsGoneFromTheGallery() {
         assertEquals(404, RestAssured.given().port(port).get("/memes/" + memeId).statusCode(),
                 "the picture still answers");
@@ -94,7 +94,7 @@ public class ErasureSagaSteps {
                 "the metadata still answers — hiding the picture alone is not hiding the meme");
     }
 
-    @Then("the meme is back in the gallery")
+    @Then("the MEME is back in the gallery")
     public void theMemeIsBackInTheGallery() {
         assertEquals(200, RestAssured.given().port(port).get("/memes/" + memeId).statusCode());
         assertEquals(200, RestAssured.given().port(port).get("/memes/" + memeId + "/meta").statusCode());
@@ -105,7 +105,7 @@ public class ErasureSagaSteps {
     // a second annotation with the same text is a DUPLICATE definition — and a duplicate does not
     // fail this scenario alone, it fails the whole glue, taking every other feature in the module
     // with it
-    @Then("the meme is still stored")
+    @Then("the MEME is still stored")
     public void theMemeIsStillStored() {
         // the whole difference between a mark and an erasure, in one assertion: the picture is
         // invisible AND intact, which is what gives the orchestrator something to undo
