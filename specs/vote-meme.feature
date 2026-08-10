@@ -1,11 +1,11 @@
 Feature: Voting on a MEME
 
-  Signed-in USERS vote on a MEME; each USER has ONE VOTE per MEME, worked as a
+  USERS vote on a MEME (a GUEST only watches); each USER has ONE VOTE per MEME, worked as a
   toggle: repeating the same VOTE retracts it, the opposite direction switches
   it. An up-voted MEME becomes a higher-scoring MEME in the public hot list.
 
   Background:
-    Given a signed-in USER
+    Given a USER
     And two uploaded MEMES A and B
 
   Rule: The MEME with more distinct up-voters ranks higher
@@ -23,8 +23,8 @@ Feature: Voting on a MEME
       When the USER up-votes MEME A 1 times
       Then MEME A's score is 1
 
-  Rule: Without signing in there is no voting
+  Rule: A GUEST may watch, not vote
 
     Example:
-      When an anonymous visitor tries to up-vote MEME A
+      When a GUEST tries to up-vote MEME A
       Then the request is refused as sign-in required

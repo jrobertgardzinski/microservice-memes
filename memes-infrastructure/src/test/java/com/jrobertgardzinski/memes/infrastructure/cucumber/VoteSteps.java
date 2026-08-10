@@ -54,7 +54,7 @@ public class VoteSteps {
         }
     }
 
-    @When("an anonymous visitor tries to up-vote MEME {word}")
+    @When("a GUEST tries to up-vote MEME {word}")
     public void anAnonymousUserTriesToUpVote(String which) {
         AuthSteps.lastAnonymousAttempt = RestAssured.given().port(port)
                 .contentType("application/json")

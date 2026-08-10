@@ -39,7 +39,7 @@ public class UploadMemeSteps {
         memeId = uploadResponse.jsonPath().getString("id");
     }
 
-    @When("an anonymous visitor tries to upload a BMP image")
+    @When("a GUEST tries to upload a BMP image")
     public void anAnonymousUserTriesToUpload() throws Exception {
         AuthSteps.lastAnonymousAttempt = RestAssured.given().port(port)
                 .multiPart("file", "meme.bmp", bmp(), "image/bmp")

@@ -67,7 +67,7 @@ public class ModerationSteps {
         lastDelete = delete(TestAuthConfig.MODERATOR_TOKEN);
     }
 
-    @When("an anonymous visitor tries to delete it")
+    @When("a GUEST tries to delete it")
     public void anAnonymousUserDeletes() {
         lastDelete = RestAssured.given().port(port).delete("/memes/{id}", memeId);
     }

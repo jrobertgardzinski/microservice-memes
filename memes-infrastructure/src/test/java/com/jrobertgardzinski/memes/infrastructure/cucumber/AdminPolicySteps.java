@@ -60,7 +60,7 @@ public class AdminPolicySteps {
         assertEquals(200, lastChange.statusCode());
     }
 
-    @When("a plain USER tries to set the memes purge policy")
+    @When("a USER tries to set the memes purge policy")
     public void plainUserTriesToSetPolicy() {
         lastChange = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN)
@@ -99,8 +99,19 @@ public class AdminPolicySteps {
         assertEquals(200, RestAssured.given().port(port).get("/memes/" + memeId).statusCode());
     }
 
-    @Then("the effective memes purge policy is {string} from {string}")
-    public void effectivePolicyIs(String rule, String source) {
+    @Then("the effective memes purge policy is {string}, set by the ADMIN")
+    public void effectivePolicySetByAdmin(String rule) {
+        // the ADMIN's runtime override lives in the DB — that is what "set by the ADMIN" means
+        effectivePolicyIs(rule, "DB");
+    }
+
+    @Then("the effective memes purge policy is {string}, set by the deployment")
+    public void effectivePolicySetByDeployment(String rule) {
+        // no override in the DB, so the env default of the deployment answers
+        effectivePolicyIs(rule, "ENV");
+    }
+
+    private void effectivePolicyIs(String rule, String source) {
         Response current = RestAssured.given().port(port)
                 .header("Authorization", "Bearer " + TestAuthConfig.ADMIN_TOKEN)
                 .get("/admin/purge-policy");

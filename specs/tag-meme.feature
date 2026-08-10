@@ -5,7 +5,7 @@ Feature: Tagging a MEME and finding it by TAG
   purged MEME vanish with it.
 
   Background:
-    Given a signed-in USER
+    Given a USER
     And an uploaded MEME
 
   Rule: The author's TAGS make the MEME findable — by those TAGS and no others

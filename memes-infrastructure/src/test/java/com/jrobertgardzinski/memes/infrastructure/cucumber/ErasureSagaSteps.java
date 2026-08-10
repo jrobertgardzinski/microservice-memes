@@ -113,7 +113,7 @@ public class ErasureSagaSteps {
                 "the mark must not have touched the image in object storage");
     }
 
-    @Then("the image is gone from object storage")
+    @Then("the image itself is gone for good")
     public void theImageIsGoneFromObjectStorage() {
         // THE PIVOT. Everything before this line was undoable; nothing after it is
         assertTrue(objectStore.get(memeId).isEmpty(),

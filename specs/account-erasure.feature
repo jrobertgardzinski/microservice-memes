@@ -31,7 +31,7 @@ Feature: An account deletion is a SAGA, so hiding comes first and erasing comes 
       When the ORCHESTRATOR commands the PURGE of their content
       And every participant confirms and the ORCHESTRATOR closes the SAGA
       Then the MEME is gone from the gallery
-      And the image is gone from object storage
+      And the image itself is gone for good
       And a late compensation brings nothing back
 
   Rule: The PURGE command arriving twice, as Kafka promises it may, changes nothing
