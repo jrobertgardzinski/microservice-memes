@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * The upload ceiling: with the limit set to one per minute, a second upload from the same user is
  * refused with 429 — uploads are heavier than reads, so one account cannot flood the gallery.
  */
+@Epic("Infrastructure")
+@Feature("Upload guards")
+@Story("Rate limit")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "memes.upload.rate-limit-per-minute=1")

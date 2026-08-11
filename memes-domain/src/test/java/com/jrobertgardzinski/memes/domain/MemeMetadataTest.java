@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.domain;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * use-case tests run on a fixed clock, so "a redelivery keeps the FIRST instant" was literally
  * unobservable there.
  */
+@Epic("Domain")
+@Feature("Erasure mark")
 class MemeMetadataTest {
 
     private static final Instant FIRST_DELIVERY = Instant.parse("2026-08-08T10:00:00Z");

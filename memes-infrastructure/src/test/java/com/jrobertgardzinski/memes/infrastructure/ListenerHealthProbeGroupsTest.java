@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * liveness/readiness probes when it detects a k8s (or Cloud Foundry) environment, and the portal's
  * actual home is a compose stack, where the groups would otherwise answer 404.
  */
+@Epic("Infrastructure")
+@Feature("Listener health")
+@Story("Probe group membership")
 @SpringBootTest(classes = MemesApplication.class)
 class ListenerHealthProbeGroupsTest {
 

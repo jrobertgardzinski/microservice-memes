@@ -1,6 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * server honours. The page is also the only bound on how far a caller may reach — an absurd page
  * number is an empty page, not a failure.
  */
+@Epic("Infrastructure")
+@Feature("Gallery paging")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 // the rate limit is a different guard with its own test; uploading a wall here must not trip it

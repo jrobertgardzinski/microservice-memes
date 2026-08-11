@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,9 @@ import static org.mockito.Mockito.mock;
  * {@code Main.DEFAULT_PARTICIPANTS} ({@code memes=memes-events}) and in the deployment's
  * {@code OFFBOARDING_PARTICIPANTS}. Changing the string here REQUIRES changing it there.
  */
+@Epic("Saga")
+@Feature("Purge confirmation")
+@Story("Topic pin")
 class PurgeConfirmationTopicTest {
 
     /** See the class comment: the twin literal lives in microservice-offboarding. */

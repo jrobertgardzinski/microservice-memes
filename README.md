@@ -176,11 +176,9 @@ property, deployments set the env var.
 
 The behaviour contract is the Gherkin specs in [`specs/`](./specs) — one file per use case
 (upload, vote, tag, delete, flag-NSFW, admin-purge-policy, account-erasure), black-box over
-HTTP, green in every build. The workspace-level tooling
-(`../create-documentation.sh`) folds this repo into the shared surfaces: the
-Ubiquitous-Language glossary (`../docs/glossary/glossary.md`, scanned from the domain,
-application and infrastructure layers here) and the aggregated Allure summary
-(`../allure-summary.md`). Run it from the workspace root after `mvn test` to regenerate both.
+HTTP, green in every build. [`Documentation.md`](./Documentation.md) is the same suite seen
+from above: generated from the Allure reports of the test run — regenerate it with
+`../create-documentation.sh` after `../mvnw clean test`.
 
 ## Where the image bytes live (`memes.blob-store` / env `MEMES_BLOB_STORE`)
 

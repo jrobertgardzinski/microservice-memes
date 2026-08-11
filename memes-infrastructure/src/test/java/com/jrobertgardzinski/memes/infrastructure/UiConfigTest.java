@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * every probe stayed green, and nobody could sign in. This is the seam that lets one image be
  * deployed twice, so it is worth a test rather than a README line.
  */
+@Epic("Infrastructure")
+@Feature("UI runtime config")
 class UiConfigTest {
 
     @Nested

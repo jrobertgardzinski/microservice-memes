@@ -7,6 +7,8 @@ import com.jrobertgardzinski.memes.application.MemeErasure;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import com.jrobertgardzinski.memes.domain.MemeStatus;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the GDPR asked for), and without this watch nobody would ever learn the difference. A gauge that
  * silently stopped being fed would restore exactly that silence, so it is worth pinning.
  */
+@Epic("Saga")
+@Feature("Stuck erasure alarm")
 class StuckErasureWatchTest {
 
     private static final String LEAVER = "leaver@example.com";

@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +60,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>The survivor collapses {@code management.server.port} back onto the main one, because MockMvc
  * has no ports — that is the one thing this test genuinely cannot exercise, and it says so above.
  */
+@Epic("Infrastructure")
+@Feature("Health probes")
 @SpringBootTest(classes = MemesApplication.class,
         // MockMvc drives the main context and has no ports; the port itself is pinned by
         // the_manifest_probes_the_port_the_actuator_listens_on below

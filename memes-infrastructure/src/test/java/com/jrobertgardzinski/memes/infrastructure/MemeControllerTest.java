@@ -1,6 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -23,6 +25,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Black-box web test: upload a BMP (signed in via the stubbed gate), then fetch the meme back
  * anonymously and check it was served as PNG.
  */
+@Epic("Infrastructure")
+@Feature("Upload and serve")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 class MemeControllerTest {

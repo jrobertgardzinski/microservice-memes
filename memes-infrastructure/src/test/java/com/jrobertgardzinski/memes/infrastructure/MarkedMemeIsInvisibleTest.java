@@ -3,6 +3,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,6 +48,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * mind, must answer exactly as they did before the mark. A hiding that cannot be undone is not the
  * feature this whole design was for.
  */
+@Epic("Saga")
+@Feature("Marked meme is invisible")
+@Story("Every public read")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "memes.upload.rate-limit-per-minute=0")

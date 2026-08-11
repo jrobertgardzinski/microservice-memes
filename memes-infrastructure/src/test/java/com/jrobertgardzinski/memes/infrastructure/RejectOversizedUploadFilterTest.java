@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -36,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * introspection calls. Nothing is leaked by it — 413 to an anonymous caller says only that the
  * request was too big, which it was.
  */
+@Epic("Infrastructure")
+@Feature("Upload guards")
+@Story("Declared-size refusal")
 class RejectOversizedUploadFilterTest {
 
     private final RejectOversizedUploadFilter filter = new RejectOversizedUploadFilter("10MB");

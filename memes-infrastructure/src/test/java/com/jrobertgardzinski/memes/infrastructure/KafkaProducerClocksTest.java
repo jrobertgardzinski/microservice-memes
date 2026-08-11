@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * <p>CAVEAT, the same one the Hikari pin carries: these are env-overridable at DEPLOY time
  * (MEMES_KAFKA_MAX_BLOCK_MS and friends), where no test runs.
  */
+@Epic("Infrastructure")
+@Feature("Kafka configuration")
+@Story("Producer clocks")
 @SpringBootTest(classes = MemesApplication.class)
 class KafkaProducerClocksTest {
 

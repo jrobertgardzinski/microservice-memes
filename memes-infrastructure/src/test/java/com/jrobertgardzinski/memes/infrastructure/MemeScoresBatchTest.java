@@ -1,6 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * is the answer "no tally" — the wall renders that as "no tally" rather than as zero. Flatten the
  * two on the wire and the client cannot tell them apart, whatever it does with them.
  */
+@Epic("Infrastructure")
+@Feature("Batch scores")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 // a handful of uploads in one test must not trip the upload rate limit

@@ -5,6 +5,8 @@ import com.jrobertgardzinski.memes.application.ObjectStore;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.image.OptimizedImage;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * variant without decoding at all; the response invites browsers to cache too (a thumbnail is
  * immutable per id); and a deleted meme takes its cached thumbnail along.
  */
+@Epic("Infrastructure")
+@Feature("Thumbnail cache")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class,
         ThumbnailCacheTest.CountingDecodes.class})
 @AutoConfigureMockMvc

@@ -6,6 +6,9 @@ import au.com.dius.pact.provider.junit5.PactVerificationContext;
 import au.com.dius.pact.provider.junit5.PactVerificationInvocationContextProvider;
 import au.com.dius.pact.provider.junitsupport.Provider;
 import au.com.dius.pact.provider.junitsupport.loader.PactFolder;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -31,6 +34,9 @@ import java.util.UUID;
  * <p>A second class rather than a second folder on the existing one, because {@code @PactFolder}
  * takes exactly one path — and each consumer keeps its pacts in its own repository.
  */
+@Epic("Contract")
+@Feature("Meme deleted announcement")
+@Story("Comments consumer")
 @Provider("microservice-memes")
 @PactFolder(CommentsMemeDeletedPactProviderTest.PACT_FOLDER)
 @EnabledIf(value = "consumerPactCheckedOut",

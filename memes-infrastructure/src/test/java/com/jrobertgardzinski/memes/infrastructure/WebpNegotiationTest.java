@@ -2,6 +2,8 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.ImageEncoder;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Content negotiation on the image: a client that accepts WebP gets WebP (encoded once, then
  * served from the cache); a client that does not still gets the stored PNG.
  */
+@Epic("Infrastructure")
+@Feature("WebP negotiation")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class, WebpNegotiationTest.FakeEncoder.class})
 @AutoConfigureMockMvc
 class WebpNegotiationTest {

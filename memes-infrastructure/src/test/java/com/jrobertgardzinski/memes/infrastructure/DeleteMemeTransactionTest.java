@@ -5,6 +5,9 @@ import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.TagRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.tags.Tag;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +25,9 @@ import static org.mockito.Mockito.doThrow;
  * steps (votes, content-index claim, tags, the row) — when a late step dies, the earlier ones must
  * roll back, or the gallery serves a meme whose tags and votes have silently vanished.
  */
+@Epic("Infrastructure")
+@Feature("Meme deletion")
+@Story("Transactional teardown")
 @SpringBootTest(classes = MemesApplication.class)
 class DeleteMemeTransactionTest {
 

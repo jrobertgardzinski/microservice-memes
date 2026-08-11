@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * configuration instead: drop or misspell the property and this fails, instead of the first k3s
  * environment quietly skipping the deletions that were commanded before the group existed.
  */
+@Epic("Infrastructure")
+@Feature("Kafka configuration")
+@Story("Consumer offset reset")
 @SpringBootTest(classes = MemesApplication.class)
 class KafkaConsumerOffsetResetTest {
 

@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -22,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * instant. Nor could the decode semaphore be taken earlier, because thumbnails take it too and one
  * thread would hold it twice.
  */
+@Epic("Infrastructure")
+@Feature("Upload guards")
+@Story("Concurrent upload admission")
 class UploadAdmissionTest {
 
     @Test

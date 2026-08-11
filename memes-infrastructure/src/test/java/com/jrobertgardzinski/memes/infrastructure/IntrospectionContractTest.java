@@ -10,6 +10,8 @@ import au.com.dius.pact.core.model.PactSpecVersion;
 import au.com.dius.pact.core.model.RequestResponsePact;
 import au.com.dius.pact.core.model.annotations.Pact;
 import au.com.dius.pact.core.model.annotations.PactDirectory;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -27,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * separate from the message pacts — a V3 file cannot mix the two) and microservice-security's
  * provider test verifies it against the real controller with a real session.
  */
+@Epic("Contract")
+@Feature("Token introspection")
 @ExtendWith(PactConsumerTestExt.class)
 @PactTestFor(providerName = "microservice-security", pactVersion = PactSpecVersion.V3)
 @PactDirectory("../pacts-http")

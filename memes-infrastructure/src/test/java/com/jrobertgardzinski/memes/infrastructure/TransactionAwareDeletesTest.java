@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * commit has happened every parked runnable is best-effort in isolation: one blowing up must
  * neither abort the others nor surface out of {@code tx.execute}.
  */
+@Epic("Infrastructure")
+@Feature("Meme deletion")
+@Story("After-commit deletes")
 @SpringBootTest(classes = MemesApplication.class)
 class TransactionAwareDeletesTest {
 

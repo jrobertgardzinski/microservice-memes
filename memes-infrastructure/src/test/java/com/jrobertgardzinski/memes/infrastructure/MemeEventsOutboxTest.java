@@ -6,6 +6,9 @@ import com.jrobertgardzinski.outbox.OutboxTable;
 import com.jrobertgardzinski.outbox.RepublisherSettings;
 import com.jrobertgardzinski.outbox.TransactionalOutbox;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +51,9 @@ import static org.mockito.Mockito.when;
  * hardened in rounds 5-9 had been lost in the extraction, it would have shown up as a failure
  * here, and the fix would have belonged in the library rather than in this file.
  */
+@Epic("Infrastructure")
+@Feature("Meme events outbox")
+@Story("Republisher and retention")
 @SpringBootTest(classes = MemesApplication.class)
 class MemeEventsOutboxTest {
 

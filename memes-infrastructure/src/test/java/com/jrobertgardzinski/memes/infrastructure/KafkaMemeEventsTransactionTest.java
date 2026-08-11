@@ -2,6 +2,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.outbox.OutboxTable;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +44,9 @@ import static org.mockito.Mockito.when;
  * table V5/V6 created and a real {@code TransactionTemplate}. Nothing here was weakened for the
  * migration; the class names in the arrangement changed and the promises did not.
  */
+@Epic("Infrastructure")
+@Feature("Meme events outbox")
+@Story("Transactional announce")
 @SpringBootTest(classes = MemesApplication.class)
 class KafkaMemeEventsTransactionTest {
 

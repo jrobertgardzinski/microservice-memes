@@ -3,6 +3,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.image.OptimizedImage;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,6 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * quickly (429 + Retry-After, the throttling contract uploads already speak) — and once the
  * permits free up, uploads must flow again.
  */
+@Epic("Infrastructure")
+@Feature("Decode concurrency")
+@Story("Global decode ceiling")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class,
         DecodeConcurrencyTest.ThreePermitsAroundABlockingDecode.class})
 @AutoConfigureMockMvc

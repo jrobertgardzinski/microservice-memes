@@ -8,6 +8,9 @@ import com.jrobertgardzinski.memes.application.RestoreUserContent;
 import com.jrobertgardzinski.outbox.OutboxRepublisher;
 import com.jrobertgardzinski.outbox.OutboxTable;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +54,9 @@ import static org.mockito.Mockito.when;
  * deletion that silently did not happen. The outbox turns that into a row that
  * outlives the process, and the republisher into a delivery that outlives the outage.
  */
+@Epic("Saga")
+@Feature("Purge confirmation")
+@Story("Outbox durability")
 @SpringBootTest(classes = MemesApplication.class)
 class PurgeConfirmationOutboxTest {
 

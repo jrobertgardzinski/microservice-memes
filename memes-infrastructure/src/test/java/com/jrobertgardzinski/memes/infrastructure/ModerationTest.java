@@ -1,6 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Moderation gate on delete: the author removes their own meme, a stranger cannot, and a MODERATOR
  * (its roles come from microservice-security's /me, stubbed here) removes anyone's.
  */
+@Epic("Infrastructure")
+@Feature("Moderation gate")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 class ModerationTest {

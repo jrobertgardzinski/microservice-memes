@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * assertion is its counterweight: the exempt adapter MUST still contain such a query, so the rule
  * cannot be satisfied by quietly deleting the erasure feature.
  */
+@Epic("Saga")
+@Feature("Marked meme is invisible")
+@Story("SQL read guard")
 class MemeReadFilterTest {
 
     private static final Path ADAPTERS =

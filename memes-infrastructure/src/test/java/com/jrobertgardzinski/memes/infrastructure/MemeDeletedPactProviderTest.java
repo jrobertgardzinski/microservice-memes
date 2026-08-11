@@ -8,6 +8,9 @@ import au.com.dius.pact.provider.junit5.PactVerificationInvocationContextProvide
 import au.com.dius.pact.provider.junitsupport.Provider;
 import au.com.dius.pact.provider.junitsupport.loader.PactFolder;
 import com.jrobertgardzinski.outbox.DispatchOutcome;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -50,6 +53,9 @@ import static org.mockito.Mockito.when;
  * silently for weeks after the workspace split, and a contract test that never runs is
  * indistinguishable from one that passes.
  */
+@Epic("Contract")
+@Feature("Meme deleted announcement")
+@Story("User-collections consumer")
 @Provider("microservice-memes")
 @PactFolder(MemeDeletedPactProviderTest.PACT_FOLDER)
 @EnabledIf(value = "consumerPactCheckedOut",

@@ -4,6 +4,8 @@ import com.jrobertgardzinski.memes.config.PurgeRule;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.tags.Tag;
 import com.jrobertgardzinski.voting.VoteDirection;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  * the law; the one command that CANNOT obey it (casting a vote — the second identical vote
  * TOGGLES the first away, by UX design) is a DECLARED EXCEPTION with its own proof below.
  */
+@Epic("Use case")
+@Feature("Idempotent commands")
 class IdempotentCommandsTest {
 
     /** A fresh gallery per run: two memes, votes, a tag, a flag. */

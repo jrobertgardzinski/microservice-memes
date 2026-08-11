@@ -3,6 +3,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.ObjectStore;
 import com.jrobertgardzinski.memes.domain.Meme;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ServeMeme) — otherwise the encoded copy of a "deleted" image lives in the object store forever,
  * which for a purge is a data-retention hole, not just litter.
  */
+@Epic("Infrastructure")
+@Feature("Meme deletion")
+@Story("Blob cleanup")
 @SpringBootTest(classes = MemesApplication.class)
 class MemeDeletionCleanupTest {
 

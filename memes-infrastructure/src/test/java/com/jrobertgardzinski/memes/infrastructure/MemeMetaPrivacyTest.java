@@ -1,6 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * address is never part of the answer, masked or not, because a public listing of ids plus one
  * cheap call per id is otherwise a complete address book of everyone who ever uploaded.
  */
+@Epic("Infrastructure")
+@Feature("Meme metadata privacy")
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 class MemeMetaPrivacyTest {

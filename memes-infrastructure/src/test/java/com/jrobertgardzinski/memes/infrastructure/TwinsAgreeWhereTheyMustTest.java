@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 
@@ -39,6 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * purge policy. Those differ because the services differ — memes deletes what it holds, comments
  * anonymises it, and that was a decision, not a drift.
  */
+@Epic("Infrastructure")
+@Feature("Twin services agreement")
 class TwinsAgreeWhereTheyMustTest {
 
     private static final Path MEMES = Path.of("src/main/resources/application.properties");

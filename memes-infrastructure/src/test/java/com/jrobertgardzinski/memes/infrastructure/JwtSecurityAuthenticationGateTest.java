@@ -1,6 +1,9 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -21,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * through with its subject and roles; a forged signature, a foreign issuer, an expired token or a
  * key the JWKS does not know (after one refetch) are all refused — the gate fails closed.
  */
+@Epic("Infrastructure")
+@Feature("Authentication gate")
+@Story("Offline JWT verification")
 class JwtSecurityAuthenticationGateTest {
 
     private final ObjectMapper mapper = new ObjectMapper();

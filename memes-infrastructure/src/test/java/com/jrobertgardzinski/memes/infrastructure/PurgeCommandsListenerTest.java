@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +38,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
  * nothing about the saga's retention), and a line that quotes the command back would let the
  * person being deleted dictate the operator's log file. Both are pinned here with a real appender.
  */
+@Epic("Saga")
+@Feature("Purge commands")
 class PurgeCommandsListenerTest {
 
     private static final String LEAVER = "leaver@example.com";

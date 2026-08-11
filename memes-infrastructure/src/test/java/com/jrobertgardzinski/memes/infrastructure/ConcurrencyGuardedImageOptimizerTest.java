@@ -2,6 +2,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * but an INTERRUPTED wait is a teardown (503, "go elsewhere") — and the interrupt flag must
  * survive the exception, or the shutdown that raised it would be silently swallowed.
  */
+@Epic("Infrastructure")
+@Feature("Decode concurrency")
+@Story("Interrupt vs overload")
 class ConcurrencyGuardedImageOptimizerTest {
 
     private final ImageLimits limits = new ImageLimits(1024);

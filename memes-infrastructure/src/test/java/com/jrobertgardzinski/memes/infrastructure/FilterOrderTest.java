@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import io.qameta.allure.Epic;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  * <p>Compared with the very comparator Spring registers servlet filters by, so this pins the
  * effective order rather than a restatement of the annotations.
  */
+@Epic("Infrastructure")
+@Feature("Upload guards")
+@Story("Filter order")
 @SpringBootTest(classes = MemesApplication.class)
 class FilterOrderTest {
 
