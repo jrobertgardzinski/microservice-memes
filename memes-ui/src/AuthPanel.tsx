@@ -18,6 +18,16 @@ type Mode = 'signin' | 'signup' | 'inbox' | 'mfa';
 
 const prettify = (code: string) => code.toLowerCase().replaceAll('_', ' ');
 
+// a password error is {CODE: parameter} — the parameter is the policy value in force for THIS
+// attempt (the minimum length is live configuration), or true for a rule that has none
+type PasswordError = string | Record<string, unknown>;
+const prettifyPasswordError = (error: PasswordError): string => {
+  if (typeof error === 'string') return prettify(error);
+  return Object.entries(error)
+    .map(([code, parameter]) => (parameter === true ? prettify(code) : `${prettify(code)}: ${String(parameter)}`))
+    .join(', ');
+};
+
 interface Props {
   token: string | null;
   user: string;
@@ -122,12 +132,13 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
       // the mail tells the owner whether it is a verification link or "you already have an account"
       setMode('inbox');
     } else if (r.status === 422) {
-      const errors: { emailErrors?: string[]; passwordErrors?: string[] } = await r.json();
-      setNotice({
-        tone: 'warning',
-        text: 'That will not do:',
-        items: [...(errors.emailErrors ?? []), ...(errors.passwordErrors ?? [])].map(prettify),
-      });
+      const errors: { emailErrors?: string[]; passwordErrors?: PasswordError[] } = await r.json();
+      // e-mail errors arrive as sentences, password errors as codes — shown under their own field
+      const sections = [
+        { title: 'e-mail', items: errors.emailErrors ?? [] },
+        { title: 'password', items: (errors.passwordErrors ?? []).map(prettifyPasswordError) },
+      ].filter((section) => section.items.length > 0);
+      setNotice({ tone: 'warning', text: 'That will not do:', sections });
     } else {
       setNotice({ tone: 'warning', text: `Registration failed (${r.status}).` });
     }
@@ -287,6 +298,14 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
               {notice.items.map((item) => <li key={item}>{item}</li>)}
             </ul>
           )}
+          {notice.sections?.map((section) => (
+            <Box key={section.title} sx={{ mt: 0.5 }}>
+              <strong>{section.title}</strong>
+              <ul style={{ margin: '2px 0 0', paddingLeft: 18 }}>
+                {section.items.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </Box>
+          ))}
         </Alert>
       )}
     </Paper>

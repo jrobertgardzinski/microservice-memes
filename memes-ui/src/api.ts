@@ -76,6 +76,8 @@ export interface Notice {
   tone: 'success' | 'warning';
   text: string;
   items?: string[];
+  /** Grouped items, one group per field — a refused registration answers per field, so is shown per field. */
+  sections?: { title: string; items: string[] }[];
 }
 
 export const jsonHeaders = { 'Content-Type': 'application/json' };
