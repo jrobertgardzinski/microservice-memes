@@ -261,7 +261,15 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
         <Tab label="Sign in" value="signin" />
         <Tab label="Create account" value="signup" />
       </Tabs>
-      <Box component="form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
+      {/*
+        * noValidate: the browser does not get a vote on what an address is. Its type="email" rule is
+        * ASCII-only, so it blocked addresses security ACCEPTS (Józef@wp.pl is a valid EAI address) and
+        * waved through ones it refuses (x@wp) — a second, disagreeing authority whose verdict arrives
+        * as a native bubble the panel cannot style or explain. type="email" stays for the phone
+        * keyboard; the judgement is the server's alone, and its refusal lands in the notice below with
+        * every other rule the attempt broke.
+        */}
+      <Box component="form" noValidate onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <Stack spacing={1.5}>
           <TextField
             label="e-mail" type="email" size="small" autoComplete="email"
