@@ -18,10 +18,11 @@ type Mode = 'signin' | 'signup' | 'inbox' | 'mfa';
 
 const prettify = (code: string) => code.toLowerCase().replaceAll('_', ' ');
 
-// a password error is {CODE: parameter} — the parameter is the policy value in force for THIS
-// attempt (the minimum length is live configuration), or true for a rule that has none
-type PasswordError = string | Record<string, unknown>;
-const prettifyPasswordError = (error: PasswordError): string => {
+// Both channels of a refused registration speak one shape: {CODE: parameter}, where the parameter
+// is the policy value in force for THIS attempt (the minimum length is live configuration) or true
+// for a rule that has none. A plain string is still accepted, so an older service is readable too.
+type FieldError = string | Record<string, unknown>;
+const prettifyFieldError = (error: FieldError): string => {
   if (typeof error === 'string') return prettify(error);
   return Object.entries(error)
     .map(([code, parameter]) => (parameter === true ? prettify(code) : `${prettify(code)}: ${String(parameter)}`))
@@ -132,11 +133,11 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
       // the mail tells the owner whether it is a verification link or "you already have an account"
       setMode('inbox');
     } else if (r.status === 422) {
-      const errors: { emailErrors?: string[]; passwordErrors?: PasswordError[] } = await r.json();
-      // e-mail errors arrive as sentences, password errors as codes — shown under their own field
+      const errors: { emailErrors?: FieldError[]; passwordErrors?: FieldError[] } = await r.json();
+      // one shape, one renderer — each field shows only the rules that attempt actually broke
       const sections = [
-        { title: 'e-mail', items: errors.emailErrors ?? [] },
-        { title: 'password', items: (errors.passwordErrors ?? []).map(prettifyPasswordError) },
+        { title: 'e-mail', items: (errors.emailErrors ?? []).map(prettifyFieldError) },
+        { title: 'password', items: (errors.passwordErrors ?? []).map(prettifyFieldError) },
       ].filter((section) => section.items.length > 0);
       setNotice({ tone: 'warning', text: 'That will not do:', sections });
     } else {
