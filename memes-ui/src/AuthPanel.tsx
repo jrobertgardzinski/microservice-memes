@@ -275,6 +275,24 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
           <Button type="submit" variant="contained" disabled={busy || !email || !password}>
             {mode === 'signup' ? 'Create account' : 'Sign in'}
           </Button>
+          {notice && (
+            <Alert severity={notice.tone}>
+              {notice.text}
+              {notice.items && (
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                  {notice.items.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              )}
+              {notice.sections?.map((section) => (
+                <Box key={section.title} sx={{ mt: 0.5 }}>
+                  <strong>{section.title}</strong>
+                  <ul style={{ margin: '2px 0 0', paddingLeft: 18 }}>
+                    {section.items.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </Box>
+              ))}
+            </Alert>
+          )}
           {providers.map((provider) => (
             <Button
               key={provider.name}
@@ -290,24 +308,6 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
           ))}
         </Stack>
       </Box>
-      {notice && (
-        <Alert severity={notice.tone} sx={{ mt: 1.5 }}>
-          {notice.text}
-          {notice.items && (
-            <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-              {notice.items.map((item) => <li key={item}>{item}</li>)}
-            </ul>
-          )}
-          {notice.sections?.map((section) => (
-            <Box key={section.title} sx={{ mt: 0.5 }}>
-              <strong>{section.title}</strong>
-              <ul style={{ margin: '2px 0 0', paddingLeft: 18 }}>
-                {section.items.map((item) => <li key={item}>{item}</li>)}
-              </ul>
-            </Box>
-          ))}
-        </Alert>
-      )}
     </Paper>
   );
 }
