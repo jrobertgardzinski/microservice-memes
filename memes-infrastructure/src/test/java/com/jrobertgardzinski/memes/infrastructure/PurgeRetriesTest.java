@@ -68,10 +68,12 @@ class PurgeRetriesTest {
             NoTransactions.template());
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    // the real adapter, so the assertion below still reads the metric an operator alerts on —
+    // the recoverer now states a fact and this is what decides it is spelled as a counter
     private final DefaultErrorHandler errorHandler = SagaParticipantConfig.errorHandler(
             new SagaRetryBudget(Duration.ofMillis(400), Duration.ofMillis(20),
                     Duration.ofMillis(50), System::nanoTime),
-            meters);
+            new MicrometerObservations(meters));
 
     private final MessageListenerContainer container = mock(MessageListenerContainer.class);
     private final Consumer<?, ?> consumer = mock(Consumer.class);

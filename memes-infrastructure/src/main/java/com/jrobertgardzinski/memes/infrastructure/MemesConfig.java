@@ -147,6 +147,23 @@ class MemesConfig {
     }
 
     @Bean
+    com.jrobertgardzinski.memes.config.ErasureTolerance erasureTolerance(
+            @Value("${memes.erasure.stuck-after-seconds:1800}") long stuckAfterSeconds) {
+        return new com.jrobertgardzinski.memes.config.ErasureTolerance(
+                java.time.Duration.ofSeconds(stuckAfterSeconds));
+    }
+
+    @Bean
+    com.jrobertgardzinski.memes.application.WatchErasureBacklog watchErasureBacklog(
+            com.jrobertgardzinski.memes.application.MemeErasure erasure,
+            com.jrobertgardzinski.memes.config.ErasureTolerance tolerance,
+            com.jrobertgardzinski.memes.application.Observations observations,
+            java.time.Clock clock) {
+        return new com.jrobertgardzinski.memes.application.WatchErasureBacklog(
+                erasure, tolerance, observations, clock);
+    }
+
+    @Bean
     PurgeRule defaultMemesPurgeRule(@Value("${memes.purge.memes:DELETE}") String rule) {
         return PurgeRule.parse(rule);
     }
