@@ -95,11 +95,41 @@ class PurgeCommandsListener {
     }
 
     /**
-     * The leaver's wizard choice for THIS service's axis (the memes rule), when the command
-     * carries one; unparseable rules fall back to the deployment default (logged) rather than
-     * wedging the saga.
+     * The one word on the wire that licenses conditions. Anything else — a missing field, an empty
+     * one, a word this service has never heard of — is a closure the account's own owner asked
+     * for, which is the same normalisation the orchestrator applies and deliberately not a
+     * symmetrical test: a garbage value must never be the reason somebody's content survives their
+     * own erasure request.
+     */
+    private static final String BY_ADMIN = "ADMIN";
+
+    /**
+     * The rule for THIS service's axis (the memes rule), and the one gate that is not a matter of
+     * configuration.
+     *
+     * <p>A closure the OWNER asked for resolves to {@link PurgeRule.Delete}, stated rather than
+     * left absent, and whatever the command carried is discarded. The difference matters because
+     * absent means "decide for me" — it lets the operator's runtime override and then the
+     * deployment default have their say (see {@code PurgeUserContent}), and an operator who has
+     * dialled in "keep the popular ones" would then keep the content of somebody who asked to be
+     * forgotten. There is no exception to that right for content the community happens to like, so
+     * this is not a dial and not a default: it is the answer.
+     *
+     * <p>An administrator's closure is an ordinary business decision, so its rule is read from the
+     * command as it always was; unparseable rules fall back to the deployment default (logged)
+     * rather than wedging the saga.
      */
     private java.util.Optional<PurgeRule> requestedPolicy(JsonNode command) {
+        if (!BY_ADMIN.equals(command.path("initiatedBy").asText())) {
+            if (!command.path("policy").path("memes").isMissingNode()) {
+                // a producer that states conditions on a self-closure is broken, not permissive:
+                // say so loudly and destroy anyway — the alternative is a silent policy breach
+                LOG.warn("a self-requested closure arrived carrying a memes purge rule; ignoring it"
+                        + " and deleting — conditions are an administrator's to state, never the"
+                        + " leaver's");
+            }
+            return java.util.Optional.of(new PurgeRule.Delete());
+        }
         JsonNode rule = command.path("policy").path("memes");
         if (rule.isMissingNode()) {
             return java.util.Optional.empty();

@@ -22,7 +22,7 @@ describe('the deletion wizard when the step-up fails', () => {
   });
 
   const open = () =>
-    render(<DeleteAccountDialog token="t" onDeleted={() => {}} onClose={() => {}} />);
+    render(<DeleteAccountDialog token="t" email="leaver@example.com" onDeleted={() => {}} onClose={() => {}} />);
 
   const typePasswordAndSubmit = () => {
     fireEvent.change(screen.getByLabelText('your password'), { target: { value: 'right-one' } });
@@ -64,17 +64,15 @@ describe('the deletion wizard when the step-up fails', () => {
 });
 
 /**
- * What the wizard puts ON THE WIRE for each option (P18 poz. 18).
+ * What the wizard puts ON THE WIRE — and what it no longer asks.
  *
- * The preselected option used to send `{}`. An empty choice map does not mean "the wizard's
- * default" to anybody downstream: identity's `PurgeChoices` documents it as "whatever each content
- * service's deployment default is", so the orchestrator leaves the `policy` field out of the fact
- * and the admin's runtime override decides the fate of the memes instead — silently overruling a
- * radio button labelled "delete my memes", while three javadocs promise the leaver's wish wins over
- * everything. A choice only outranks the override if it is actually stated, so every option states
- * one now.
+ * It used to offer three options, one of which kept the memes the community had up-voted. Closing
+ * your own account is the right to be forgotten and that right has no exception for popular
+ * content, so the options are gone: the route takes no body at all, and every content service
+ * discards a rule it finds on a self-requested closure anyway. Conditions live on the ADMIN route,
+ * where nobody is exercising a right.
  */
-describe('the policy the wizard sends', () => {
+describe('what the wizard sends', () => {
   const original = globalThis.fetch;
 
   afterEach(() => {
@@ -88,7 +86,7 @@ describe('the policy the wizard sends', () => {
     globalThis.fetch = vi.fn((input: unknown, init?: RequestInit) => {
       const url = String(input);
       calls.push({ url, body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) });
-      return Promise.resolve(url.endsWith('/account/delete')
+      return Promise.resolve(url.endsWith('/account/leaver%40example.com')
         ? new Response('{}', { status: 202 })
         : new Response(JSON.stringify({ status: 'ELEVATED' }), { status: 200 }));
     }) as unknown as typeof globalThis.fetch;
@@ -96,34 +94,27 @@ describe('the policy the wizard sends', () => {
   };
 
   const deleteCall = (calls: Array<{ url: string; body: unknown }>) =>
-    calls.find((call) => call.url.endsWith('/account/delete'));
+    calls.find((call) => call.url.endsWith('/account/leaver%40example.com'));
 
-  const runWizard = async (pick?: string) => {
+  const runWizard = async () => {
     const calls = stubSecurity();
     const deleted = vi.fn();
-    render(<DeleteAccountDialog token="t" onDeleted={deleted} onClose={() => {}} />);
-    if (pick) {
-      fireEvent.click(screen.getByRole('radio', { name: new RegExp(pick) }));
-    }
+    render(<DeleteAccountDialog token="t" email="leaver@example.com" onDeleted={deleted} onClose={() => {}} />);
     fireEvent.change(screen.getByLabelText('your password'), { target: { value: 'right-one' } });
     fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }));
     await waitFor(() => expect(deleted).toHaveBeenCalled());
     return calls;
   };
 
-  it('spells out the recommended option instead of sending no preference at all', async () => {
-    const calls = await runWizard();
-
-    expect(deleteCall(calls)?.body).toEqual({ purge: { memes: 'DELETE', comments: 'ANONYMIZE_AUTHOR' } });
+  it('sends no body at all — there is no condition left to state', async () => {
+    expect(deleteCall(await runWizard())?.body).toBeUndefined();
   });
 
-  it('still spells out "burn it all"', async () => {
-    expect(deleteCall(await runWizard('Burn it all'))?.body)
-      .toEqual({ purge: { memes: 'DELETE', comments: 'DELETE' } });
-  });
+  it('offers the person nothing to choose', async () => {
+    stubSecurity();
+    render(<DeleteAccountDialog token="t" email="leaver@example.com" onDeleted={() => {}} onClose={() => {}} />);
 
-  it('still spells out the popularity rule, with its threshold', async () => {
-    expect(deleteCall(await runWizard('Keep what the community liked'))?.body)
-      .toEqual({ purge: { memes: 'KEEP_POPULAR_ANONYMIZED:100', comments: 'KEEP_POPULAR_ANONYMIZED:100' } });
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByText(/everything you posted goes with it/)).toBeTruthy();
   });
 });

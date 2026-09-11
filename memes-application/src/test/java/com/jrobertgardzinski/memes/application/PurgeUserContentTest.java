@@ -177,8 +177,8 @@ class PurgeUserContentTest {
     }
 
     @Test
-    @DisplayName("the leaver's wizard choice beats the admin's override")
-    void wizard_choice_beats_the_override() {
+    @DisplayName("a rule stated on the closure beats the admin's override")
+    void a_stated_rule_beats_the_override() {
         adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
         memes.put("gone", new Meme("gone", "leaver@example.com", "png", new byte[]{1}));
 

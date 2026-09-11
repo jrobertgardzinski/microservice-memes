@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.memes.config.PurgeRule;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -118,8 +119,10 @@ class PurgeCommandsListenerTest {
     @Test
     @DisplayName("the closure erases, and is NOT confirmed — the orchestrator has already decided")
     void the_closure_erases_what_the_mark_reserved() throws Exception {
+        // an administrator's closure that states no rule: empty means "decide for me", so the
+        // service's own override and default get their say (see PurgeUserContent)
         listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
-                + "\"sagaId\":\"" + SAGA + "\"}", null);
+                + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\"}", null);
 
         verify(purgeUserContent).execute(LEAVER, Optional.empty());
         verifyNoInteractions(markForErasure, restoreUserContent);
@@ -168,14 +171,14 @@ class PurgeCommandsListenerTest {
     @Test
     @DisplayName("an unparseable rule is logged by shape and size — never quoted back from the wire")
     void an_unparseable_rule_cannot_write_into_the_log() throws Exception {
-        // the rule text is whatever the leaver typed into their deletion request: the wizard is
-        // one client of that API, curl is another. Newlines in it used to become NEW LOG LINES,
+        // the rule text is whatever reached the admin route: the panel is one client of that API,
+        // curl is another. Newlines in it used to become NEW LOG LINES,
         // so an operator could be shown a fabricated "ERROR" from the memes service.
         String forged = "DELETE\nERROR memes-service: seized by " + LEAVER + "\n";
         String rule = forged.repeat(100);
         // the policy rides the CLOSURE now — that is the command whose use case reads the rule
         listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
-                + "\"sagaId\":\"" + SAGA + "\",\"policy\":{\"memes\":\""
+                + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\",\"policy\":{\"memes\":\""
                 + rule.replace("\n", "\\n") + "\"}}", null);
 
         // the erasure still runs, on the deployment default — an unreadable rule must not wedge the saga
@@ -208,5 +211,41 @@ class PurgeCommandsListenerTest {
     private void assertNothingLoggedContains(String forbidden) {
         assertFalse(logLines().stream().anyMatch(line -> line.contains(forbidden)),
                 "\"" + forbidden + "\" must not appear in the log: " + logLines());
+    }
+
+    @Test
+    @DisplayName("a closure the leaver asked for DELETES, whatever rule the command carries")
+    void a_self_requested_closure_always_deletes() throws Exception {
+        // the command states the most generous rule there is, and it is the leaver's own request:
+        // there is no ground on which a portal keeps the content of somebody exercising their right
+        // to be forgotten, so the rule is discarded and the answer is stated rather than left open
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"SELF\","
+                + "\"policy\":{\"memes\":\"KEEP_POPULAR_ANONYMIZED:1\"}}", null);
+
+        verify(purgeUserContent).execute(LEAVER, Optional.of(new PurgeRule.Delete()));
+    }
+
+    @Test
+    @DisplayName("a command with no initiator at all is read as the leaver's own request")
+    void an_absent_initiator_is_read_as_self() throws Exception {
+        // a producer from before the field existed had exactly one deletion route, and it was the
+        // account owner's — and a garbage value must never be the reason content survives
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"\","
+                + "\"policy\":{\"memes\":\"ANONYMIZE_AUTHOR\"}}", null);
+
+        verify(purgeUserContent).execute(LEAVER, Optional.of(new PurgeRule.Delete()));
+    }
+
+    @Test
+    @DisplayName("an administrator's closure keeps what the community voted up")
+    void an_administrators_closure_honours_the_rule() throws Exception {
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\","
+                + "\"policy\":{\"memes\":\"KEEP_POPULAR_ANONYMIZED:100\"}}", null);
+
+        verify(purgeUserContent).execute(LEAVER,
+                Optional.of(new PurgeRule.KeepPopularAnonymized(100)));
     }
 }

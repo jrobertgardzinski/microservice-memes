@@ -4,14 +4,9 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Radio from '@mui/material/Radio';
-import RadioGroup from '@mui/material/RadioGroup';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { authHeader, jsonHeaders, request, SECURITY } from './api';
-
-type Choice = 'default' | 'wipe' | 'popular';
 
 /**
  * What to tell the person, per status. "Wrong password." used to cover EVERY non-2xx here — a
@@ -31,17 +26,26 @@ const UNREACHABLE = 'Could not reach the security service — check your connect
 
 interface Props {
   token: string;
+  /** The signed-in address. It goes in the PATH, and that is what makes this a request to be
+   *  forgotten rather than an administrator's act: the same route with somebody else's address
+   *  asks for the ADMIN role instead. */
+  email: string;
   onDeleted: () => void;
   onClose: () => void;
 }
 
 /**
- * The deletion wizard: what should happen to the account's content is the leaver's choice, carried
- * with the request through the saga (the rule vocabulary belongs to the meme service).
+ * The deletion wizard — and it no longer asks what should happen to the content, because that was
+ * never this person's to choose. Closing your own account is the right to be forgotten, and there
+ * is no ground on which a portal keeps the memes of somebody who asked to be forgotten because the
+ * community up-voted them. It used to offer three options, one of which kept the popular ones.
+ *
+ * <p>Conditions still exist — delete, keep without the author, keep only what was voted up — but
+ * they belong to the ADMIN closing SOMEBODY ELSE's account (a ban, house rules), where nobody is
+ * exercising any right and the fate of the content is an ordinary business decision. That lives in
+ * the admin panel; this dialog states plainly what will happen and asks only for proof of identity.
  */
-export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props) {
-  const [choice, setChoice] = useState<Choice>('default');
-  const [minScore, setMinScore] = useState(100);
+export default function DeleteAccountDialog({ token, email, onDeleted, onClose }: Props) {
   const [busy, setBusy] = useState(false);
   // deleting is irreversible → step-up: confirm the password, then a factor code if one is enrolled
   const [password, setPassword] = useState('');
@@ -50,23 +54,11 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
   const [error, setError] = useState<string | null>(null);
 
   const doDelete = async () => {
-    const rule = `KEEP_POPULAR_ANONYMIZED:${Math.max(1, minScore)}`;
-    // Every option ships EXPLICIT rules, the preselected one included. It used to send `{}`, and an
-    // empty map is not "the wizard's default" on the wire — identity's PurgeChoices calls it
-    // "whatever each content service's deployment default is", so the orchestrator omits the policy
-    // field and the admin's runtime override decides instead. The radio button says "delete my
-    // memes", three javadocs promise the leaver's wish outranks the override, and neither was true
-    // while the wish travelled as silence (P18 poz. 18). The pair below IS the label, spelled in the
-    // content services' vocabulary; it also happens to be their env defaults, so nothing changes
-    // for a deployment without an override — only the override stops overruling a stated choice.
-    const purge =
-      choice === 'wipe' ? { memes: 'DELETE', comments: 'DELETE' }
-      : choice === 'popular' ? { memes: rule, comments: rule }
-      : { memes: 'DELETE', comments: 'ANONYMIZE_AUTHOR' };
-    const r = await request(`${SECURITY}/account/delete`, {
-      method: 'POST',
-      headers: { ...jsonHeaders, ...authHeader(token) },
-      body: JSON.stringify({ purge }),
+    // your own address in the path, and no body: a rule sent from here would be dropped before it
+    // reached the wire anyway — a self-requested closure destroys, and that is not configurable
+    const r = await request(`${SECURITY}/account/${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+      headers: authHeader(token),
     });
     if (r.status === 202) onDeleted();
     else setError(messageFor(r.status, 'Deletion was refused — please try again.'));
@@ -119,25 +111,10 @@ export default function DeleteAccountDialog({ token, onDeleted, onClose }: Props
       <DialogTitle>Delete your account</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Your account locks immediately. What happens to what you posted is up to you:
+          Your account locks immediately, and <b>everything you posted goes with it</b> — every
+          meme, every comment, every saved favourite, and the votes you cast. There is nothing to
+          choose here and nothing is kept: that is what being forgotten means.
         </Typography>
-        <RadioGroup value={choice} onChange={(e) => setChoice(e.target.value as Choice)}>
-          <FormControlLabel value="default" control={<Radio />}
-            label={<span><b>Recommended:</b> delete my memes (with their comment threads); keep my
-              comment texts elsewhere, signed “deleted account”</span>} />
-          <FormControlLabel value="wipe" control={<Radio />}
-            label="Burn it all: delete my memes and every comment I ever wrote" />
-          <FormControlLabel value="popular" control={<Radio />}
-            label="Keep what the community liked, anonymised — delete the rest" />
-        </RadioGroup>
-        {choice === 'popular' && (
-          <TextField
-            size="small" type="number" label="minimum votes to keep" sx={{ mt: 1 }}
-            value={minScore}
-            onChange={(e) => setMinScore(parseInt(e.target.value, 10) || 1)}
-            slotProps={{ htmlInput: { min: 1 } }}
-          />
-        )}
         <Typography variant="body2" sx={{ mt: 2 }}>Confirm it is you:</Typography>
         {!stepUpTicket ? (
           <TextField size="small" type="password" label="your password" fullWidth sx={{ mt: 1 }}

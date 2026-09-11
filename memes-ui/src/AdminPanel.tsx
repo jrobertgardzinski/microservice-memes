@@ -14,9 +14,14 @@ import { clearPurgePolicy, getPurgePolicy, PurgePolicy, setPurgePolicy } from '.
 const KEEP_POPULAR = 'KEEP_POPULAR_ANONYMIZED';
 
 /**
- * The administrator's dial over the purge-policy default: what happens to a leaver's memes when
- * their deletion wizard didn't say. The backend is the authority — refusals (bad rule, not an
- * admin) come back as messages, never enforced client-side.
+ * The administrator's dial over the purge-policy default: what happens to a leaver's memes when the
+ * closure that took them away stated no rule of its own. The backend is the authority — refusals
+ * (bad rule, not an admin) come back as messages, never enforced client-side.
+ *
+ * <p>It used to say "the leaver's own choice always wins over this dial", and that stopped being
+ * true when the deletion wizard lost its choices: somebody closing their own account states
+ * nothing and every meme goes, dial or no dial. What this dial still answers is the closure an
+ * ADMIN starts without naming a rule.
  */
 export default function AdminPanel({ token, open, onClose }: {
   token: string | null;
@@ -60,8 +65,9 @@ export default function AdminPanel({ token, open, onClose }: {
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            What happens to a leaver&apos;s memes when their deletion wizard didn&apos;t choose.
-            The leaver&apos;s own choice always wins over this dial.
+            What happens to a leaver&apos;s memes when an admin closes their account without
+            naming a rule. It never applies to somebody closing their OWN account — that always
+            deletes everything.
           </Typography>
           {policy && (
             <Alert severity="info">

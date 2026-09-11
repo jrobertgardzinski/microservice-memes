@@ -350,7 +350,7 @@ export const setCommentHidden = async (
     body: JSON.stringify({ hidden }),
   })).ok;
 
-/** The purge-policy dial, admin-only: what happens to a leaver's memes unless their wizard says otherwise. */
+/** The purge-policy dial, admin-only: what happens to a leaver's memes when the closure named no rule. */
 export interface PurgePolicy {
   axis: string;
   effective: string;

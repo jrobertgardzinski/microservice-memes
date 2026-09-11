@@ -134,8 +134,9 @@
     {
       "contents": {
         "email": "leaver@example.com",
+        "initiatedBy": "ADMIN",
         "policy": {
-          "memes": "DELETE"
+          "memes": "KEEP_POPULAR_ANONYMIZED:100"
         },
         "sagaId": "e2490de5-5bd3-43d5-b7c4-526e33f71304",
         "type": "ERASE_USER_CONTENT"
@@ -184,7 +185,7 @@
   ],
   "metadata": {
     "pact-jvm": {
-      "version": "4.7.3"
+      "version": "4.7.5"
     },
     "pactSpecification": {
       "version": "3.0.0"

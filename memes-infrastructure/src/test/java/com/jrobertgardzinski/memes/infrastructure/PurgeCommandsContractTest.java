@@ -98,8 +98,14 @@ class PurgeCommandsContractTest {
                         .stringValue("type", "ERASE_USER_CONTENT")
                         .uuid("sagaId")
                         .stringType("email", "leaver@example.com")
+                        // the basis, and this consumer needs it STATED: anything else it reads as
+                        // the leaver's own request and deletes, whatever the rule beside it says
+                        .stringValue("initiatedBy", "ADMIN")
                         .object("policy")
-                        .stringType("memes", "DELETE")
+                        // the popularity rule rather than DELETE, so this pact proves the rule is
+                        // HONOURED — with DELETE, a consumer that ignored the policy entirely
+                        // would have passed it
+                        .stringType("memes", "KEEP_POPULAR_ANONYMIZED:100")
                         .closeObject())
                 .toPact();
     }
@@ -108,7 +114,8 @@ class PurgeCommandsContractTest {
     @PactTestFor(pactMethod = "eraseCommand")
     void erasesOnTheClosureAndAppliesTheRule(List<Message> messages) throws Exception {
         listener.receive(messages.get(0).contentsAsString(), null);
-        verify(purgeUserContent).execute("leaver@example.com", Optional.of(new PurgeRule.Delete()));
+        verify(purgeUserContent).execute("leaver@example.com",
+                Optional.of(new PurgeRule.KeepPopularAnonymized(100)));
     }
 
     @Pact(consumer = "microservice-memes")

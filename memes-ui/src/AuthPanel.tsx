@@ -107,12 +107,13 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
         {deleting && (
           <DeleteAccountDialog
             token={token}
+            email={user}
             onClose={() => setDeleting(false)}
             onDeleted={() => {
               setDeleting(false);
               setNotice({
                 tone: 'success',
-                text: 'Account deletion started — your content is being handled as you chose; the goodbye mail will confirm.',
+                text: 'Account deletion started — everything you posted is being removed; the goodbye mail will confirm.',
               });
               onLogout();
             }}

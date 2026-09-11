@@ -77,7 +77,7 @@ public class AdminPolicySteps {
         assertEquals(200, lastChange.statusCode());
     }
 
-    @When("a leaver with one MEME is purged without a wizard choice")
+    @When("a leaver with one MEME is purged without a stated rule")
     public void leaverIsPurged() throws Exception {
         BufferedImage image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
         image.setRGB(3, 3, ThreadLocalRandom.current().nextInt(0xFFFFFF));
