@@ -6,6 +6,8 @@ import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
 import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.closure.ClosureInitiator;
+import com.jrobertgardzinski.closure.ClosureMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -69,11 +71,11 @@ class PurgeCommandsListener {
     private static final Logger LOG = LoggerFactory.getLogger(PurgeCommandsListener.class);
 
     /** The reversible mark; its confirmation is what the orchestrator's quorum counts. */
-    static final String MARK = "PURGE_USER_CONTENT";
+    static final String MARK = ClosureMessages.PURGE_USER_CONTENT;
     /** The closure: past this command the saga has nothing left to compensate with. */
-    static final String ERASE = "ERASE_USER_CONTENT";
+    static final String ERASE = ClosureMessages.ERASE_USER_CONTENT;
     /** The compensation: the marks come off and the content is public again. */
-    static final String RESTORE = "RESTORE_USER_CONTENT";
+    static final String RESTORE = ClosureMessages.RESTORE_USER_CONTENT;
 
     private final MarkUserContentForErasure markForErasure;
     private final RestoreUserContent restoreUserContent;
@@ -95,15 +97,6 @@ class PurgeCommandsListener {
     }
 
     /**
-     * The one word on the wire that licenses conditions. Anything else — a missing field, an empty
-     * one, a word this service has never heard of — is a closure the account's own owner asked
-     * for, which is the same normalisation the orchestrator applies and deliberately not a
-     * symmetrical test: a garbage value must never be the reason somebody's content survives their
-     * own erasure request.
-     */
-    private static final String BY_ADMIN = "ADMIN";
-
-    /**
      * The rule for THIS service's axis (the memes rule), and the one gate that is not a matter of
      * configuration.
      *
@@ -120,7 +113,10 @@ class PurgeCommandsListener {
      * rather than wedging the saga.
      */
     private java.util.Optional<PurgeRule> requestedPolicy(JsonNode command) {
-        if (!BY_ADMIN.equals(command.path("initiatedBy").asText())) {
+        // ClosureInitiator, not a local constant: the one word that licenses conditions is the
+        // agreement's, and its reading is deliberately not symmetrical — a missing field, an empty
+        // one or a word this service has never heard of is a closure the OWNER asked for
+        if (!ClosureInitiator.allowsConditions(command.path(ClosureMessages.Field.INITIATED_BY).asText())) {
             if (!command.path("policy").path("memes").isMissingNode()) {
                 // a producer that states conditions on a self-closure is broken, not permissive:
                 // say so loudly and destroy anyway — the alternative is a silent policy breach

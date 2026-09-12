@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.closure.ClosureMessages;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.outbox.OutboxEvent;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
@@ -45,7 +46,7 @@ import java.util.UUID;
 class PurgeConfirmations {
 
     /** The type the orchestrator's router keys on; the topic is {@link KafkaMemeEvents#TOPIC}. */
-    static final String USER_CONTENT_PURGED = "USER_CONTENT_PURGED";
+    static final String USER_CONTENT_PURGED = ClosureMessages.USER_CONTENT_PURGED;
 
     private final SpringOutbox outbox;
     private final ObjectMapper mapper;
