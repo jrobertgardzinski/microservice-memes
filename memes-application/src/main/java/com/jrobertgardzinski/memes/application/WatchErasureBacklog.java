@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.config.ErasureTolerance;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import com.jrobertgardzinski.memes.domain.Observation;
@@ -32,11 +33,11 @@ public class WatchErasureBacklog {
 
     private final MemeErasure erasure;
     private final ErasureTolerance tolerance;
-    private final Observations observations;
+    private final Observations<Observation> observations;
     private final Clock clock;
 
     public WatchErasureBacklog(MemeErasure erasure, ErasureTolerance tolerance,
-                               Observations observations, Clock clock) {
+                               Observations<Observation> observations, Clock clock) {
         this.erasure = erasure;
         this.tolerance = tolerance;
         this.observations = observations;

@@ -22,6 +22,11 @@
             <artifactId>voting</artifactId>
         </dependency>
         <dependency>
+            <!-- the port a service states its own facts through; the facts themselves stay ours -->
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>observation</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-tags</artifactId>
         </dependency>

@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.MemeErasure;
-import com.jrobertgardzinski.memes.application.Observations;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.WatchErasureBacklog;
 import com.jrobertgardzinski.memes.config.ErasureTolerance;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
@@ -81,7 +81,7 @@ class ObservabilityIsOptionalTest {
         Instant markedAt = Instant.parse("2026-08-08T10:00:00Z");
         MemeErasure backlog = holding(List.of(
                 new MemeMetadata("m1", "leaver@example.com", "png", MemeStatus.PENDING_ERASURE, markedAt)));
-        Observations silence = observation -> { };
+        Observations<Observation> silence = observation -> { };
 
         Observation.ErasureBacklog said = new WatchErasureBacklog(backlog,
                 new ErasureTolerance(Duration.ofMinutes(30)), silence,

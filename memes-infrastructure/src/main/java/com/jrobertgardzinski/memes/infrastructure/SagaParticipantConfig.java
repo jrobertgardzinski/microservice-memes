@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jrobertgardzinski.memes.application.Observations;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.domain.Observation;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -73,7 +73,7 @@ class SagaParticipantConfig {
      */
     @Bean
     @ConditionalOnProperty(name = "memes.kafka-enabled", havingValue = "true")
-    CommonErrorHandler sagaRecordErrorHandler(Observations observations) {
+    CommonErrorHandler sagaRecordErrorHandler(Observations<Observation> observations) {
         return errorHandler(SagaRetryBudget.forSagaRecords(), observations);
     }
 
@@ -95,7 +95,7 @@ class SagaParticipantConfig {
      * shape the listener parses. (This service's listener already drops malformed JSON itself, with a
      * PII-free WARN, before any of this is reached.)
      */
-    static DefaultErrorHandler errorHandler(SagaRetryBudget budget, Observations observations) {
+    static DefaultErrorHandler errorHandler(SagaRetryBudget budget, Observations<Observation> observations) {
         DefaultErrorHandler handler = new DefaultErrorHandler(droppedAfterBudget(observations), budget);
         handler.setResetStateOnExceptionChange(false);
         handler.setRetryListeners(retryLogging());
@@ -114,7 +114,7 @@ class SagaParticipantConfig {
      * A framework callback is where a technical event becomes a sentence about the business, which
      * is exactly what an adapter is for.
      */
-    private static ConsumerRecordRecoverer droppedAfterBudget(Observations observations) {
+    private static ConsumerRecordRecoverer droppedAfterBudget(Observations<Observation> observations) {
         return (record, failure) -> {
             observations.record(new Observation.SagaCommandDropped(record.topic()));
             withCidOf(record, () -> LOG.error("giving up on {}-{}@{} after the {}s retry budget:"

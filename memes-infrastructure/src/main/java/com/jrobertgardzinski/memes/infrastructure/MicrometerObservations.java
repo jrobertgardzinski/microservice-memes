@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.Observations;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.domain.Observation;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Component
 @ConditionalOnProperty(name = "memes.observability-enabled", havingValue = "true", matchIfMissing = true)
-class MicrometerObservations implements Observations {
+class MicrometerObservations implements Observations<Observation> {
 
     private final AtomicLong erasureBacklog = new AtomicLong();
     private final MeterRegistry meters;

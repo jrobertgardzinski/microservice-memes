@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.ListMemes;
 import com.jrobertgardzinski.memes.application.MakeThumbnail;
@@ -157,7 +158,7 @@ class MemesConfig {
     com.jrobertgardzinski.memes.application.WatchErasureBacklog watchErasureBacklog(
             com.jrobertgardzinski.memes.application.MemeErasure erasure,
             com.jrobertgardzinski.memes.config.ErasureTolerance tolerance,
-            com.jrobertgardzinski.memes.application.Observations observations,
+            com.jrobertgardzinski.observation.Observations<com.jrobertgardzinski.memes.domain.Observation> observations,
             java.time.Clock clock) {
         return new com.jrobertgardzinski.memes.application.WatchErasureBacklog(
                 erasure, tolerance, observations, clock);

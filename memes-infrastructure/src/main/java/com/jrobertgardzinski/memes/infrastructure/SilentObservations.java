@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.Observations;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.domain.Observation;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -24,11 +24,7 @@ class SilentObservations {
 
     @Bean
     @ConditionalOnMissingBean(Observations.class)
-    Observations silence() {
-        return new Observations() {
-            @Override
-            public void record(Observation observation) {
-            }
-        };
+    Observations<Observation> silence() {
+        return Observations.silent();
     }
 }
