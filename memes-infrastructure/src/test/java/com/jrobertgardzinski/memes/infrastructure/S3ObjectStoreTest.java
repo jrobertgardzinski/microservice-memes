@@ -30,8 +30,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers(disabledWithoutDocker = true)
 class S3ObjectStoreTest {
 
+    /**
+     * From quay.io, not Docker Hub.
+     *
+     * <p>{@code docker.io/minio/minio} stopped answering anonymous pulls — "repository does not
+     * exist or may require 'docker login'" — so every CI run failed on fetching the image rather
+     * than on anything this test is about, and a laptop without a cached copy failed the same way.
+     * quay.io serves the identical release; Testcontainers takes the registry from the name, and
+     * the tag stays pinned because a floating one would make this suite's result depend on the day.
+     */
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer("minio/minio:RELEASE.2025-09-07T16-13-09Z");
+    static final MinIOContainer MINIO = new MinIOContainer(
+            org.testcontainers.utility.DockerImageName
+                    .parse("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z")
+                    // Testcontainers recognises MinIO by the Docker Hub name; saying the two are
+                    // the same image is the whole of what this line does
+                    .asCompatibleSubstituteFor("minio/minio"));
 
     static S3ObjectStore store;
 
