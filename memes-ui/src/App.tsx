@@ -175,15 +175,22 @@ export default function App() {
     setFavourites((current) => (current === null ? current
       : isFavourite ? drop(current) : add(current)));
     setStarsInFlight((current) => new Set(current).add(memeId));
+    // undo THIS id and nothing else
+    const rollBack = () => {
+      setFavourites((current) => (current === null ? current
+        : isFavourite ? add(current) : drop(current)));
+      setWarning('The favourites service did not answer — try again.');
+    };
     try {
       const ok = isFavourite ? await removeFavourite(memeId, token)
                              : await saveFavourite(memeId, token);
-      if (!ok) {
-        // undo THIS id and nothing else
-        setFavourites((current) => (current === null ? current
-          : isFavourite ? add(current) : drop(current)));
-        setWarning('The favourites service did not answer — try again.');
-      }
+      if (!ok) rollBack();
+    } catch {
+      // A REFUSAL and a CALL THAT NEVER LANDED are the same thing to the star on the screen: the
+      // optimistic flip has to come back either way. Only the refusal was handled, so a collections
+      // service that was down left the star showing a favourite the server had never been told
+      // about — and it stayed wrong until a reload.
+      rollBack();
     } finally {
       setStarsInFlight((current) => {
         const next = new Set(current);
@@ -196,8 +203,14 @@ export default function App() {
   const upload = async (file: File) => {
     const body = new FormData();
     body.append('file', file);
-    const r = await request('/memes', { method: 'POST', headers: authHeader(token), body });
-    if (r.status !== 201) setWarning(`Upload refused (${r.status}).`);
+    try {
+      const r = await request('/memes', { method: 'POST', headers: authHeader(token), body });
+      if (r.status !== 201) setWarning(`Upload refused (${r.status}).`);
+    } catch {
+      // without this the picture simply never appeared and nothing was said: an upload is the one
+      // action here the user cannot repeat by guessing, so it has to name its own failure
+      setWarning('The upload did not reach the gallery — check your connection and try again.');
+    }
     refresh();
   };
 

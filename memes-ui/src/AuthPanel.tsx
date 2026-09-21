@@ -179,6 +179,16 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
   };
 
   const submitFactor = async () => {
+    try {
+      await sendFactor();
+    } catch {
+      // the second step of a sign-in is where a silent failure hurts most: the code expires while
+      // the user waits for a screen that will never change
+      setNotice({ tone: 'warning', text: 'Could not reach the sign-in service — try again in a moment.' });
+    }
+  };
+
+  const sendFactor = async () => {
     const r = await fetch(`${SECURITY}/authenticate/factor`, {
       method: 'POST',
       headers: jsonHeaders,
@@ -209,6 +219,11 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
     setNotice(null);
     try {
       await (mode === 'signup' ? signUp() : signIn());
+    } catch {
+      // `finally` alone put the button back and said nothing, so an unreachable security service
+      // looked exactly like a form the user had not filled in yet: they press it again, and again.
+      // Naming the service is the difference between "try again" and "try again LATER".
+      setNotice({ tone: 'warning', text: 'Could not reach the sign-in service — try again in a moment.' });
     } finally {
       setBusy(false);
     }

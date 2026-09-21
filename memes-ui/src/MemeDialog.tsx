@@ -164,7 +164,23 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
       }
     });
 
-  const guard = (action: () => void) => (token ? action() : onRequireSignIn());
+  /**
+   * Every write in this dialog goes through here, and every one of them is `async`. Typed as
+   * `() => void` the returned promise was dropped on the floor: when memes, comments or security
+   * is simply down, `fetch` REJECTS rather than answering, none of the `status` branches below are
+   * reached, and the user got no word at all — the arrow stayed put, the dialog stayed open, and
+   * nothing said why. Awaiting the action is what turns that silence into a sentence.
+   */
+  const guard = (action: () => void | Promise<void>) => {
+    if (!token) { onRequireSignIn(); return; }
+    void (async () => {
+      try {
+        await action();
+      } catch {
+        setNotice('That did not reach the server — check your connection and try again.');
+      }
+    })();
+  };
 
   const removeMeme = () =>
     guard(async () => {

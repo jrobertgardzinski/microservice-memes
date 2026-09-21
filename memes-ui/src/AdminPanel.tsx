@@ -42,21 +42,33 @@ export default function AdminPanel({ token, open, onClose }: {
       setKind(rule);
       if (threshold) setMinScore(Number(threshold));
     }
-  });
+  }).catch(() => setNotice('Could not read the current policy — the dial below is NOT what is in force.'));
   useEffect(() => { if (open) { setNotice(null); load(); } }, [open]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     const rule = kind === KEEP_POPULAR ? `${KEEP_POPULAR}:${minScore}` : kind;
-    const r = await setPurgePolicy(rule, token);
-    setNotice(r.ok ? 'Override saved — purges follow it from now on.' : `Refused: ${r.detail}`);
-    load();
+    try {
+      const r = await setPurgePolicy(rule, token);
+      setNotice(r.ok ? 'Override saved — purges follow it from now on.' : `Refused: ${r.detail}`);
+      load();
+    } catch {
+      // the dangerous silence: the admin sets a rule, sees nothing, and walks away believing the
+      // purge policy changed. Note there is no re-read on this path — the service that just failed
+      // to take the write is not going to answer a read, and its failure notice would overwrite
+      // this one, leaving the weaker of the two sentences on screen.
+      setNotice('The service did not answer — the override was NOT saved.');
+    }
   };
 
   const reset = async () => {
-    setNotice((await clearPurgePolicy(token))
-      ? 'Override cleared — the deployment default applies again.'
-      : 'Refused.');
-    load();
+    try {
+      setNotice((await clearPurgePolicy(token))
+        ? 'Override cleared — the deployment default applies again.'
+        : 'Refused.');
+      load();
+    } catch {
+      setNotice('The service did not answer — the override was NOT cleared.');
+    }
   };
 
   return (
@@ -89,7 +101,7 @@ export default function AdminPanel({ token, open, onClose }: {
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={reset}>Use env default</Button>
+        <Button onClick={() => void reset()}>Use env default</Button>
         <Button onClick={() => void save()} variant="contained">Save override</Button>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
