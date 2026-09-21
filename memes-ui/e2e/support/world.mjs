@@ -67,10 +67,16 @@ class GalleryWorld {
   async provisionAccount({ verify = true } = {}) {
     const email = `gallery-${Date.now()}-${counter++}@example.com`;
     const password = 'StrongPassword1!';
-    await this.post(`${SECURITY}/register`, { email, password });
+    // Both calls are CHECKED. They used to be fire-and-forget, and a refusal here does not fail
+    // the step that made it — it fails three steps later, as "no token and no ticket", naming a
+    // symptom instead of the refusal that caused it. A scenario that cannot provision its own
+    // account has nothing left to be about, so it says so where it happened.
+    await this.expectOk(this.post(`${SECURITY}/register`, { email, password }), `register ${email}`);
     this.account = { email, password };
     if (verify) {
-      await this.post(`${SECURITY}/verify-email`, { token: await this.verificationToken(email) });
+      await this.expectOk(
+        this.post(`${SECURITY}/verify-email`, { token: await this.verificationToken(email) }),
+        `verify ${email}`);
     }
     return this.account;
   }
@@ -228,9 +234,15 @@ class GalleryWorld {
   async apiToken() {
     this.markCodeRequested();
     const r = await this.post(`${SECURITY}/authenticate`, this.account);
-    const body = await r.json();
+    const body = await r.json().catch(() => ({}));
     if (body.accessToken) return body.accessToken;
-    if (!body.mfaTicket) throw new Error(`no token and no ticket for ${this.account.email}`);
+    if (!body.mfaTicket) {
+      // the status and the body, not just the absence: 403 is an unverified address, 429 is a
+      // throttle this suite tripped on itself, 401 is a password that does not match — three
+      // different bugs that all used to arrive as one sentence naming none of them
+      throw new Error(`no token and no ticket for ${this.account.email}: `
+        + `${r.status} ${JSON.stringify(body)}`);
+    }
     const code = await this.signInCode(this.account.email);
     const done = await this.post(`${SECURITY}/authenticate/factor`,
       { mfaTicket: body.mfaTicket, proof: code });
@@ -290,6 +302,17 @@ class GalleryWorld {
     this.page.on('requestfailed', (r) =>
       this.browserLog.push(`requestfailed: ${r.method()} ${r.url()} — ${r.failure()?.errorText}`));
     await this.page.goto(UI);
+  }
+
+  /** A provisioning call that must have worked: the status and the body travel into the error,
+   *  because a seeding step that fails silently makes the NEXT step tell a lie about why. */
+  async expectOk(pending, what) {
+    const r = await pending;
+    if (!r.ok) {
+      const text = await r.text().catch(() => '');
+      throw new Error(`${what} refused: ${r.status} ${text}`);
+    }
+    return r;
   }
 
   post(url, body) {
