@@ -2,6 +2,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
@@ -96,7 +97,8 @@ class PurgeConfirmationOutboxTest {
                 new KafkaMemeDispatch(kafka));
         republisher = MemeOutboxConfig.republisher(springOutbox, 24);
         listener = new PurgeCommandsListener(markForErasure, mock(RestoreUserContent.class),
-                purgeUserContent, new PurgeConfirmations(springOutbox, mapper), mapper, tx);
+                purgeUserContent, new PurgeConfirmations(springOutbox, mapper),
+                Observations.silent(), mapper, tx);
         jdbc.sql("DELETE FROM meme_events_outbox").update();
     }
 

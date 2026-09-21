@@ -48,6 +48,11 @@ class MicrometerObservations implements Observations<Observation> {
             case Observation.ErasureBacklog backlog -> erasureBacklog.set(backlog.marked());
             case Observation.SagaCommandDropped dropped ->
                     meters.counter("memes.kafka.records.dropped", "topic", dropped.topic()).increment();
+            // also a COUNTER, and for the same reason: one increment is one deletion this service
+            // answered with an empty confirmation. It is the alarm for a rename that lost its race
+            // with a purge — a steady zero is the healthy reading
+            case Observation.PurgeReservedNothing ignored ->
+                    meters.counter("memes.saga.purge.reserved.nothing").increment();
         }
     }
 }

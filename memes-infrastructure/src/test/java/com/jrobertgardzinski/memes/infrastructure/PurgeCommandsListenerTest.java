@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
+import com.jrobertgardzinski.memes.domain.Observation;
+import com.jrobertgardzinski.observation.Observations;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,6 +31,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * The listener's own guardrails (the happy paths are pinned by the Pact contract tests): a purge
@@ -50,8 +54,10 @@ class PurgeCommandsListenerTest {
     private final RestoreUserContent restoreUserContent = mock(RestoreUserContent.class);
     private final PurgeUserContent purgeUserContent = mock(PurgeUserContent.class);
     private final PurgeConfirmations confirmations = mock(PurgeConfirmations.class);
+    private final List<Observation> observed = new java.util.ArrayList<>();
+    private final Observations<Observation> observations = observed::add;
     private final PurgeCommandsListener listener = new PurgeCommandsListener(markForErasure,
-            restoreUserContent, purgeUserContent, confirmations, new ObjectMapper(),
+            restoreUserContent, purgeUserContent, confirmations, observations, new ObjectMapper(),
             NoTransactions.template());
 
     private final Logger listenerLog = (Logger) LoggerFactory.getLogger(PurgeCommandsListener.class);
@@ -103,6 +109,8 @@ class PurgeCommandsListenerTest {
     @Test
     @DisplayName("a completed mark confirms the SAME saga it was commanded for — and erases nothing")
     void a_completed_purge_confirms_its_own_saga() throws Exception {
+        when(markForErasure.execute(LEAVER)).thenReturn(3);
+
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
@@ -110,10 +118,31 @@ class PurgeCommandsListenerTest {
         // the mark first, the promise to report it second, both inside one transaction: a
         // confirmation announced before the mark would be a lie the outbox then made durable
         order.verify(markForErasure).execute(LEAVER);
-        order.verify(confirmations).confirm(SAGA, LEAVER);
+        // and the confirmation carries what the mark actually reserved, not just that it ran
+        order.verify(confirmations).confirm(SAGA, LEAVER, 3);
         // and the point of the whole two-phase design: the command the orchestrator can still take
         // back destroys nothing
         verifyNoInteractions(purgeUserContent);
+        assertTrue(observed.isEmpty(), "a mark with something to reserve raises no alarm: " + observed);
+    }
+
+    @Test
+    @DisplayName("a mark that reserved NOTHING is confirmed as nothing — counted and warned, never as a purge")
+    void a_mark_that_found_nobody_confirms_a_zero() throws Exception {
+        // the mock's default: the address on the command matched no meme. From in here that is
+        // either a member who never uploaded anything or F-014 — a member whose memes are still
+        // keyed by the address they used to have — and this service cannot tell the two apart,
+        // so it stops claiming and starts reporting
+        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                + "\"sagaId\":\"" + SAGA + "\"}", null);
+
+        verify(confirmations).confirm(SAGA, LEAVER, 0);
+        assertEquals(List.of(new Observation.PurgeReservedNothing()), observed,
+                "an empty confirmation is the one thing only this service can count");
+        assertTrue(logLines().stream().anyMatch(line -> line.contains("reserved NOTHING")),
+                "and it says so where an operator reading the deletion's trace will see it: "
+                        + logLines());
+        assertNothingLoggedContains(LEAVER);
     }
 
     @Test

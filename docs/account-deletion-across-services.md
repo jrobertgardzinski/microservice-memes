@@ -80,7 +80,10 @@ And the road NOT taken — the same picture when a participant stays silent:
    `status = PENDING_ERASURE` and leave the gallery, the tag search, the ranking and every image
    URL at once — because all of those read through the `active_memes` view — while row, blob,
    votes and authorship stay exactly where they were. The confirmation therefore means
-   *reserved*, not *destroyed*, and a reservation can be given back. (ADR 0007.)
+   *reserved*, not *destroyed*, and a reservation can be given back. (ADR 0007.) It also says HOW
+   MANY — `reserved` in the payload — because a mark that matched nothing used to be reported in
+   exactly the same words as one that emptied a whole gallery, and the commonest way to match
+   nothing is a member whose address moved (see the README).
 6. **The closure is what deletes.** Once every participant has confirmed, offboarding sends
    `ERASE_USER_CONTENT` on the same topic, and only then does `PurgeUserContent` apply the rule
    per axis (`DELETE` / `ANONYMIZE_AUTHOR` / `KEEP_POPULAR_ANONYMIZED:n`, the table in the

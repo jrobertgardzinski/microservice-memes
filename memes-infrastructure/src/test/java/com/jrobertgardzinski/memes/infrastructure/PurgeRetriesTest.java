@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
@@ -64,8 +65,8 @@ class PurgeRetriesTest {
     private final PurgeConfirmations confirmations = mock(PurgeConfirmations.class);
     private final MarkUserContentForErasure markForErasure = mock(MarkUserContentForErasure.class);
     private final PurgeCommandsListener listener = new PurgeCommandsListener(markForErasure,
-            mock(RestoreUserContent.class), purgeUserContent, confirmations, new ObjectMapper(),
-            NoTransactions.template());
+            mock(RestoreUserContent.class), purgeUserContent, confirmations,
+            Observations.silent(), new ObjectMapper(), NoTransactions.template());
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     // the real adapter, so the assertion below still reads the metric an operator alerts on —
@@ -128,7 +129,7 @@ class PurgeRetriesTest {
             if (attempts.incrementAndGet() == 1) {
                 throw new org.springframework.dao.QueryTimeoutException("the pool is momentarily empty");
             }
-            return null;
+            return 1;   // the mark's own answer: one meme reserved, which the confirmation carries
         }).when(markForErasure).execute(LEAVER);
 
         assertFalse(deliverOnce(), "the first delivery fails — the handler must ask for a redelivery,"
@@ -136,7 +137,7 @@ class PurgeRetriesTest {
         assertFalse(deliverOnce(), "and the second one succeeds, so nothing is recovered/dropped");
 
         assertEquals(2, attempts.get(), "the mark ran again on redelivery — it is idempotent by design");
-        Mockito.verify(confirmations).confirm(SAGA, LEAVER);
+        Mockito.verify(confirmations).confirm(SAGA, LEAVER, 1);
         assertEquals(0, dropped(), "nothing was dropped, so the counter that alerts stays at zero");
     }
 
@@ -159,7 +160,8 @@ class PurgeRetriesTest {
                 + " with extra steps, was: " + deliveries);
         assertTrue(spent.compareTo(Duration.ofSeconds(30)) < 0,
                 "and it ended on the budget's deadline, not on the loop's guard: " + spent);
-        Mockito.verify(confirmations, Mockito.never()).confirm(SAGA, LEAVER);
+        Mockito.verify(confirmations, Mockito.never())
+                .confirm(Mockito.eq(SAGA), Mockito.eq(LEAVER), Mockito.anyInt());
     }
 
     @Test

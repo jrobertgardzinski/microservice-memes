@@ -201,6 +201,17 @@ class MemesConfig {
         return new com.jrobertgardzinski.memes.application.RestoreUserContent(erasure);
     }
 
+    /**
+     * No transactional decorator here either, and for the listener's reason rather than the saga's:
+     * {@code SecurityEventsListener} opens one transaction per record, so the three tables the
+     * re-key touches move together or not at all.
+     */
+    @Bean
+    com.jrobertgardzinski.memes.application.RekeyUserContent rekeyUserContent(
+            com.jrobertgardzinski.memes.application.UserContentRekey rekey) {
+        return new com.jrobertgardzinski.memes.application.RekeyUserContent(rekey);
+    }
+
     @Bean
     RankMemes rankMemes(VoteRepository voteRepository, java.time.Clock clock) {
         return new RankMemes(voteRepository, clock);

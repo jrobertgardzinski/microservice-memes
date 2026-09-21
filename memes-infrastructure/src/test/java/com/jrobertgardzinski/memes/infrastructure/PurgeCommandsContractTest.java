@@ -10,6 +10,7 @@ import au.com.dius.pact.core.model.annotations.Pact;
 import au.com.dius.pact.core.model.messaging.Message;
 import au.com.dius.pact.core.model.messaging.MessagePact;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
@@ -50,7 +51,7 @@ class PurgeCommandsContractTest {
     private final MarkUserContentForErasure markForErasure = mock(MarkUserContentForErasure.class);
     private final PurgeCommandsListener listener = new PurgeCommandsListener(markForErasure,
             mock(RestoreUserContent.class), purgeUserContent, new CapturedConfirmations(),
-            new ObjectMapper(), NoTransactions.template());
+            Observations.silent(), new ObjectMapper(), NoTransactions.template());
 
     @Pact(consumer = "microservice-memes")
     MessagePact purgeCommand(MessagePactBuilder builder) {
@@ -134,7 +135,8 @@ class PurgeCommandsContractTest {
         PurgeUserContent nothingErases = mock(PurgeUserContent.class);
         RestoreUserContent restore = mock(RestoreUserContent.class);
         new PurgeCommandsListener(markForErasure, restore, nothingErases,
-                new CapturedConfirmations(), new ObjectMapper(), NoTransactions.template())
+                new CapturedConfirmations(), Observations.silent(), new ObjectMapper(),
+                NoTransactions.template())
                 .receive(messages.get(0).contentsAsString(), null);
         verify(restore).execute("leaver@example.com");
     }

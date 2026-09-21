@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
@@ -44,7 +45,7 @@ class PurgeConfirmationTopicTest {
         CapturedConfirmations confirmations = new CapturedConfirmations();
         new PurgeCommandsListener(mock(MarkUserContentForErasure.class),
                 mock(RestoreUserContent.class), mock(PurgeUserContent.class), confirmations,
-                new ObjectMapper(), NoTransactions.template())
+                Observations.silent(), new ObjectMapper(), NoTransactions.template())
                 .receive("{\"type\":\"PURGE_USER_CONTENT\",\"sagaId\":\"" + SAGA + "\","
                         + "\"email\":\"leaver@example.com\"}", null);
         // the same mapping the outbox's dispatch performs on the stored row, first attempt or

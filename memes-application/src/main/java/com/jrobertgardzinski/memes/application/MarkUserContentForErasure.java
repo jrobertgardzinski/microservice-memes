@@ -23,6 +23,12 @@ import java.time.Instant;
  * already marked keeps its ORIGINAL instant, so re-commanding never rejuvenates an obligation the
  * erasure backlog is watching.
  *
+ * <p><strong>It reports what it reserved</strong>, and the caller is expected to care. Zero is not
+ * the same statement as "this person had nothing here": it means nothing was found UNDER THAT
+ * ADDRESS, and an address is a name a person can change. The confirmation this service sends back
+ * to the orchestrator therefore carries the count instead of asserting an erasure it cannot vouch
+ * for ({@code PurgeCommandsListener}).
+ *
  * <p>The rule (delete / anonymise / keep the popular ones) is deliberately NOT consulted here. It
  * reads vote scores, and the leaver's own votes are retracted as part of the erasure, so applying
  * it before the votes go would measure the community's judgement against a tally that includes the
@@ -39,13 +45,17 @@ public class MarkUserContentForErasure {
         this.clock = clock;
     }
 
-    public void execute(String author) {
+    /** Returns how many memes this run reserved — see the paragraph above on what zero means. */
+    public int execute(String author) {
         Instant at = Instant.now(clock);
+        int reserved = 0;
         for (MemeMetadata meme : erasure.activeOf(author)) {
             // the transition is the aggregate's, never a setter and never an UPDATE spelled out
             // here: the record decides what "marked" means (including keeping the first instant on
             // a redelivery), and the port only stores the answer
             erasure.store(meme.markForErasure(at));
+            reserved++;
         }
+        return reserved;
     }
 }

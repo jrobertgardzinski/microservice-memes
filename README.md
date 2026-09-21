@@ -106,6 +106,17 @@ Defaults: memes `DELETE`, comments `ANONYMIZE_AUTHOR`. Votes the leaver cast are
 retracted — identity-keyed data has no policy escape hatch. Unparseable rules in a command fall
 back to the defaults (logged), never wedging the saga.
 
+**A member's address can move, and their content moves with it.** Everything here is keyed by the
+address the token carried at the time — `memes.author`, `meme_votes.voter`, `settings.updated_by` —
+so when security confirms a change of address it announces `EMAIL_CHANGED` on `security-events` and
+this service re-keys those rows (`SecurityEventsListener` → `RekeyUserContent`). Without it a member
+was a stranger to their own uploads (`own:false`, `DELETE` 403) and their deletion marked nothing
+while confirming an erasure, leaving the images to whoever registered the freed address next. The
+two topics are independent, so a deletion can still overtake a rename; that is why the confirmation
+sent back on `memes-events` carries `reserved` — how many memes the mark actually took out of the
+gallery — and why a zero raises `memes_saga_purge_reserved_nothing_total` instead of reading as a
+successful erasure.
+
 ## Contract
 
 ```
