@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -103,6 +103,8 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onNsfw
   // compare against (same contract as a comment's `own`)
   const [own, setOwn] = useState(false);
   const [nsfw, setNsfw] = useState(false);
+  /** the comment field — focus lives here whenever the Post button is about to go dead */
+  const composer = useRef<HTMLInputElement>(null);
 
   /**
    * The thread from the top, and — when `wantedId` is given — as far forward as it takes to bring
@@ -302,6 +304,15 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onNsfw
       // the flag the guard above reads was never SET here — only the thread reads set it — so the
       // Post button stayed live for the whole POST and an impatient second press (or Enter, then
       // a click) put the same text in the thread twice
+      //
+      // Focus moves to the composer FIRST, and that is not a nicety. The button the person just
+      // clicked is about to be disabled, and a focused element that becomes disabled drops focus
+      // to document.body — outside this dialog. MUI listens for Escape on the modal's own root, so
+      // from there it never hears it: the dialog stops closing on Escape for as long as the POST
+      // is out, and after a successful post the emptied field keeps the button disabled, so it
+      // never closes on Escape again. Keeping focus in the composer is also where a writer wants
+      // it next.
+      composer.current?.focus();
       setBusyThread(true);
       try {
         const result = await postComment(memeId, text, token);
@@ -440,6 +451,7 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onNsfw
                onSubmit={(e) => { e.preventDefault(); submitComment(); }}>
           <TextField
             size="small" fullWidth
+            inputRef={composer}
             placeholder={token ? 'add a comment…' : 'sign in to comment'}
             value={text} onChange={(e) => setText(e.target.value)}
           />

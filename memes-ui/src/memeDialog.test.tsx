@@ -133,3 +133,45 @@ describe('the vote arrows', () => {
     expect(screen.getByRole('button', { name: 'vote down' })).toBeDisabled();
   });
 });
+
+describe('the keyboard while a comment is on the wire', () => {
+  const original = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = original; });
+
+  /**
+   * A dialog that stops closing on Escape is not a styling detail: Escape is how a keyboard user
+   * dismisses one, and the gallery's browser suite presses it to leave a meme.
+   *
+   * The trap is specific and easy to walk back into. MUI listens for Escape on the MODAL's own
+   * root, so the key has to be pressed with focus somewhere inside it. Disabling the Post button
+   * the moment it is clicked — which is exactly what stops a double submit — drops focus to
+   * document.body, because that is what a browser does to a focused element that becomes disabled.
+   * From body, the modal never hears the key, and after a successful post the emptied field keeps
+   * the button disabled, so it never hears it again either.
+   *
+   * jsdom does NOT reproduce the focus drop — it leaves focus on a disabled element — so this
+   * cannot assert the symptom and says so rather than pretending. What it pins is the remedy: the
+   * composer takes focus before the button is disabled, which is the one thing that keeps focus
+   * inside the dialog in a real browser. Remove that line and this goes red; the browser suite's
+   * "close the meme" step is what catches the symptom itself, and did.
+   */
+  it('hands focus to the composer before the Post button goes dead', async () => {
+    let release: (r: Response) => void = () => {};
+    globalThis.fetch = dialogFetch((url, init) =>
+      (url.includes('/comments') && init?.method === 'POST'
+        ? new Promise<Response>((resolve) => { release = resolve; })
+        : undefined));
+
+    open();
+    const field = await screen.findByPlaceholderText('add a comment…');
+    fireEvent.change(field, { target: { value: 'hello' } });
+    const post = screen.getByRole('button', { name: 'Post' });
+    post.focus();
+    fireEvent.click(post);
+
+    await waitFor(() => expect(post).toBeDisabled());
+    expect(document.activeElement).toBe(field);
+
+    release(json({ id: 'c-1' }, 201));
+  });
+});
