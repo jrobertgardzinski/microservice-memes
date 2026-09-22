@@ -41,16 +41,34 @@ class RequireSignInFilter extends OncePerRequestFilter {
         }
         // resolve the identity whenever a token is presented (reads use it to show "your vote");
         // only writes REQUIRE it — and everything under /admin does, reads included
-        Optional<Caller> caller = bearerToken(request).flatMap(gate::callerFor);
+        Optional<Caller> caller = Optional.empty();
+        boolean securityAnswered = true;
+        try {
+            caller = bearerToken(request).flatMap(gate::callerFor);
+        } catch (SecurityAuthenticationGate.SecurityUnavailable couldNotAsk) {
+            // a public read carries on anonymously — the gallery does not go dark because the
+            // sign-in service is down — but a write cannot, and must not be told to sign in again
+            securityAnswered = false;
+        }
         caller.ifPresent(c -> {
             request.setAttribute(AUTHENTICATED_USER, c.email());
             request.setAttribute(AUTHENTICATED_ROLES, c.roles());
         });
         boolean write = admin || Set.of("POST", "PUT", "DELETE", "PATCH").contains(request.getMethod());
         if (write && caller.isEmpty()) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            // 401 SIGN_IN_REQUIRED is a statement about the CALLER'S SESSION, and the gallery acts
+            // on it: api.ts tries to renew the token, fails against the same dead service and logs
+            // the visitor out. Saying it when security is merely unreachable destroys a live
+            // session over somebody else's outage, so an unanswered gate gets its own code — the
+            // token was never judged, and a 503 leaves the session intact
+            response.setStatus(securityAnswered
+                    ? HttpServletResponse.SC_UNAUTHORIZED
+                    : HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             response.setContentType("application/json");
-            response.getWriter().write("{\"status\":\"SIGN_IN_REQUIRED\"}");
+            response.getWriter().write(securityAnswered
+                    ? "{\"status\":\"SIGN_IN_REQUIRED\"}"
+                    : "{\"status\":\"SECURITY_UNAVAILABLE\",\"detail\":\"the sign-in service "
+                            + "could not be reached; your session is unaffected\"}");
             return;
         }
         chain.doFilter(request, response);

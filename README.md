@@ -80,7 +80,11 @@ Browsing is public; **contributing requires signing in**. Every `POST` under `/m
 `Authorization: Bearer <access token issued by microservice-security>`; the gate confirms it via
 `GET /me` (config: `security.url` / `SECURITY_URL`) and the confirmed identity becomes the
 meme's author — the request body cannot impersonate anyone. Anonymous writes get
-`401 {"status": "SIGN_IN_REQUIRED"}`.
+`401 {"status": "SIGN_IN_REQUIRED"}` — a statement about the caller's session, which the gallery
+acts on by signing them out. A write whose token could not be confirmed **because security did not
+answer** gets `503 {"status": "SECURITY_UNAVAILABLE"}` instead: nobody judged that token, and an
+outage of another service is not a reason to end a live session. Reads carrying a token are served
+anonymously during such an outage rather than refused.
 
 ## Account deletion (the saga's memes side)
 
@@ -146,9 +150,12 @@ GET  /memes/scores?ids=a,b,c    -> 200 [ { "memeId", "score" }, ... ] | 400 TOO_
                                    service has no such meme. UIs must render those differently
 
 # writes: Authorization: Bearer <security access token>, else 401 SIGN_IN_REQUIRED
+#         (503 SECURITY_UNAVAILABLE when security itself could not be asked)
 POST /memes                     multipart/form-data, field "file"
                                 -> 201 { "id": "..." }, Location: /memes/{id}
                                    (uploading the same image twice returns the existing id)
+                                   400 MALFORMED_MULTIPART for a body that is not a readable
+                                   multipart; 413 TOO_LARGE past the size limit
 POST   /memes/{id}/votes        { "direction": "UP" | "DOWN" }  -> 200 { "score": n } | 400 | 404
 POST   /memes/{id}/tags         { "tags": [ ... ] }  — the author replaces the whole set
 PUT    /memes/{id}/nsfw         { "nsfw": true|false }  — MODERATOR/ADMIN only

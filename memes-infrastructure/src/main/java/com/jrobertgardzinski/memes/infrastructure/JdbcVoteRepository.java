@@ -3,9 +3,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.domain.ScoredMeme;
 import com.jrobertgardzinski.voting.VoteDirection;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.util.Collection;
@@ -15,8 +15,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Postgres-backed {@link VoteRepository} (H2 in dev/tests): one row per (meme, voter); cast is
- * delete-then-insert — the portable upsert this portfolio uses everywhere.
+ * Postgres-backed {@link VoteRepository} (H2 in dev/tests): one row per (meme, voter); cast is a
+ * MERGE — the upsert this portfolio uses everywhere, and the only shape that survives two
+ * first-time casts arriving at once.
  */
 @Repository
 class JdbcVoteRepository implements VoteRepository {
@@ -28,21 +29,43 @@ class JdbcVoteRepository implements VoteRepository {
     }
 
     @Override
-    @Transactional
     public void cast(String memeId, String voter, VoteDirection direction) {
-        retract(memeId, voter);
-        // Conditional on the meme row, because CastVote's exists() check and this insert are two
-        // separate transactions: a delete or a GDPR purge that commits in between used to leave an
-        // orphan ballot that nothing ever removed and the hot page promoted to the top (V8 spells
-        // the whole scenario out). V8's foreign key is what GUARANTEES no orphan can exist; the
-        // WHERE EXISTS here decides what the loser of that race sees — a vote that quietly did not
-        // happen on a meme that is gone, rather than a 500 from a constraint violation.
-        // active_memes, not memes: a meme a running account-deletion saga has reserved is not
-        // something the world may vote on either — and the ballot would then have to be restored
-        // (or not) by the compensation, which is a decision nobody should have to make
-        jdbc.sql("INSERT INTO meme_votes (meme_id, voter, direction) "
-                        + "SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM active_memes WHERE id = ?)")
-                .params(memeId, voter, direction.name(), memeId).update();
+        try {
+            mergeVote(memeId, voter, direction);
+        } catch (DuplicateKeyException concurrentFirstCast) {
+            // Two first-time casts by the same voter can both take WHEN NOT MATCHED, and the loser
+            // hits the (meme_id, voter) primary key — 23505. One retry finds the winner's row and
+            // goes down WHEN MATCHED, recording this direction as the later of the two casts. The
+            // comments twin answers the same race the same way; before this, the loser got an
+            // unhandled DuplicateKeyException, i.e. a 500 for a double-click.
+            mergeVote(memeId, voter, direction);
+        }
+    }
+
+    /**
+     * The upsert itself — one statement, so nothing of this cast is ever half-done, and a seam the
+     * retry test overrides to force the first pass to fail.
+     *
+     * <p>The source is a SELECT over the meme rather than plain VALUES (which is what the comments
+     * twin can afford), because CastVote's exists() check and this write are two separate
+     * transactions: a delete or a GDPR purge committing in between used to leave an orphan ballot
+     * that nothing ever removed and the hot page promoted to the top (V8 spells the whole scenario
+     * out). V8's foreign key is what GUARANTEES no orphan can exist; an empty source here decides
+     * what the loser of that race sees — a vote that quietly did not happen on a meme that is gone,
+     * rather than a 500 from a constraint violation. active_memes, not memes: a meme a running
+     * account-deletion saga has reserved is not something the world may vote on either — and the
+     * ballot would then have to be restored (or not) by the compensation, which is a decision
+     * nobody should have to make.
+     */
+    void mergeVote(String memeId, String voter, VoteDirection direction) {
+        jdbc.sql("MERGE INTO meme_votes USING "
+                        + "(SELECT m.id AS meme_id, CAST(? AS VARCHAR) AS voter, "
+                        + "CAST(? AS VARCHAR) AS direction FROM active_memes m WHERE m.id = ?) AS src "
+                        + "ON meme_votes.meme_id = src.meme_id AND meme_votes.voter = src.voter "
+                        + "WHEN MATCHED THEN UPDATE SET direction = src.direction "
+                        + "WHEN NOT MATCHED THEN INSERT (meme_id, voter, direction) "
+                        + "VALUES (src.meme_id, src.voter, src.direction)")
+                .params(voter, direction.name(), memeId).update();
     }
 
     @Override

@@ -31,7 +31,12 @@ class JdbcTagRepository implements TagRepository {
 
     @Override
     public Set<Tag> tagsOf(String memeId) {
-        return jdbc.sql("SELECT tag FROM meme_tags WHERE meme_id = ?")
+        // joined to active_memes, like every other public read: the tag list is served to anyone,
+        // so a meme a running account-deletion saga has reserved must not hand its tags out — nor
+        // answer "I exist" by returning a non-empty list where a never-uploaded id returns none.
+        // The tag rows themselves stay untouched; the mark hides, it does not destroy.
+        return jdbc.sql("SELECT t.tag FROM meme_tags t JOIN active_memes m ON m.id = t.meme_id "
+                        + "WHERE t.meme_id = ?")
                 .params(memeId)
                 .query((rs, n) -> new Tag(rs.getString("tag")))
                 .list().stream().collect(Collectors.toSet());

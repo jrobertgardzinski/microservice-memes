@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.io.UncheckedIOException;
 import java.util.Map;
@@ -18,7 +20,9 @@ import java.util.Map;
  * it escapes the blob adapters when the DISK or bucket fails mid-read on a GET, so it maps to a
  * 500 with a generic body (the detail — internal paths included — goes to the log, not the wire).
  * A bare {@link IllegalArgumentException} stays a 400, but likewise with a generic body: those
- * messages were written for developers and may leak internals. Controllers that want a RICHER
+ * messages were written for developers and may leak internals. A {@link MultipartException} is a
+ * refusal too, and one no controller ever sees: the multipart is resolved before handler mapping,
+ * so an upload the container cannot parse never gets that far. Controllers that want a RICHER
  * refusal body (e.g. tagging's {@code {"status": "INVALID_TAG"}} contract) keep their local
  * catches — those run first, this advice is the uniform floor under everything else.
  */
@@ -52,6 +56,28 @@ class WebErrorHandler {
         LOG.warn("refusing request: {}", torn.getMessage());
         return ResponseEntity.status(503)
                 .body(Map.of("status", "UNAVAILABLE", "detail", "the server is shutting this worker down"));
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    ResponseEntity<Map<String, String>> malformedMultipart(MultipartException unparseable) {
+        // The upload never reached a controller: the multipart is resolved before handler mapping,
+        // and a Content-Type of "multipart/form-data" with no boundary makes the container refuse
+        // to parse it. That refusal carries no status of its own, so it used to fall through to
+        // Boot's 500 — the server confessing to a fault for a request the caller wrote wrong.
+        LOG.warn("refusing request: {}", unparseable.getMessage());
+        return ResponseEntity.badRequest().body(Map.of("status", "MALFORMED_MULTIPART",
+                "detail", "the upload is not a readable multipart/form-data request"));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<Map<String, String>> uploadTooLarge(MaxUploadSizeExceededException oversized) {
+        // A subclass of the above, and a DIFFERENT refusal: the request was perfectly readable,
+        // there was just too much of it. Named explicitly so the family handler cannot demote it —
+        // the body matches RejectOversizedUploadFilter's, which refuses the same thing earlier
+        // when the caller declares the length up front.
+        LOG.warn("refusing request: {}", oversized.getMessage());
+        return ResponseEntity.status(413).body(Map.of("status", "TOO_LARGE",
+                "detail", "the upload is larger than this service accepts"));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

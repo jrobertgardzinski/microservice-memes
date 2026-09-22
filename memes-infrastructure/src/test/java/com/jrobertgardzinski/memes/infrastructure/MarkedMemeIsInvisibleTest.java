@@ -39,9 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>The list is the interesting part, because each entry is a path that reaches the database by a
  * different route and could have been forgotten separately: the gallery page, the tag search, the
  * hot ranking (which reads votes and joins the memes), the batch scores, the metadata, the image
- * itself, the thumbnail, and the dedup index — the last of which is not a read of a meme at all
- * until you notice that re-uploading a picture and being handed somebody's id is a way to prove
- * they posted it. {@code MemeReadFilterTest} is the static half of the same promise; this is the
+ * itself, the thumbnail, the meme's own tag list, and the dedup index — the last of which is not a
+ * read of a meme at all until you notice that re-uploading a picture and being handed somebody's
+ * id is a way to prove they posted it. {@code MemeReadFilterTest} is the static half of the same promise; this is the
  * behavioural half, and it is the one that would catch a filter defeated by a view definition.
  *
  * <p>The last test is the compensation: the same endpoints, after the orchestrator changed its
@@ -101,6 +101,9 @@ class MarkedMemeIsInvisibleTest {
         mockMvc.perform(get("/memes/" + memeId + "/meta")).andExpect(status().isNotFound());
         mockMvc.perform(get("/memes/" + memeId)).andExpect(status().isNotFound());
         mockMvc.perform(get("/memes/" + memeId + "/thumbnail")).andExpect(status().isNotFound());
+        // the one read that answered from meme_tags alone: it handed the leaver's tags to anybody,
+        // and a non-empty list where an unknown id returns [] told the caller the meme is real
+        assertEquals(List.of(), strings("/memes/" + memeId + "/tags"), "the meme's own tag list");
     }
 
     @Test
