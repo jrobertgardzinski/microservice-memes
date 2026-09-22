@@ -173,8 +173,14 @@ export default function AuthPanel({ token, user, onToken, onLogout }: Props) {
       setNotice({ tone: 'warning', text: 'E-mail not verified yet — click the link in the mail (inbox: Mailpit, localhost:8025).' });
     } else if (r.status === 429) {
       setNotice({ tone: 'warning', text: 'Too many failed attempts from this machine — blocked for a few minutes.' });
-    } else {
+    } else if (r.status === 401) {
       setNotice({ tone: 'warning', text: 'Wrong e-mail or password.' });
+    } else {
+      // Security's refusals are 401, 403 and 429 and nothing else (AuthenticationController) —
+      // so what lands here is a FAULT: its database down, a gateway in front of it, a 500. Calling
+      // that a wrong password sends somebody to retype a password that was right until the
+      // per-source throttle blocks them for it
+      setNotice({ tone: 'warning', text: `The sign-in service is having trouble (${r.status}) — this is not about your password; try again in a moment.` });
     }
   };
 

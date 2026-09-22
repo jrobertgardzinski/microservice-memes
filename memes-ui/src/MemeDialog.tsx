@@ -26,22 +26,33 @@ interface Props {
   token: string | null;
   isModerator: boolean;
   onVoted: () => void;
+  /** a moderator's verdict, handed back so the wall behind the dialog stops showing the old one */
+  onNsfwChanged: (nsfw: boolean) => void;
   onRequireSignIn: () => void;
   onTagClick: (tag: string) => void;
   onDeleted: () => void;
   onClose: () => void;
 }
 
-/** Arrows with the caller's current vote pressed; clicking the pressed one retracts (the API toggles). */
-function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote: (d: VoteDirection) => void }) {
+/**
+ * Arrows with the caller's current vote pressed; clicking the pressed one retracts (the API
+ * toggles). They go dead while a vote of theirs is on the wire: the toggle means a second click
+ * is not a repeat but the OPPOSITE instruction, so an impatient double click used to race two
+ * writes for one target and leave whichever answered last in charge.
+ */
+function VoteButtons({ myVote, busy, onVote }: {
+  myVote: VoteDirection | null;
+  busy: boolean;
+  onVote: (d: VoteDirection) => void;
+}) {
   return (
     <>
-      <IconButton size="small" aria-label="vote up" onClick={() => onVote('UP')}
+      <IconButton size="small" aria-label="vote up" onClick={() => onVote('UP')} disabled={busy}
                   color={myVote === 'UP' ? 'primary' : 'default'}
                   sx={myVote === 'UP' ? { bgcolor: 'primary.dark' } : undefined}>
         <ArrowUpwardIcon fontSize="inherit" />
       </IconButton>
-      <IconButton size="small" aria-label="vote down" onClick={() => onVote('DOWN')}
+      <IconButton size="small" aria-label="vote down" onClick={() => onVote('DOWN')} disabled={busy}
                   color={myVote === 'DOWN' ? 'error' : 'default'}
                   sx={myVote === 'DOWN' ? { bgcolor: 'error.dark' } : undefined}>
         <ArrowDownwardIcon fontSize="inherit" />
@@ -57,7 +68,21 @@ function VoteButtons({ myVote, onVote }: { myVote: VoteDirection | null; onVote:
  */
 const MAX_THREAD_PAGES = 20;
 
-export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequireSignIn, onTagClick, onDeleted, onClose }: Props) {
+/**
+ * A refused write, in words rather than in a number.
+ *
+ * 503 is the one status here a user can act on: memes answers SECURITY_UNAVAILABLE when it could
+ * not reach security AT ALL (RequireSignInFilter), and the whole point of that code is that the
+ * session is untouched — "(503)" beside a vote that did not move reads like a dead session it is
+ * not. Everything else keeps its number, which is honest about what we know.
+ */
+const refusal = (what: string, status: number): string =>
+  (status === 503
+    ? `${what} — the sign-in service could not be reached, so nothing was recorded. You are still `
+      + 'signed in; try again in a moment.'
+    : `${what} (${status}).`);
+
+export default function MemeDialog({ memeId, token, isModerator, onVoted, onNsfwChanged, onRequireSignIn, onTagClick, onDeleted, onClose }: Props) {
   // score null renders "n/a" — the honest answer before the first read has landed, and after one
   // that failed; the old `{ score: 0 }` claimed a tally nobody had reported yet
   const [tally, setTally] = useState<VoteTally>({ score: null, myVote: null });
@@ -191,8 +216,21 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
 
   const toggleNsfw = () =>
     guard(async () => {
-      if (await setMemeNsfw(memeId, !nsfw, token)) setNsfw(!nsfw);
-      else window.alert('Only a moderator may flag NSFW.');
+      const { ok, status } = await setMemeNsfw(memeId, !nsfw, token);
+      if (ok) {
+        setNsfw(!nsfw);
+        onNsfwChanged(!nsfw);
+      } else if (status === 403) {
+        window.alert('Only a moderator may flag NSFW.');
+      } else if (status === 404) {
+        // "you are not a moderator" was said for every refusal, this one included — an accusation
+        // aimed at a moderator who had done nothing wrong and a meme that was simply gone
+        window.alert('This meme is no longer here.');
+      } else if (status !== 401) {
+        // a 401 has been through `request` already and App has spoken for both of its endings —
+        // the session died, or the service refused a freshly minted token
+        window.alert(refusal('The flag did not take', status));
+      }
     });
 
   const removeComment = (commentId: string) =>
@@ -201,9 +239,10 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
       if (ok) {
         setComments((current) => current.filter((c) => c.id !== commentId));
       } else if (status !== 401) {
-        // a 401 has already been through the refresh attempt inside `request`; if it is still 401
-        // the session is gone and App has said so — anything else needs its own word here
-        setNotice(`Could not delete that comment (${status}).`);
+        // a 401 has already been through the refresh attempt inside `request`, and App speaks for
+        // BOTH of its endings: the refresh failed (the session is gone) or it succeeded and the
+        // service refused the new token anyway. Only the second used to pass in silence
+        setNotice(refusal('Could not delete that comment', status));
       }
     });
 
@@ -213,49 +252,79 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
       else window.alert('Only a moderator may hide a comment.');
     });
 
+  // one vote in flight per target (the meme is keyed by its own id, a comment by the comment's) —
+  // the arrows read this and go dead, which is what stops a double click reaching the server twice
+  const [votesInFlight, setVotesInFlight] = useState<ReadonlySet<string>>(new Set());
+  const startVote = (id: string) => setVotesInFlight((current) => new Set(current).add(id));
+  const endVote = (id: string) => setVotesInFlight((current) => {
+    const next = new Set(current);
+    next.delete(id);
+    return next;
+  });
+
   const voteMeme = (direction: VoteDirection) =>
     guard(async () => {
-      const { ok, tally: fresh, status } = await voteOnMeme(memeId, direction, token);
-      if (ok && fresh) setTally(fresh);
-      // a vote that did not count used to leave the arrow untouched and the user guessing; the
-      // 401 branch is the whole point — the session dies after an hour and this is the click
-      // people make most
-      else if (status !== 401) setNotice(`Your vote did not go through (${status}).`);
-      onVoted();
+      if (votesInFlight.has(memeId)) return;
+      startVote(memeId);
+      try {
+        const { ok, tally: fresh, status } = await voteOnMeme(memeId, direction, token);
+        if (ok && fresh) setTally(fresh);
+        // a vote that did not count used to leave the arrow untouched and the user guessing; the
+        // 401 branch is the whole point — the session dies after an hour and this is the click
+        // people make most (and App now says something for a 401 either way, see api.ts)
+        else if (status !== 401) setNotice(refusal('Your vote did not go through', status));
+        onVoted();
+      } finally {
+        endVote(memeId);
+      }
     });
 
   const voteComment = (commentId: string, direction: VoteDirection) =>
     guard(async () => {
-      const { ok, tally: fresh, status } = await voteOnComment(memeId, commentId, direction, token);
-      if (ok && fresh) {
-        setComments((current) => current.map((c) =>
-          c.id === commentId ? { ...c, score: fresh.score, myVote: fresh.myVote } : c));
-      } else if (status !== 401) {
-        setNotice(`Your vote did not go through (${status}).`);
+      if (votesInFlight.has(commentId)) return;
+      startVote(commentId);
+      try {
+        const { ok, tally: fresh, status } = await voteOnComment(memeId, commentId, direction, token);
+        if (ok && fresh) {
+          setComments((current) => current.map((c) =>
+            c.id === commentId ? { ...c, score: fresh.score, myVote: fresh.myVote } : c));
+        } else if (status !== 401) {
+          setNotice(refusal('Your vote did not go through', status));
+        }
+      } finally {
+        endVote(commentId);
       }
     });
 
   const submitComment = () =>
     guard(async () => {
       if (!text.trim() || busyThread) return;
-      const result = await postComment(memeId, text, token);
-      if (!result.ok) {
-        // the draft STAYS in the field. It is the only copy, and the old code cleared it before
-        // knowing whether the server had taken it
-        if (result.status !== 401) {
-          setNotice(result.detail === 'COMMENT_TOO_LONG' ? 'That comment is too long.'
-            : result.detail === 'RATE_LIMITED' ? 'You are commenting too fast — wait a minute.'
-            : `Your comment was not saved (${result.status}) — the text is still here, try again.`);
+      // the flag the guard above reads was never SET here — only the thread reads set it — so the
+      // Post button stayed live for the whole POST and an impatient second press (or Enter, then
+      // a click) put the same text in the thread twice
+      setBusyThread(true);
+      try {
+        const result = await postComment(memeId, text, token);
+        if (!result.ok) {
+          // the draft STAYS in the field. It is the only copy, and the old code cleared it before
+          // knowing whether the server had taken it
+          if (result.status !== 401) {
+            setNotice(result.detail === 'COMMENT_TOO_LONG' ? 'That comment is too long.'
+              : result.detail === 'RATE_LIMITED' ? 'You are commenting too fast — wait a minute.'
+              : `Your comment was not saved (${result.status}) — the text is still here, try again.`);
+          }
+          return;
         }
-        return;
-      }
-      setText('');
-      setNotice(null);
-      // walk the thread to wherever the server put it, so the author actually SEES their comment
-      const thread = await loadThread(result.id);
-      if (result.id !== undefined && thread !== null && !thread.some((c) => c.id === result.id)) {
-        setNotice('Your comment was saved, but this thread is longer than this view — it is '
-          + 'further down.');
+        setText('');
+        setNotice(null);
+        // walk the thread to wherever the server put it, so the author actually SEES their comment
+        const thread = await loadThread(result.id);
+        if (result.id !== undefined && thread !== null && !thread.some((c) => c.id === result.id)) {
+          setNotice('Your comment was saved, but this thread is longer than this view — it is '
+            + 'further down.');
+        }
+      } finally {
+        setBusyThread(false);
       }
     });
 
@@ -265,7 +334,7 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
         <Box component="img" src={`/memes/${memeId}`} alt="meme"
              sx={{ width: '100%', borderRadius: 2 }} />
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', my: 1 }}>
-          <VoteButtons myVote={tally.myVote} onVote={voteMeme} />
+          <VoteButtons myVote={tally.myVote} busy={votesInFlight.has(memeId)} onVote={voteMeme} />
           <Chip data-testid="meme-score" label={tally.score ?? 'n/a'} size="small" />
           {!token && <Typography variant="caption" color="text.secondary">sign in to vote or comment</Typography>}
           {nsfw && <Chip label="NSFW" size="small" color="warning" />}
@@ -331,7 +400,8 @@ export default function MemeDialog({ memeId, token, isModerator, onVoted, onRequ
               )}
             </Typography>
             <Chip label={c.score ?? 'n/a'} size="small" variant="outlined" />
-            <VoteButtons myVote={c.myVote} onVote={(d) => voteComment(c.id, d)} />
+            <VoteButtons myVote={c.myVote} busy={votesInFlight.has(c.id)}
+                         onVote={(d) => voteComment(c.id, d)} />
             {isModerator && (
               <IconButton size="small" aria-label={c.hidden ? 'reveal comment' : 'hide comment'}
                           title={c.hidden ? 'reveal (moderator)' : 'hide (moderator)'}

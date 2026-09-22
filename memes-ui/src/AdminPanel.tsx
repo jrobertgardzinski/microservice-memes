@@ -13,6 +13,8 @@ import { clearPurgePolicy, getPurgePolicy, PurgePolicy, setPurgePolicy } from '.
 
 const KEEP_POPULAR = 'KEEP_POPULAR_ANONYMIZED';
 
+const UNREAD_POLICY = 'Could not read the current policy — the dial below is NOT what is in force.';
+
 /**
  * The administrator's dial over the purge-policy default: what happens to a leaver's memes when the
  * closure that took them away stated no rule of its own. The backend is the authority — refusals
@@ -41,8 +43,14 @@ export default function AdminPanel({ token, open, onClose }: {
       const [rule = 'DELETE', threshold] = p.effective.split(':');
       setKind(rule);
       if (threshold) setMinScore(Number(threshold));
+    } else {
+      // a REFUSED read (403 not an admin, a 500, a 401 that outlived its refresh) arrives as null,
+      // and hiding the "Effective:" alert was all that happened: the dial kept its initial DELETE
+      // and presented it, unlabelled, as the rule in force — so "Save override" wrote a rule
+      // nobody had chosen. An unread policy is exactly as unknown as an unreachable one
+      setNotice(UNREAD_POLICY);
     }
-  }).catch(() => setNotice('Could not read the current policy — the dial below is NOT what is in force.'));
+  }).catch(() => setNotice(UNREAD_POLICY));
   useEffect(() => { if (open) { setNotice(null); load(); } }, [open]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
@@ -97,7 +105,10 @@ export default function AdminPanel({ token, open, onClose }: {
                        slotProps={{ htmlInput: { min: 1 } }}
                        onChange={(e) => setMinScore(Math.max(1, Number(e.target.value) || 1))} />
           )}
-          {notice && <Alert severity={notice.startsWith('Refused') ? 'warning' : 'success'}>{notice}</Alert>}
+          {/* only a write that LANDED is good news; everything else here is a refusal, a fault or
+              a policy nobody could read, and a green alert over any of those is the same lie the
+              confident DELETE was */}
+          {notice && <Alert severity={notice.startsWith('Override') ? 'success' : 'warning'}>{notice}</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>

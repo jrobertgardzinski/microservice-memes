@@ -64,6 +64,93 @@ describe('the deletion wizard when the step-up fails', () => {
 });
 
 /**
+ * Which refusal it was — a question the STATUS cannot answer.
+ *
+ * StepUpController spends one 401 on four different outcomes: a wrong password, a wrong code, a
+ * code chain that has run out of attempts and a ticket that is no longer valid. Only the body
+ * names which. Grading the answer by its number alone told somebody with a dead ticket that their
+ * code was wrong, so they typed another one into a chain that was already over — the same defect
+ * as "Wrong password." for a 500, one layer further in.
+ */
+describe('the deletion wizard reading WHICH refusal it was', () => {
+  const original = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = original;
+    vi.restoreAllMocks();
+  });
+
+  /** Answers the password step with `first`, and the code step (if reached) with `then`. */
+  const security = (first: { status: number; body: unknown }, then?: { status: number; body: unknown }) => {
+    globalThis.fetch = vi.fn((input: unknown) => {
+      const url = String(input);
+      // a 401 sends `request` off to renew the token first; this session has no live cookie
+      if (url.endsWith('/refresh')) return Promise.resolve(new Response('{}', { status: 401 }));
+      const answer = url.endsWith('/step-up/factor') && then ? then : first;
+      return Promise.resolve(new Response(JSON.stringify(answer.body), { status: answer.status }));
+    }) as unknown as typeof globalThis.fetch;
+  };
+
+  const open = () =>
+    render(<DeleteAccountDialog token="t" email="leaver@example.com" onDeleted={() => {}} onClose={() => {}} />);
+
+  const typePasswordAndSubmit = () => {
+    fireEvent.change(screen.getByLabelText('your password'), { target: { value: 'right-one' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete my account' }));
+  };
+
+  it('still says "Wrong password." when that is what security said', async () => {
+    security({ status: 401, body: { status: 'WRONG_PASSWORD' } });
+    open();
+
+    typePasswordAndSubmit();
+
+    await waitFor(() => expect(screen.getByText('Wrong password.')).toBeTruthy());
+  });
+
+  it('sends somebody with no second factor to enrol one instead of repeating 409 at them', async () => {
+    security({ status: 409, body: { status: 'ENROL_A_FACTOR_FIRST' } });
+    open();
+
+    typePasswordAndSubmit();
+
+    await waitFor(() => expect(screen.getByText(/no second factor to confirm with/)).toBeTruthy());
+    expect(screen.queryByText('Security answered 409. Please try again.')).toBeNull();
+  });
+
+  it('closes a spent code chain instead of asking for one more code', async () => {
+    security(
+      { status: 202, body: { status: 'FACTOR_REQUIRED', stepUpTicket: 'tk-1' } },
+      { status: 401, body: { status: 'TOO_MANY_ATTEMPTS' } },
+    );
+    open();
+
+    typePasswordAndSubmit();
+    fireEvent.change(await screen.findByLabelText('sign-in code'), { target: { value: '000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & delete' }));
+
+    await waitFor(() => expect(screen.getByText(/that confirmation is closed/i)).toBeTruthy());
+    expect(screen.queryByText('Wrong code.')).toBeNull();
+    // and the way forward is the password again — the ticket accepts nothing any more
+    expect(screen.getByLabelText('your password')).toBeTruthy();
+  });
+
+  it('counts down the tries security is still willing to give', async () => {
+    security(
+      { status: 202, body: { status: 'FACTOR_REQUIRED', stepUpTicket: 'tk-1' } },
+      { status: 401, body: { status: 'WRONG_CODE', attemptsLeft: 2 } },
+    );
+    open();
+
+    typePasswordAndSubmit();
+    fireEvent.change(await screen.findByLabelText('sign-in code'), { target: { value: '000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & delete' }));
+
+    await waitFor(() => expect(screen.getByText('Wrong code — 2 tries left.')).toBeTruthy());
+  });
+});
+
+/**
  * What the wizard puts ON THE WIRE — and what it no longer asks.
  *
  * It used to offer three options, one of which kept the memes the community had up-voted. Closing

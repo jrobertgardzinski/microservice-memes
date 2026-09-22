@@ -8,18 +8,42 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { authHeader, jsonHeaders, request, SECURITY } from './api';
 
+/** The refusal as security words it: the code, and for a wrong code how many tries are left. */
+type Refusal = { status?: string; attemptsLeft?: number };
+
 /**
- * What to tell the person, per status. "Wrong password." used to cover EVERY non-2xx here — a
+ * What to tell the person, per refusal. "Wrong password." used to cover EVERY non-2xx here — a
  * throttled attempt, a 500, a service restart — so somebody whose password was right retyped it
  * until they gave up, which is the same defect security-ui already fixed on its side (P18 poz. 40).
  * It matters more since step-up gained a rate limit: 429 is now a routine answer, and it means
  * "wait", not "you typed it wrong".
+ *
+ * <p>The STATUS alone still cannot say which refusal it is: StepUpController answers 401 for a
+ * wrong password, a wrong code, a code chain that has run out of attempts and a ticket that is no
+ * longer valid alike. Only the body names it — and telling somebody to type another code into a
+ * ticket that is already dead is the same defect wearing different clothes.
  */
-const messageFor = (status: number, wrong: string): string => {
+const messageFor = (status: number, wrong: string, body: Refusal = {}): string => {
+  switch (body.status) {
+    case 'WRONG_PASSWORD': return 'Wrong password.';
+    case 'WRONG_CODE':
+      return `Wrong code${body.attemptsLeft != null ? ` — ${body.attemptsLeft} tries left` : ''}.`;
+    case 'TOO_MANY_ATTEMPTS':
+      return 'Too many wrong codes — that confirmation is closed. Start again with your password.';
+    case 'INVALID_TICKET':
+      return 'That confirmation is no longer valid — start again with your password.';
+    case 'ENROL_A_FACTOR_FIRST':
+      return 'This account has no second factor to confirm with — enrol one before deleting it.';
+    default: break;
+  }
   if (status === 401 || status === 403) return wrong;
   if (status === 429) return 'Too many attempts — wait a moment and try again.';
   return `Security answered ${status}. Please try again.`;
 };
+
+/** A ticket security has closed: nothing typed into it can work, so the wizard goes back a step. */
+const ticketIsSpent = (body: Refusal): boolean =>
+  body.status === 'TOO_MANY_ATTEMPTS' || body.status === 'INVALID_TICKET';
 
 /** A request that never arrived says nothing about the password — and must not wedge the dialog. */
 const UNREACHABLE = 'Could not reach the security service — check your connection and try again.';
@@ -74,10 +98,10 @@ export default function DeleteAccountDialog({ token, email, onDeleted, onClose }
         headers: { ...jsonHeaders, ...authHeader(token) },
         body: JSON.stringify({ action: 'delete-account', password }),
       });
-      const body: { status?: string; stepUpTicket?: string } = await r.json().catch(() => ({}));
+      const body: Refusal & { stepUpTicket?: string } = await r.json().catch(() => ({}));
       if (r.status === 200 && body.status === 'ELEVATED') await doDelete();
       else if (r.status === 202 && body.status === 'FACTOR_REQUIRED') setStepUpTicket(body.stepUpTicket!);
-      else setError(messageFor(r.status, 'Wrong password.'));
+      else setError(messageFor(r.status, 'Wrong password.', body));
     } catch {
       setError(UNREACHABLE);
     } finally {
@@ -97,8 +121,15 @@ export default function DeleteAccountDialog({ token, email, onDeleted, onClose }
         headers: { ...jsonHeaders, ...authHeader(token) },
         body: JSON.stringify({ stepUpTicket, proof: code }),
       });
-      if (r.status === 200) await doDelete();
-      else setError(messageFor(r.status, 'Wrong code.'));
+      if (r.status === 200) {
+        await doDelete();
+      } else {
+        const body: Refusal = await r.json().catch(() => ({}));
+        setError(messageFor(r.status, 'Wrong code.', body));
+        // back to the password field: a spent ticket accepts nothing, and leaving the code box in
+        // front of somebody is an invitation to keep feeding a chain that is already over
+        if (ticketIsSpent(body)) setStepUpTicket('');
+      }
     } catch {
       setError(UNREACHABLE);
     } finally {

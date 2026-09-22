@@ -24,9 +24,28 @@ import AdminPanel from './AdminPanel';
 import AuthPanel from './AuthPanel';
 import MemeDialog from './MemeDialog';
 import {
-  authHeader, bindSession, GALLERY_PAGE_SIZE, listFavourites, listMemes, logout, MemeRef,
+  authHeader, bindSession, GALLERY_PAGE_SIZE, listFavourites, listMemes, logout, memeMeta, MemeRef,
   memeScores, removeFavourite, request, saveFavourite, SECURITY,
 } from './api';
+
+/**
+ * A refused upload, in the uploader's words.
+ *
+ * memes writes the explanation into the BODY on purpose — the size it will accept, why an image
+ * was unreadable, how long to wait — and printing only the status threw all of it away: a 14 MB
+ * photo read as "Upload refused (413)." with no mention of a limit. `error` is the image
+ * pipeline's own sentence (WebErrorHandler), `detail` belongs to the coded refusals (TOO_LARGE,
+ * MALFORMED_MULTIPART, RATE_LIMITED, BUSY, SECURITY_UNAVAILABLE). The per-status fallbacks are for
+ * a refusal written by something in FRONT of the service, which answers HTML and no code at all.
+ */
+const uploadRefusal = (status: number, body: { error?: string; detail?: string }): string => {
+  const said = body.error ?? body.detail;
+  if (said) return `Upload refused — ${said}.`;
+  if (status === 413) return 'Upload refused — that image is larger than the gallery accepts.';
+  if (status === 429) return 'Upload refused — you are uploading too fast; wait a minute.';
+  if (status === 503) return 'Upload refused — the gallery is unavailable right now; try again shortly.';
+  return `Upload refused (${status}).`;
+};
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('accessToken'));
@@ -56,6 +75,10 @@ export default function App() {
   const [showFavourites, setShowFavourites] = useState(false);
   // the wall itself can fail too; then it says so and offers a retry instead of looking empty
   const [wallError, setWallError] = useState(false);
+  // the NSFW flag of memes the FAVOURITES wall shows. The wall's own listing carries the flag per
+  // meme; favourites arrive from user-collections as bare ids and carry nothing, so they are asked
+  // about separately — see the hydration effect below
+  const [favouriteNsfw, setFavouriteNsfw] = useState<ReadonlyMap<string, boolean>>(new Map());
 
   const refresh = useCallback(() => {
     void listMemes(tagFilter ?? undefined, 0)
@@ -81,7 +104,12 @@ export default function App() {
   // value for the same id, so a vote still moves the number — and re-asking about tiles we already
   // have a number for is the point, not waste: one query per fifty tiles buys a wall that is
   // current after every vote and every "Load more".
-  useEffect(() => {
+  //
+  // It is a callable read and not only an effect because a vote has to move the number WITHOUT
+  // touching the wall: re-listing page 0 is what the dialog used to trigger, and that threw away
+  // every page "Load more" had appended — a visitor who had walked to 200 tiles found 50 and a
+  // meaningless scroll position after a single up-vote.
+  const loadScores = useCallback(() => {
     const onScreen = showFavourites ? (favourites ?? []) : memes.map((m) => m.id);
     void memeScores(onScreen)
       .then((fresh) => setScores((known) => new Map([...known, ...fresh])))
@@ -89,6 +117,34 @@ export default function App() {
       // it must not become an unhandled rejection either
       .catch(() => {});
   }, [memes, favourites, showFavourites]);
+  useEffect(loadScores, [loadScores]);
+
+  /**
+   * The NSFW flag for the favourites on screen, asked for one meme at a time.
+   *
+   * The favourites wall hydrates opaque ids from user-collections, so it cannot learn the flag the
+   * way the wall does (the listing carries it per meme). It used to look the id up in the wall
+   * page it happened to have loaded — which holds 50 tiles and is tag-filtered whenever a filter
+   * is on — so any favourite outside that set came back `undefined` and rendered in the clear:
+   * a meme the moderators had blurred, unblurred on the very wall somebody curated.
+   *
+   * A flag that has not arrived yet is NOT a flag that says "safe", so the tile stays blurred
+   * until this answers (see the call site).
+   */
+  useEffect(() => {
+    if (!showFavourites || favourites === null) return;
+    let live = true;
+    void Promise.all(favourites.map((id) => memeMeta(id, token)
+      .then((m) => [id, m.nsfw === true] as const)
+      .catch(() => null)))
+      .then((read) => {
+        if (!live) return;
+        setFavouriteNsfw((known) => new Map([
+          ...known, ...read.filter((entry): entry is readonly [string, boolean] => entry !== null),
+        ]));
+      });
+    return () => { live = false; };
+  }, [showFavourites, favourites, token]);
 
   const showMore = () => {
     // the guard is not cosmetic: two clicks before the first answer lands would append the same
@@ -129,6 +185,11 @@ export default function App() {
       setToken(null);
       setWarning('Your session expired — sign in again to vote or comment.');
     },
+    // the token is fine and the session is untouched — the service would not take it, and the
+    // write did not happen. Nobody downstream says this: every caller reads a 401 as "the session
+    // died and this warning already went out", so without it the click vanished in silence
+    refused: () => setWarning('That did not go through — your sign-in could not be confirmed just '
+      + 'now. You are still signed in; try again in a moment.'),
   }), []);
 
   useEffect(() => {
@@ -205,7 +266,9 @@ export default function App() {
     body.append('file', file);
     try {
       const r = await request('/memes', { method: 'POST', headers: authHeader(token), body });
-      if (r.status !== 201) setWarning(`Upload refused (${r.status}).`);
+      if (r.status !== 201) {
+        setWarning(uploadRefusal(r.status, await r.json().catch(() => ({}))));
+      }
     } catch {
       // without this the picture simply never appeared and nothing was said: an upload is the one
       // action here the user cannot repeat by guessing, so it has to name its own failure
@@ -295,7 +358,10 @@ export default function App() {
               )}
               <Box sx={{ display: 'grid', gap: 1.5, gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
                 {(favourites ?? []).map((id) => (
-                  <FavouriteTile key={id} memeId={id} nsfw={memes.find((m) => m.id === id)?.nsfw}
+                  // `?? true`: until the flag has been read this tile blurs. An unread flag is not
+                  // a meme anybody vouched for, and showing a flagged one in the clear is the
+                  // failure that matters here — a blur that lifts a moment later is not
+                  <FavouriteTile key={id} memeId={id} nsfw={favouriteNsfw.get(id) ?? true}
                                  score={scores.get(id)} star={star(id)} onOpen={() => setSelected(id)} />
                 ))}
               </Box>
@@ -351,7 +417,15 @@ export default function App() {
 
       {selected && (
         <MemeDialog memeId={selected} token={token} isModerator={isModerator}
-                    onVoted={refresh} onRequireSignIn={requireSignIn}
+                    onVoted={loadScores} onRequireSignIn={requireSignIn}
+                    onNsfwChanged={(flagged) => {
+                      // the moderator's own wall must show what they just decided: the tile blurs
+                      // from this array, and nothing was refreshing it until something unrelated
+                      // happened to re-list the wall
+                      setMemes((current) => current.map((m) =>
+                        (m.id === selected ? { ...m, nsfw: flagged } : m)));
+                      setFavouriteNsfw((known) => new Map(known).set(selected, flagged));
+                    }}
                     onTagClick={(t) => { setTagFilter(t); setSelected(null); }}
                     onDeleted={() => { setSelected(null); refresh(); }}
                     onClose={() => setSelected(null)} />

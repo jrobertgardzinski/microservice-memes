@@ -99,12 +99,15 @@ export class HttpError extends Error {
 
 /**
  * What the wrapper cannot decide on its own: the access token has been renewed (App must keep it,
- * localStorage and all), or the session is really gone (App must forget it and say so). Wired once,
- * from App — deliberately not a context or a store, so nothing else has to change shape.
+ * localStorage and all), the session is really gone (App must forget it and say so), or a service
+ * refused a token security had just minted — the session lives, this one write did not happen, and
+ * nothing else in the app was ever going to mention it. Wired once, from App — deliberately not a
+ * context or a store, so nothing else has to change shape.
  */
 let session = {
   renewed: (_token: string) => {},
   expired: () => {},
+  refused: () => {},
 };
 export const bindSession = (handlers: typeof session) => { session = handlers; };
 
@@ -163,7 +166,16 @@ export const request = async (url: string, init: RequestInit = {}): Promise<Resp
     return response;
   }
   session.renewed(renewed);
-  return fetch(url, { ...init, headers: { ...headersOf(init), Authorization: `Bearer ${renewed}` } });
+  const retried = await fetch(url, {
+    ...init, headers: { ...headersOf(init), Authorization: `Bearer ${renewed}` },
+  });
+  // A 401 that OUTLIVES the renewal is not an expired session: security has just minted this very
+  // token. It is the service in front of us refusing it — memes could not reach security to
+  // introspect it, or comments is working from a key set a few seconds stale. Callers treat a 401
+  // as "the session died and App has already said so", which on this path nobody had: the arrow
+  // did not move, the score did not move, and not a word was said.
+  if (retried.status === 401) session.refused();
+  return retried;
 };
 
 /** A read that must come back as a JSON object, or not at all. */
@@ -213,13 +225,18 @@ export const memeMeta = async (
 ): Promise<{ id: string; author: string; own?: boolean; nsfw?: boolean }> =>
   readObject(`/memes/${memeId}/meta`, { headers: authHeader(token) });
 
-/** Flag or unflag a meme NSFW — a moderator-only call; the backend is the authority. */
-export const setMemeNsfw = async (memeId: string, nsfw: boolean, token: string | null): Promise<boolean> =>
-  (await request(`/memes/${memeId}/nsfw`, {
+/** Flag or unflag a meme NSFW — a moderator-only call; the backend is the authority. The status
+ *  comes back because 403 (not a moderator) and 404 (the meme went) are different sentences. */
+export const setMemeNsfw = async (
+  memeId: string, nsfw: boolean, token: string | null,
+): Promise<{ ok: boolean; status: number }> => {
+  const r = await request(`/memes/${memeId}/nsfw`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ nsfw }),
-  })).ok;
+  });
+  return { ok: r.ok, status: r.status };
+};
 
 /** The tags an uploader has put on a meme (sorted). */
 export const memeTags = async (memeId: string): Promise<string[]> =>
