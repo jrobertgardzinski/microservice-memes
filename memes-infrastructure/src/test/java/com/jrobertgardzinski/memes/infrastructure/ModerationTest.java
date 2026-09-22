@@ -19,6 +19,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -77,6 +78,26 @@ class ModerationTest {
                 // (what the public sees is pinned by MemeMetaPrivacyTest)
                 .andExpect(jsonPath("$.author").value("a***@example.com"));
         mockMvc.perform(get("/memes/{id}/meta", "ghost")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("a body that states no flag is refused — it does not quietly take the flag back")
+    void an_unstated_nsfw_field_is_refused() throws Exception {
+        String id = upload(TestAuthConfig.VALID_TOKEN);
+        mockMvc.perform(put("/memes/{id}/nsfw", id)
+                        .header("Authorization", "Bearer " + TestAuthConfig.MODERATOR_TOKEN)
+                        .contentType("application/json").content("{\"nsfw\":true}"))
+                .andExpect(status().isOk());
+
+        // a misspelled key (a UI build, a hand-written curl) states nothing about nsfw at all
+        mockMvc.perform(put("/memes/{id}/nsfw", id)
+                        .header("Authorization", "Bearer " + TestAuthConfig.MODERATOR_TOKEN)
+                        .contentType("application/json").content("{\"value\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("MISSING_FLAG"));
+
+        mockMvc.perform(get("/memes/{id}/meta", id))
+                .andExpect(jsonPath("$.nsfw").value(true));
     }
 
     private String upload(String token) throws Exception {

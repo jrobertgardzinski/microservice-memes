@@ -66,6 +66,22 @@ class RankMemesTest {
     }
 
     @Test
+    @DisplayName("age buries a down-voted meme instead of promoting it")
+    void age_never_promotes_a_negative_score() {
+        // the decay used to be a plain division, which moves a NEGATIVE score towards zero, i.e. UP
+        // a page sorted descending: the meme the gallery rejected ten times a month ago outranked
+        // the one it rejected once this hour, and both sat just under a meme nobody voted on
+        List<RankedMeme> ranked = ranker(
+                scored("rejected-ten-times-a-month-ago", -10, NOW.minusSeconds(30 * 24 * 3600)),
+                scored("rejected-once-this-hour", -1, NOW.minusSeconds(3600)),
+                scored("nobody-voted", 0, NOW)).execute();
+
+        assertEquals(List.of("nobody-voted", "rejected-once-this-hour", "rejected-ten-times-a-month-ago"),
+                ranked.stream().map(RankedMeme::memeId).toList(),
+                "age must bury a down-voted meme, never carry it back up the page");
+    }
+
+    @Test
     @DisplayName("a meme the store has no publication time for is treated as brand new, not buried")
     void unknown_age_fails_safe() {
         List<RankedMeme> ranked = ranker(

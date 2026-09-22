@@ -25,6 +25,10 @@ public interface PurgePolicyOverride {
     /** Replaces the override; {@code updatedBy} is the admin's identity, kept for the audit. */
     void set(PurgeRule rule, String updatedBy);
 
-    /** Removes the override — the deployment default applies again. */
-    void clear();
+    /**
+     * Removes the override — the deployment default applies again. {@code clearedBy} is the
+     * admin's identity, for the same reason {@link #set}'s is: moving this dial, in either
+     * direction, decides the fate of other people's content.
+     */
+    void clear(String clearedBy);
 }

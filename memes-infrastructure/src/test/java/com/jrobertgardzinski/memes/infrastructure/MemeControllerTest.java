@@ -106,7 +106,7 @@ class MemeControllerTest {
                         .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN))
                 .andExpect(status().isBadRequest())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.error").exists());
+                        .jsonPath("$.detail").exists());
     }
 
     @Test
@@ -120,7 +120,7 @@ class MemeControllerTest {
                         .header("Authorization", "Bearer " + TestAuthConfig.VALID_TOKEN))
                 .andExpect(status().isBadRequest())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.error").exists());
+                        .jsonPath("$.detail").exists());
     }
 
     @Test
@@ -134,7 +134,7 @@ class MemeControllerTest {
         mockMvc.perform(get("/memes/{id}/thumbnail", "rotten"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.error").value("internal error"));
+                        .jsonPath("$.detail").value("internal error"));
     }
 
     private static byte[] pngBytes() throws Exception {

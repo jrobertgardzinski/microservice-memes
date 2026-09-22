@@ -52,7 +52,8 @@ class WebErrorHandlerTest {
 
         String body = mockMvc.perform(get("/memes/{id}", "sick"))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.error").value("internal storage error"))
+                .andExpect(jsonPath("$.status").value("STORAGE_ERROR"))
+                .andExpect(jsonPath("$.detail").value("internal storage error"))
                 .andReturn().getResponse().getContentAsString();
 
         assertFalse(body.contains("/var/lib"), "internal paths must not leak to the wire");

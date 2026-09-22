@@ -76,12 +76,13 @@ class AdminController {
     }
 
     @DeleteMapping
-    ResponseEntity<?> clear(@RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
-            required = false) Set<String> roles) {
+    ResponseEntity<?> clear(@RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String caller,
+                            @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
+                                    required = false) Set<String> roles) {
         if (notAdmin(roles)) {
             return refused();
         }
-        override.clear();
+        override.clear(caller);
         return ResponseEntity.ok(Map.of("status", "ENV_DEFAULT_RESTORED", "memes", envDefault.asText()));
     }
 

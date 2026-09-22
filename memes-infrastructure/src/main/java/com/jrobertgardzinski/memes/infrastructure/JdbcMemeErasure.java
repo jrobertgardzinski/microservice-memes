@@ -64,6 +64,18 @@ class JdbcMemeErasure implements MemeErasure {
         // mark or to restore, and the erasure that follows works off a fresh read anyway
     }
 
+    /**
+     * Has a running saga reserved this meme? Not on the port: the three saga steps do not ask it —
+     * {@link JdbcMemeContentIndex} does, about the meme holding a content hash it wants, and this
+     * is the one file allowed to look. "Not in {@code active_memes}" cannot answer it, because a
+     * meme that is merely being SAVED is not in the view either.
+     */
+    boolean isReserved(String memeId) {
+        return jdbc.sql("SELECT 1 FROM memes WHERE id = ? AND status = ?")
+                .params(memeId, MemeStatus.PENDING_ERASURE.name())
+                .query((rs, n) -> 1).optional().isPresent();
+    }
+
     @Override
     public List<MemeMetadata> pendingSince(Instant cutoff) {
         // the reaper's query, in full: a status and an instant, served by idx_memes_pending_erasure.

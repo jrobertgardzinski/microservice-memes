@@ -47,7 +47,7 @@ public class AdminPolicySteps {
 
     @Before
     public void cleanDial() {
-        purgePolicyOverride.clear();
+        purgePolicyOverride.clear("test-setup@example.com");
     }
 
     @Given("the ADMIN sets the memes purge policy to {string}")

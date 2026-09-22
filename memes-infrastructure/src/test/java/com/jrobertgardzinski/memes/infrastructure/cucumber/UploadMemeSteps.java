@@ -98,7 +98,9 @@ public class UploadMemeSteps {
     public void theUploadIsTurnedAwayWithAPoliteExplanation() {
         assertEquals(400, uploadResponse.statusCode(),
                 "a refusal at the door, not a server crash — got: " + uploadResponse.asString());
-        String explanation = uploadResponse.jsonPath().getString("error");
+        assertEquals("INVALID_IMAGE", uploadResponse.jsonPath().getString("status"),
+                "a coded refusal, the one shape this boundary answers in");
+        String explanation = uploadResponse.jsonPath().getString("detail");
         assertNotNull(explanation, "the refusal says why");
         assertFalse(explanation.contains("Exception"),
                 "the explanation speaks to a person, not a stack trace: " + explanation);

@@ -95,7 +95,7 @@ class PurgeUserContentTest {
             adminOverride = Optional.of(rule);
         }
 
-        public void clear() {
+        public void clear(String clearedBy) {
             adminOverride = Optional.empty();
         }
     };

@@ -124,6 +124,25 @@ class ThumbnailCacheTest {
     }
 
     @Test
+    @DisplayName("the full-size image states the same cache policy as its thumbnail, not none at all")
+    void the_full_image_carries_the_same_policy_as_the_thumbnail() throws Exception {
+        String id = upload();
+
+        // Saying nothing is not "do not cache" — it is "whatever heuristic this browser or proxy
+        // picks", i.e. an unwritten stale window on the bigger half of the same picture, under the
+        // same erasure duty the thumbnail's hour is argued for at length.
+        String image = mockMvc.perform(get("/memes/{id}", id))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("Cache-Control");
+        String thumbnail = mockMvc.perform(get("/memes/{id}/thumbnail", id))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader("Cache-Control");
+
+        assertEquals(thumbnail, image,
+                "both halves of one meme must decay together — the image said: " + image);
+    }
+
+    @Test
     @DisplayName("deleting the meme sweeps the cached thumbnail — and the endpoint answers 404, not a ghost image")
     void delete_takes_the_cached_thumbnail_along() throws Exception {
         String id = upload();

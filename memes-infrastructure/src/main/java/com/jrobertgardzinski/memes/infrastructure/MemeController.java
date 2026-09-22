@@ -127,6 +127,22 @@ class MemeController {
                 .map(image -> ResponseEntity.ok()
                         .header("Content-Type", image.contentType())
                         .header("Vary", "Accept")
+                        // the SAME policy as the thumbnail below, and stated for the same reason:
+                        // a meme is immutable per id, and saying nothing here does not mean "do
+                        // not cache" — it means "whatever heuristic this browser or proxy picks",
+                        // which is an unwritten stale window on the LARGER payload under the same
+                        // erasure duty. One hour, so the two halves of one picture decay together;
+                        // the reasoning, and what to change should a purge ever need to be
+                        // harder, is written out once at #thumbnail.
+                        // the SAME policy as the thumbnail below, and stated for the same reason:
+                        // a meme is immutable per id, and saying nothing here does not mean "do
+                        // not cache" — it means "whatever heuristic this browser or proxy picks",
+                        // which is an unwritten stale window on the LARGER payload under the same
+                        // erasure duty. One hour, so the two halves of one picture decay together;
+                        // the reasoning, and what to change should a purge ever need to be
+                        // harder, is written out once at #thumbnail.
+                        .cacheControl(org.springframework.http.CacheControl
+                                .maxAge(java.time.Duration.ofHours(1)).cachePublic())
                         .body(image.data()))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -254,7 +270,18 @@ class MemeController {
                                @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
                                        required = false) java.util.Set<String> roles) {
         boolean moderator = roles != null && (roles.contains("MODERATOR") || roles.contains("ADMIN"));
-        boolean nsfw = Boolean.TRUE.equals(body.get("nsfw"));
+        Boolean stated = body.get("nsfw");
+        if (stated == null) {
+            // NOT STATED is not the same as false. A missing key, an explicit null or a misspelled
+            // one used to fold into the unflag command, whose adapter runs an unconditional DELETE
+            // FROM meme_flags — so a flag-ON that lost its field in transit was answered 200
+            // {"nsfw": false}, the blur came off the tile, and the moderator read the 200 as
+            // "marked". The two sibling map-bodied endpoints here already refuse the unstated
+            // field (AdminController's MISSING_RULE, VoteController's INVALID_DIRECTION).
+            return ResponseEntity.badRequest().body(Map.of("status", "MISSING_FLAG",
+                    "detail", "expected {\"nsfw\": true|false}"));
+        }
+        boolean nsfw = stated;
         return switch (flagMeme.execute(id, nsfw, moderator)) {
             case FLAGGED -> ResponseEntity.ok(Map.of("id", id, "nsfw", nsfw));
             case NOT_A_MODERATOR -> ResponseEntity.status(403).body(Map.of("status", "NOT_A_MODERATOR"));

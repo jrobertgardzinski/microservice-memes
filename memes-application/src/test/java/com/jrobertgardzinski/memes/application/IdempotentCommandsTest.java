@@ -123,7 +123,7 @@ class IdempotentCommandsTest {
     private static final PurgePolicyOverride NO_OVERRIDE = new PurgePolicyOverride() {
         public Optional<PurgeRule> current() { return Optional.empty(); }
         public void set(PurgeRule rule, String updatedBy) { }
-        public void clear() { }
+        public void clear(String clearedBy) { }
     };
 
     /** A stopped clock: two runs of the same command must not differ by when they ran. */
