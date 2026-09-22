@@ -7,7 +7,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import org.springframework.web.util.UriUtils;
+
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.Set;
 
@@ -34,8 +37,15 @@ class RequireSignInFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        boolean admin = request.getRequestURI().startsWith("/admin");
-        if (!request.getRequestURI().startsWith("/memes") && !admin) {
+        // DECODED, because Spring routes on decoded path segments and this gate does not: a request
+        // for /%61dmin/purge-policy reaches AdminController, while a raw-URI test reads it as
+        // "not ours" and lets it past with `admin` false — no sign-in demanded AND the admin
+        // branch missed. Decoding the whole URI makes the gate slightly WIDER than the router (a
+        // %2F reads as a separator here and not there), which is the safe direction for a gate.
+        // The comments twin was fixed the same way; neither of us had a correct filter to copy.
+        String path = UriUtils.decode(request.getRequestURI(), StandardCharsets.UTF_8);
+        boolean admin = path.startsWith("/admin");
+        if (!path.startsWith("/memes") && !admin) {
             chain.doFilter(request, response);
             return;
         }
