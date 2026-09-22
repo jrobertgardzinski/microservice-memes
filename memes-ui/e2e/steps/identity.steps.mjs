@@ -152,10 +152,6 @@ Then('signing in with that account is refused', async function () {
   });
 });
 
-When('choose to burn every meme and comment', async function () {
-  await this.page.getByRole('radio', { name: /Burn it all/ }).click();
-});
-
 When('close the meme', async function () {
   await this.page.keyboard.press('Escape');
   await expect(this.page.getByTestId('meme-score')).toHaveCount(0);
@@ -176,12 +172,20 @@ Then('their meme is gone from the wall', async function () {
   await expect(this.page.locator(`img[src*="${this.uploadedMemeId}/thumbnail"]`)).toHaveCount(0);
 });
 
-Then('the comment {string} still stands, signed {string}', async function (text, author) {
+Then('the comment {string} is gone from the thread', async function (text) {
+  // The scenario this replaced asserted the opposite — the comment surviving, signed "deleted
+  // account" — because a leaver used to CHOOSE what happened to what they wrote. Since the two
+  // ways out of an account were separated, a closure somebody asks for themselves destroys
+  // everything and offers no rule; anonymising is a condition only an ADMIN may attach when
+  // closing SOMEBODY ELSE's account. The assertion moved with the product.
+  //
+  // Read through the whole thread, not page 0: the purge is a saga hop away and this suite
+  // shares one meme, so "not on the first page" would pass for a comment that is merely late.
   await this.eventually(async () => {
-    const thread = await (await fetch(`${COMMENTS}/memes/${this.memeId}/comments`)).json();
+    const thread = await (await fetch(`${COMMENTS}/memes/${this.memeId}/comments?page=0&size=100`)).json();
     const mine = (thread.comments ?? thread).find((c) => c.text === text);
-    expect(mine, `the comment "${text}" should have outlived its author`).toBeTruthy();
-    expect(mine.author).toBe(author);
+    expect(mine, `the comment "${text}" belonged to an account that is gone, so it goes too`)
+      .toBeFalsy();
   });
 });
 
