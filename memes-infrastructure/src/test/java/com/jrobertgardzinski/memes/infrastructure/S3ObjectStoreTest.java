@@ -5,9 +5,11 @@ import io.qameta.allure.Feature;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.MinIOContainer;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -30,32 +32,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers(disabledWithoutDocker = true)
 class S3ObjectStoreTest {
 
+    private static final String USER = "memes";
+    private static final String PASSWORD = "supersecret";
+
     /**
-     * From quay.io, not Docker Hub.
+     * MinIO from bitnamilegacy/, and NOT through Testcontainers' {@code MinIOContainer}.
      *
-     * <p>{@code docker.io/minio/minio} stopped answering anonymous pulls — "repository does not
-     * exist or may require 'docker login'" — so every CI run failed on fetching the image rather
-     * than on anything this test is about, and a laptop without a cached copy failed the same way.
-     * quay.io serves the identical release; Testcontainers takes the registry from the name, and
-     * the tag stays pinned because a floating one would make this suite's result depend on the day.
+     * <p>The registry first: MinIO has put its own images behind a login. Docker Hub stopped
+     * answering anonymous pulls in September 2026, quay.io followed on 2026-09-24 with a 401 for
+     * every tag, and ghcr.io and public.ecr.aws never carried it — so every CI run failed on
+     * FETCHING the image rather than on anything this test is about. Bitnami's build from source
+     * is the only public copy left; read the namespace, it is frozen and will never get another
+     * update. The tag stays pinned because a floating one would make this suite's result depend
+     * on the day. The same image and the same three differences are in the compose stack.
+     *
+     * <p>And that is why the container is a plain {@link GenericContainer}:
+     * {@code MinIOContainer} hands the image {@code server --console-address :9001 /data}, which
+     * upstream's entrypoint understands and Bitnami's does not — it runs the server itself and
+     * would try to exec that as a program. Three lines of configuration are cheaper than a
+     * subclass that fights its own helper.
      */
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer(
-            org.testcontainers.utility.DockerImageName
-                    .parse("quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z")
-                    // Testcontainers recognises MinIO by the Docker Hub name; saying the two are
-                    // the same image is the whole of what this line does
-                    .asCompatibleSubstituteFor("minio/minio"));
+    static final GenericContainer<?> MINIO = new GenericContainer<>(
+            DockerImageName.parse("bitnamilegacy/minio:2025.7.23-debian-12-r5"))
+            .withEnv("MINIO_ROOT_USER", USER)
+            .withEnv("MINIO_ROOT_PASSWORD", PASSWORD)
+            .withExposedPorts(9000)
+            .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000).forStatusCode(200));
 
     static S3ObjectStore store;
 
     @BeforeAll
     static void connect() {
         S3Client s3 = S3Client.builder()
-                .endpointOverride(URI.create(MINIO.getS3URL()))
+                .endpointOverride(URI.create("http://" + MINIO.getHost() + ":" + MINIO.getMappedPort(9000)))
                 .region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(MINIO.getUserName(), MINIO.getPassword())))
+                        AwsBasicCredentials.create(USER, PASSWORD)))
                 .forcePathStyle(true)
                 .build();
         store = new S3ObjectStore(s3, "memes", PendingBlobDeletes.none());

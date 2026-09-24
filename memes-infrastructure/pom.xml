@@ -147,16 +147,14 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <!-- a real MinIO for the S3 adapter's round-trip; skipped where docker is absent -->
-            <groupId>org.testcontainers</groupId>
-            <artifactId>minio</artifactId>
-            <!-- pinned here too, and note it is 1.x: testcontainers reorganised its modules in 2.x
-                 and neither minio nor junit-jupiter has a 2.x release at all, so "the testcontainers
-                 version" is no longer one number for the whole set. -->
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
+            <!-- a real MinIO for the S3 adapter's round-trip; skipped where docker is absent.
+                 The `minio` MODULE is deliberately gone: its MinIOContainer commands the image
+                 the way UPSTREAM's entrypoint expects, and the only publicly pullable MinIO left
+                 is Bitnami's build, which starts the server itself (see S3ObjectStoreTest). A
+                 GenericContainer out of the core does the job in three lines.
+                 Note the 1.x: testcontainers reorganised its modules in 2.x and junit-jupiter has
+                 no 2.x release at all, so "the testcontainers version" is no longer one number
+                 for the whole set. -->
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${testcontainers.version}</version>
