@@ -65,6 +65,14 @@ and Quarkus (`microservice-email`, BCE).
 - **memes-application** — use cases (`PublishMeme`, `ServeMeme`, `MakeThumbnail`, `CastVote`,
   `RankMemes`, `TagMeme`, `DeleteMeme`, `PurgeUserContent`, …) + the ports (`MemeRepository`,
   `VoteRepository`, `MemeContentIndex`, `TagRepository`, `ObjectStore`). No framework.
+- **memes_account-closure** — this service's side of ONE cross-service process: what happens to a
+  person's memes when their account closes. The three commands (mark, erase, restore), which one
+  is reversible, which rule applies and what gets confirmed — with no Kafka, no database and no
+  Spring anywhere in it, so the flow can be read and tested before anyone decides whether the
+  portal is six services or one. The underscore says it is not a layer: `memes-<x>` is a layer of
+  this service, `memes_<x>` is its part in the process named after the shared library `<x>`
+  (here `account-closure`), and `comments_account-closure` would be the other end of the same
+  conversation.
 - **memes-ui** — the gallery UI: React + TypeScript + Material UI, built by Vite through
   frontend-maven-plugin (own pinned Node) and packed as `META-INF/resources`, so the service jar
   serves it at `/`. UI development: `cd memes-ui && npm run dev` (proxies `/memes` to :8083).

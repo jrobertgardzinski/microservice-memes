@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
+import com.jrobertgardzinski.memes.closure.MemesClosureParticipant;
 import com.jrobertgardzinski.memes.domain.Observation;
 import com.jrobertgardzinski.observation.Observations;
 import io.qameta.allure.Epic;
@@ -60,18 +61,27 @@ class PurgeCommandsListenerTest {
             restoreUserContent, purgeUserContent, confirmations, observations, new ObjectMapper(),
             NoTransactions.template());
 
-    private final Logger listenerLog = (Logger) LoggerFactory.getLogger(PurgeCommandsListener.class);
+    /**
+     * BOTH loggers, because the two halves of this path log for different reasons: the adapter
+     * says what it could not read off the wire, and the participant (memes_account-closure) says
+     * what it decided. A test that watched only one of them would go half blind the moment a line
+     * moved across that boundary — which is exactly what happened when the participant was cut
+     * out of the listener.
+     */
+    private final List<Logger> loggers = List.of(
+            (Logger) LoggerFactory.getLogger(PurgeCommandsListener.class),
+            (Logger) LoggerFactory.getLogger(MemesClosureParticipant.class));
     private final ListAppender<ILoggingEvent> written = new ListAppender<>();
 
     @BeforeEach
     void captureTheLog() {
         written.start();
-        listenerLog.addAppender(written);
+        loggers.forEach(logger -> logger.addAppender(written));
     }
 
     @AfterEach
     void releaseTheLog() {
-        listenerLog.detachAppender(written);
+        loggers.forEach(logger -> logger.detachAppender(written));
         written.stop();
     }
 

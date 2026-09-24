@@ -34,6 +34,7 @@
         <module>memes-image</module>
         <module>memes-tags</module>
         <module>memes-application</module>
+        <module>memes_account-closure</module>
         <module>memes-ui</module>
         <module>memes-infrastructure</module>
     </modules>
@@ -85,6 +86,11 @@
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
                 <artifactId>memes-application</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.jrobertgardzinski</groupId>
+                <artifactId>memes_account-closure</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
