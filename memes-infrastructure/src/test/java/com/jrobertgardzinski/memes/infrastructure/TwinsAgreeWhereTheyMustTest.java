@@ -46,8 +46,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class TwinsAgreeWhereTheyMustTest {
 
     private static final Path MEMES = Path.of("src/main/resources/application.properties");
-    private static final Path COMMENTS =
-            Path.of("../../microservice-comments/src/main/resources/application.properties");
+    // comments-infrastructure, not the repo root: comments was cut into one module per layer on
+    // 2026-09-24, and its shipped properties moved with the rest of src/main/resources. The old
+    // path did not fail — loadTwinOrSkip() ASSUMES the twin may be absent, because a developer
+    // may have only one of the two repos cloned — so this law went quietly dormant instead,
+    // which is the exact shape of failure this estate keeps paying for.
+    private static final Path COMMENTS = Path.of(
+            "../../microservice-comments/comments-infrastructure/src/main/resources/application.properties");
 
     /** Same key, same value, in both services. */
     private static final Set<String> SAME_VALUE = Set.of(
