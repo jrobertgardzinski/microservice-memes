@@ -18,7 +18,7 @@ import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.config.ImageLimits;
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.config.RateLimit;
 import com.jrobertgardzinski.memes.config.TagLimits;
 import com.jrobertgardzinski.memes.config.ThumbnailSize;

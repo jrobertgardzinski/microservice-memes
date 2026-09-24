@@ -6,7 +6,7 @@ import com.jrobertgardzinski.closure.ClosureMessages;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.domain.Observation;
 import com.jrobertgardzinski.observation.Observations;
 import io.qameta.allure.Epic;

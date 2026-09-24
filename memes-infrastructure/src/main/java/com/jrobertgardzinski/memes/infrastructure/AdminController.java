@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;

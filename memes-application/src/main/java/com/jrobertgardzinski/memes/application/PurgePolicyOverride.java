@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 
 import java.util.Optional;
 

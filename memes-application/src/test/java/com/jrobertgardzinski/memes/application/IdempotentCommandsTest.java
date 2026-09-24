@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.tags.Tag;
 import com.jrobertgardzinski.voting.VoteDirection;

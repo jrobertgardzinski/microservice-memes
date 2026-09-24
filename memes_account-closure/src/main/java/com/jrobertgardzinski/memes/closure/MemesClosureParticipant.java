@@ -5,7 +5,7 @@ import com.jrobertgardzinski.closure.ClosureMessages;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.domain.Observation;
 import com.jrobertgardzinski.observation.Observations;
 import org.slf4j.Logger;
@@ -13,8 +13,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * The meme service's side of the account-closure saga: a participant in TWO phases, which is what
@@ -200,43 +198,12 @@ public final class MemesClosureParticipant {
         try {
             return Optional.of(PurgeRule.parse(text));
         } catch (IllegalArgumentException invalid) {
-            // NOT invalid.getMessage(): parse() pastes the raw rule text from the wire into it,
-            // and that text is whatever the leaver typed into the deletion request — kilobytes
-            // of it, newlines included, i.e. forged log lines in Loki. A constant plus the
-            // length and a vocabulary-only fragment is enough to investigate
-            LOG.warn("ignoring an unparseable memes purge rule ({} chars, looks like '{}'), "
-                    + "using the default", text.length(), sanitizedFragment(text));
+            // invalid.getMessage() is safe to log now, and that is the whole point of having moved
+            // the vocabulary into the library: the refusal states the length and the SHAPE, never
+            // the text, so a new caller cannot reintroduce the leak by logging the obvious thing
+            LOG.warn("ignoring an unparseable memes purge rule, using the default: {}",
+                    invalid.getMessage());
             return Optional.empty();
         }
-    }
-
-    /**
-     * The purge-rule VOCABULARY, whole tokens only — never the raw wire text (the same whitelist
-     * the comments service arrived at, for the same reason). A per-character filter would keep
-     * every digit and every uppercase letter, which is exactly the alphabet of phone numbers and
-     * SHOUTED e-mail addresses; this inverts the burden of proof — only the three rule words
-     * survive, with a popularity threshold (≤4 digits) accepted solely in its grammar position
-     * after {@code KEEP_POPULAR_ANONYMIZED:}, because a free-standing number is not vocabulary.
-     * Everything unrecognised collapses to a single {@code ?} per run, so the log shows the
-     * rule's shape ("was it almost a rule?") and none of its content.
-     */
-    private static final Pattern VOCABULARY = Pattern.compile(
-            "(?<![A-Z_0-9:])(?:KEEP_POPULAR_ANONYMIZED(?::\\d{1,4})?|ANONYMIZE_AUTHOR|DELETE)(?![A-Z_0-9:])");
-
-    private static String sanitizedFragment(String text) {
-        StringBuilder kept = new StringBuilder();
-        Matcher vocabulary = VOCABULARY.matcher(text);
-        int consumedUpTo = 0;
-        while (vocabulary.find()) {
-            if (vocabulary.start() > consumedUpTo) {
-                kept.append('?');   // one ? per unrecognised run, no matter how long or what it held
-            }
-            kept.append(vocabulary.group());
-            consumedUpTo = vocabulary.end();
-        }
-        if (consumedUpTo < text.length() || text.isEmpty()) {
-            kept.append('?');
-        }
-        return kept.length() <= 32 ? kept.toString() : kept.substring(0, 32) + "…";
     }
 }

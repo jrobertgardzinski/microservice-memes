@@ -1,6 +1,7 @@
 name: CI
 
-# microservice-memes needs two sibling SNAPSHOTs (voting and offline-jwt, both public), so CI
+# microservice-memes needs three sibling SNAPSHOTs (voting, purge-rule and offline-jwt, all
+# public), so CI
 # checks them out and installs them first. Checkouts use the workspace layout (each repo in its own directory) because the
 # saga-confirmation provider test verifies microservice-offboarding's committed pact from the sibling
 # checkout. The reactor CI (in the aggregator repo) still validates everything together.
@@ -22,6 +23,10 @@ jobs:
         with:
           repository: jrobertgardzinski/voting
           path: voting
+      - uses: actions/checkout@v7
+        with:
+          repository: jrobertgardzinski/purge-rule
+          path: purge-rule
       - uses: actions/checkout@v7
         with:
           repository: jrobertgardzinski/observation
@@ -57,6 +62,7 @@ jobs:
       - name: Install the shared libraries
         run: |
           mvn -B -q --no-transfer-progress -f voting/pom.xml install -DskipTests
+          mvn -B -q --no-transfer-progress -f purge-rule/pom.xml install -DskipTests
           mvn -B -q --no-transfer-progress -f observation/pom.xml install -DskipTests
           mvn -B -q --no-transfer-progress -f account-closure/pom.xml install -DskipTests
           mvn -B -q --no-transfer-progress -f offline-jwt/pom.xml install -DskipTests

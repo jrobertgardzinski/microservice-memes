@@ -14,7 +14,7 @@ import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;

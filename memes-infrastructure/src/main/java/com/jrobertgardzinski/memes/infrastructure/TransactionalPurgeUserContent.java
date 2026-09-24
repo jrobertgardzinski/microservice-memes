@@ -8,7 +8,7 @@ import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.TagRepository;
 import com.jrobertgardzinski.memes.application.VoteRepository;
-import com.jrobertgardzinski.memes.config.PurgeRule;
+import com.jrobertgardzinski.purge.PurgeRule;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
