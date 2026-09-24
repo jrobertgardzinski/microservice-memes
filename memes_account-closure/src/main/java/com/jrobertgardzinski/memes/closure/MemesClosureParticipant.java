@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.closure;
 
-import com.jrobertgardzinski.closure.ClosureInitiator;
+import com.jrobertgardzinski.closure.ClosureCommand;
 import com.jrobertgardzinski.closure.ClosureMessages;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
@@ -84,7 +84,7 @@ public final class MemesClosureParticipant {
             return new ClosureOutcome.NotOurs(type);
         }
         String sagaId = command.sagaId();
-        if (command.email() == null || command.email().isBlank()) {
+        if (!command.isAddressed()) {
             // a command keyed by NOBODY would "succeed" instantly — and for the mark it would
             // confirm a deletion that never happened, advancing the saga on a lie. Dropped WITHOUT
             // confirming: the command is malformed at the source, and the orchestrator's timeout
@@ -180,11 +180,11 @@ public final class MemesClosureParticipant {
      * rather than wedging the saga.
      */
     private Optional<PurgeRule> requestedRule(ClosureCommand command) {
-        // ClosureInitiator, not a local constant: the one word that licenses conditions is the
-        // agreement's, and its reading is deliberately not symmetrical — a missing field, an empty
-        // one or a word this service has never heard of is a closure the OWNER asked for
-        if (!ClosureInitiator.allowsConditions(command.initiatedBy())) {
-            if (command.memesRule().isPresent()) {
+        // the command answers it, not a constant of ours: the one word that licenses conditions
+        // is the agreement's, and its reading is deliberately not symmetrical — a missing field,
+        // an empty one or a word this service has never heard of is a closure the OWNER asked for
+        if (!command.allowsConditions()) {
+            if (command.rule().isPresent()) {
                 // a producer that states conditions on a self-closure is broken, not permissive:
                 // say so loudly and destroy anyway — the alternative is a silent policy breach
                 LOG.warn("a self-requested closure arrived carrying a memes purge rule; ignoring it"
@@ -193,10 +193,10 @@ public final class MemesClosureParticipant {
             }
             return Optional.of(new PurgeRule.Delete());
         }
-        if (command.memesRule().isEmpty()) {
+        if (command.rule().isEmpty()) {
             return Optional.empty();
         }
-        String text = command.memesRule().get();
+        String text = command.rule().get();
         try {
             return Optional.of(PurgeRule.parse(text));
         } catch (IllegalArgumentException invalid) {

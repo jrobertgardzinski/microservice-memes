@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.closure;
 
+import com.jrobertgardzinski.closure.ClosureCommand;
 import com.jrobertgardzinski.closure.ClosureInitiator;
 import com.jrobertgardzinski.closure.ClosureMessages;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;

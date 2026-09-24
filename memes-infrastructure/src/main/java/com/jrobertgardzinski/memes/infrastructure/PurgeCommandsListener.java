@@ -2,11 +2,11 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jrobertgardzinski.closure.ClosureCommand;
 import com.jrobertgardzinski.closure.ClosureMessages;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
-import com.jrobertgardzinski.memes.closure.ClosureCommand;
 import com.jrobertgardzinski.memes.closure.MemesClosureParticipant;
 import com.jrobertgardzinski.memes.domain.Observation;
 import com.jrobertgardzinski.observation.Observations;
