@@ -97,14 +97,6 @@ class StuckErasureWatchTest {
             this.failure = why;
         }
 
-        public List<MemeMetadata> activeOf(String author) {
-            return List.of();
-        }
-
-        public List<MemeMetadata> pendingOf(String author) {
-            return List.of();
-        }
-
         public List<MemeMetadata> activeOf(com.jrobertgardzinski.identity.UserId author) {
             return List.of();
         }

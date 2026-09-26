@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.tags.Tag;
@@ -34,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 @Epic("Use case")
 @Feature("Idempotent commands")
 class IdempotentCommandsTest {
+
+    private static final UserId ALICE = UserId.random();
+    private static final UserId BOB = UserId.random();
 
     /** A fresh gallery per run: two memes, votes, a tag, a flag. */
     private static final class World {
@@ -91,8 +95,8 @@ class IdempotentCommandsTest {
         final FakeMemeErasure erasure = new FakeMemeErasure(memes);
 
         World() {
-            memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
-            memes.put("m2", new Meme("m2", "bob@example.com", "png", new byte[]{2}));
+            memes.put("m1", new Meme("m1", "alice@example.com", Optional.of(ALICE), "png", new byte[]{1}));
+            memes.put("m2", new Meme("m2", "bob@example.com", Optional.of(BOB), "png", new byte[]{2}));
             contentIndex.put(new String(new byte[]{1}), "m1");
             contentIndex.put(new String(new byte[]{2}), "m2");
             votes.put("m1", new HashMap<>(Map.of("bob@example.com", VoteDirection.UP)));
@@ -141,20 +145,20 @@ class IdempotentCommandsTest {
         c.put("flag a meme NSFW (moderator)", w -> new FlagMeme(w.memeRepository, w.flags)
                 .execute("m2", true, true));
         c.put("mark a leaver's gallery for erasure",
-                w -> new MarkUserContentForErasure(w.erasure, CLOCK).execute("alice@example.com"));
+                w -> new MarkUserContentForErasure(w.erasure, CLOCK).execute(ALICE));
         c.put("compensate: mark, then restore",
                 w -> {
-                    new MarkUserContentForErasure(w.erasure, CLOCK).execute("alice@example.com");
-                    new RestoreUserContent(w.erasure).execute("alice@example.com");
+                    new MarkUserContentForErasure(w.erasure, CLOCK).execute(ALICE);
+                    new RestoreUserContent(w.erasure).execute(ALICE);
                 });
         c.put("purge a leaver's gallery (default rule)",
                 w -> {
                     // the whole saga, both phases: the closure erases what the mark reserved
-                    new MarkUserContentForErasure(w.erasure, CLOCK).execute("alice@example.com");
+                    new MarkUserContentForErasure(w.erasure, CLOCK).execute(ALICE);
                     new PurgeUserContent(w.memeRepository, w.erasure, w.voteRepository, w.index,
                             w.tagRepository, w.memeEvents, NO_OVERRIDE,
                             new PurgeRule.AnonymizeAuthor())
-                            .execute("alice@example.com", Optional.empty());
+                            .execute(ALICE, Optional.empty());
                 });
         return c;
     }

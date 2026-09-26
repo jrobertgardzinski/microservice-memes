@@ -92,7 +92,7 @@ class MarkedMemeIsInvisibleTest {
     void nothing_public_returns_a_marked_meme() throws Exception {
         assertTrue(galleryIds().contains(memeId), "the fixture must start from a visible meme");
 
-        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER);
+        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER_ID);
 
         assertFalse(galleryIds().contains(memeId), "the gallery page");
         assertFalse(ids("/memes?tag=cats").contains(memeId), "the tag search");
@@ -109,7 +109,7 @@ class MarkedMemeIsInvisibleTest {
     @Test
     @DisplayName("re-uploading the marked picture yields a NEW meme, never the leaver's id")
     void the_dedup_index_does_not_hand_out_a_marked_meme() throws Exception {
-        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER);
+        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER_ID);
 
         // bob uploads the very same bytes. The content index still held alice's claim on that
         // hash, so without a status-aware claim this answered with HER meme id — a 200 pointing at
@@ -124,8 +124,8 @@ class MarkedMemeIsInvisibleTest {
     @Test
     @DisplayName("the mark takes nothing away but the visibility — tags and votes survive it")
     void the_mark_destroys_nothing() throws Exception {
-        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER);
-        restoreUserContent.execute(TestAuthConfig.SIGNED_IN_USER);
+        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER_ID);
+        restoreUserContent.execute(TestAuthConfig.SIGNED_IN_USER_ID);
 
         assertEquals(List.of("cats"), strings("/memes/" + memeId + "/tags"),
                 "the tags were never touched: the mark is a status, not a teardown");
@@ -134,9 +134,9 @@ class MarkedMemeIsInvisibleTest {
     @Test
     @DisplayName("the compensation gives the gallery back exactly what the mark took")
     void restoring_makes_everything_visible_again() throws Exception {
-        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER);
+        markForErasure.execute(TestAuthConfig.SIGNED_IN_USER_ID);
 
-        restoreUserContent.execute(TestAuthConfig.SIGNED_IN_USER);
+        restoreUserContent.execute(TestAuthConfig.SIGNED_IN_USER_ID);
 
         assertTrue(galleryIds().contains(memeId), "the gallery page");
         assertTrue(ids("/memes?tag=cats").contains(memeId), "the tag search — its tags survived");

@@ -65,11 +65,7 @@ public class PurgeUserContent {
         this.defaultRule = defaultRule;
     }
 
-    public void execute(String author, Optional<PurgeRule> requested) {
-        execute(author, Optional.empty(), requested);
-    }
-
-    public void execute(String author, Optional<UserId> authorId, Optional<PurgeRule> requested) {
+    public void execute(UserId author, Optional<PurgeRule> requested) {
         PurgeRule rule = requested.or(override::current).orElse(defaultRule);
         // FIRST, before any score is read: the leaver's own votes are leaving with him anyway, and a
         // rule like "keep what the community liked" must be answered by the COMMUNITY. Retracting
@@ -77,8 +73,8 @@ public class PurgeUserContent {
         // moment later — a leaver who had upvoted his own memes bought their survival with a vote
         // this method was about to delete (P18 poz. 39). It is also why the rule is not read at
         // MARK time: the mark must change nothing, and this ordering needs the votes to go first.
-        voteRepository.purgeVoter(author);
-        for (MemeMetadata meme : erasure.pendingOf(author, authorId)) {
+        voteRepository.purgeVoter(author.toString());   // ballots are keyed by the voter's id, in its wire form
+        for (MemeMetadata meme : erasure.pendingOf(author)) {
             if (rule.keeps(voteRepository.scoreOf(meme.id()))) {
                 memeRepository.reassignAuthor(meme.id(), DeletedAccount.AUTHOR);
                 // and out of the reservation: the community keeps the meme, so it belongs in the

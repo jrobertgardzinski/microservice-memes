@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import java.util.Optional;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,9 +63,9 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(classes = MemesApplication.class)
 class PurgeConfirmationOutboxTest {
 
-    private static final String LEAVER = "leaver@example.com";
+    private static final UserId LEAVER = UserId.of("0b7c1c2e-5d3a-4f1b-9e8d-6a5b4c3d2e1f");
     private static final String SAGA = "5c1c7e3d-9b41-4b32-8f0a-7a3f2d1e5b90";
-    private static final String COMMAND = "{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER
+    private static final String COMMAND = "{\"type\":\"PURGE_USER_CONTENT\",\"userId\":\"" + LEAVER
             + "\",\"sagaId\":\"" + SAGA + "\"}";
 
     @Autowired
@@ -122,7 +123,7 @@ class PurgeConfirmationOutboxTest {
         listener.receive(COMMAND, "cid-of-the-deletion");
 
         // the command is the MARK, so the mark is what ran: the erasure waits for the closure
-        verify(markForErasure).execute(LEAVER, Optional.empty());
+        verify(markForErasure).execute(LEAVER);
         verifyNoInteractions(purgeUserContent);
         ArgumentCaptor<ProducerRecord<String, String>> firstTry =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -169,7 +170,7 @@ class PurgeConfirmationOutboxTest {
         JsonNode payload = mapper.readTree(confirmation.value());
         assertEquals("USER_CONTENT_PURGED", payload.path("type").asText());
         assertEquals(SAGA, payload.path("sagaId").asText());
-        assertEquals(LEAVER, payload.path("email").asText(), "the orchestrator matches on the address");
+        assertEquals(LEAVER.toString(), payload.path("userId").asText(), "the orchestrator matches on the id");
         assertEquals(1, payload.path("version").asInt(), "envelope version 1 (ADR 0004)");
     }
 
@@ -199,7 +200,7 @@ class PurgeConfirmationOutboxTest {
     @DisplayName("a mark that throws writes nothing at all and lets the failure out to the container")
     void a_failing_purge_writes_nothing() {
         doThrow(new org.springframework.dao.DataAccessResourceFailureException("no database"))
-                .when(markForErasure).execute(LEAVER, Optional.empty());
+                .when(markForErasure).execute(LEAVER);
 
         assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
                 () -> listener.receive(COMMAND, null));

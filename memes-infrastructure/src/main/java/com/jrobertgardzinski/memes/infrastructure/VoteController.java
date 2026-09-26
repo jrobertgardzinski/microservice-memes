@@ -57,20 +57,22 @@ class VoteController {
 
     @PostMapping("/{memeId}/votes")
     ResponseEntity<?> voteOnMeme(@PathVariable("memeId") String memeId,
-                                 @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String voter,
+                                 @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
+                                 com.jrobertgardzinski.identity.UserId voter,
                                  @RequestBody VoteRequest request) {
         Optional<VoteDirection> direction = parseDirection(request);
         if (direction.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
         }
-        return toResponse(castVote.execute(memeId, voter, direction.get()));
+        // the ballot is keyed by the voter's id, in its wire form
+        return toResponse(castVote.execute(memeId, voter.toString(), direction.get()));
     }
 
     @GetMapping("/{memeId}/votes")
     ResponseEntity<?> memeTally(@PathVariable("memeId") String memeId,
-                                @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER, required = false)
-                                String viewer) {
-        return toResponse(showMemeVote.execute(memeId, Optional.ofNullable(viewer)));
+                                @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID, required = false)
+                                com.jrobertgardzinski.identity.UserId viewer) {
+        return toResponse(showMemeVote.execute(memeId, Optional.ofNullable(viewer).map(Object::toString)));
     }
 
     /**

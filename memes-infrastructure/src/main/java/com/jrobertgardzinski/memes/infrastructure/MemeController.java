@@ -81,8 +81,7 @@ class MemeController {
     ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file,
                                                @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER)
                                                String uploader,
-                                               @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID,
-                                                       required = false)
+                                               @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
                                                com.jrobertgardzinski.identity.UserId uploaderId) throws IOException {
         if (!uploadRate.tryAcquire(uploader)) {
             return ResponseEntity.status(429).header("Retry-After", "60")
@@ -94,7 +93,7 @@ class MemeController {
         // duration; releasing before that would bound nothing.
         String id = uploadAdmission.admit(() -> {
             try {
-                return publishMeme.execute(file.getBytes(), uploader, java.util.Optional.ofNullable(uploaderId));
+                return publishMeme.execute(file.getBytes(), uploader, java.util.Optional.of(uploaderId));
             } catch (IOException unreadableUpload) {
                 throw new UncheckedIOException(unreadableUpload);
             }
@@ -241,8 +240,6 @@ class MemeController {
      */
     @GetMapping("/{id}/meta")
     ResponseEntity<Map<String, Object>> meta(@PathVariable("id") String id,
-                                             @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER,
-                                                     required = false) String viewer,
                                              @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID,
                                                      required = false)
                                              com.jrobertgardzinski.identity.UserId viewerId) {
@@ -252,36 +249,21 @@ class MemeController {
                         "author", nameOf(meme),
                         // the full author never leaves the service, so the UI cannot compare it
                         // against the signed-in user any more — "own" carries that answer instead
-                        "own", meme.isOwnedBy(viewer, Optional.ofNullable(viewerId)),
+                        "own", viewerId != null && meme.isOwnedBy(viewerId),
                         "nsfw", contentFlags.isNsfw(id))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * The public face of an uploader: first character, then {@code ***}, then the domain — the
-     * same representation {@code CommentController.maskAuthor} gives a comment's author, so the
-     * two halves of one dialog speak about people the same way. Internally (authorisation, the
-     * account purge) the full e-mail still flows; only this representation masks. Non-e-mail
-     * authors (the "deleted account" placeholder) pass through untouched.
-     */
-    /**
-     * The name security shows for the author's id; a row that predates the id still shows its
-     * masked address. An id security no longer knows is a deleted account.
-     */
+    /** The name security shows for the author's id; a row without one, or with one security no longer knows, is a deleted account. */
     private String nameOf(com.jrobertgardzinski.memes.domain.MemeMetadata meme) {
         return meme.authorId()
                 .map(id -> authors.namesOf(java.util.List.of(id)).getOrDefault(id,
-                        new com.jrobertgardzinski.authors.AuthorName("deleted account")).display())
-                .orElseGet(() -> maskAuthor(meme.author()));
+                        new com.jrobertgardzinski.authors.AuthorName(DELETED_ACCOUNT)).display())
+                .orElse(DELETED_ACCOUNT);
     }
 
-    private static String maskAuthor(String author) {
-        int at = author.indexOf('@');
-        if (at <= 0) {
-            return author;
-        }
-        return author.charAt(0) + "***" + author.substring(at);
-    }
+    private static final String DELETED_ACCOUNT = "deleted account";
+
 
     /** Flag a meme NSFW (or take the flag back): a MODERATOR-only judgement — authors may label
      *  their uploads editorially, but the gallery's blur trusts only the moderator's word. */
@@ -313,9 +295,8 @@ class MemeController {
     /** Take a meme down: its author may remove their own, a MODERATOR may remove anyone's. */
     @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
     ResponseEntity<?> delete(@PathVariable("id") String id,
-                             @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String caller,
-                             @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID,
-                                     required = false) com.jrobertgardzinski.identity.UserId callerId,
+                             @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
+                             com.jrobertgardzinski.identity.UserId callerId,
                              @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
                                      required = false) java.util.Set<String> roles) {
         boolean moderator = roles != null && (roles.contains("MODERATOR") || roles.contains("ADMIN"));
@@ -323,7 +304,7 @@ class MemeController {
         if (meme.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        boolean own = meme.get().isOwnedBy(caller, Optional.ofNullable(callerId));
+        boolean own = meme.get().isOwnedBy(callerId);
         if (!moderator && !own) {
             return ResponseEntity.status(403).body(Map.of("status", "NOT_YOURS",
                     "detail", "only the author or a moderator can delete this meme"));

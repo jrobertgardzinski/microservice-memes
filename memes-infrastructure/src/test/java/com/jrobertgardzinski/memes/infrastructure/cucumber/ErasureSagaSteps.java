@@ -69,7 +69,7 @@ public class ErasureSagaSteps {
     public void theOrchestratorCommandsThePurge() {
         // PURGE_USER_CONTENT: the reversible half. Written twice by one scenario on purpose —
         // at-least-once delivery means this really does arrive twice
-        markForErasure.execute(TestAuthConfig.SECOND_USER);
+        markForErasure.execute(TestAuthConfig.SECOND_USER_ID);
     }
 
     @When("the comments service never confirms and the ORCHESTRATOR compensates")
@@ -77,13 +77,13 @@ public class ErasureSagaSteps {
         // RESTORE_USER_CONTENT: what the orchestrator sends when it gives up on a sibling
         // participant. This service is not the one that failed and does not get to decide —
         // it only obeys
-        restoreUserContent.execute(TestAuthConfig.SECOND_USER);
+        restoreUserContent.execute(TestAuthConfig.SECOND_USER_ID);
     }
 
     @When("every participant confirms and the ORCHESTRATOR closes the SAGA")
     public void theOrchestratorClosesTheSaga() {
         // ERASE_USER_CONTENT: the closure, and the only command that destroys anything
-        purgeUserContent.execute(TestAuthConfig.SECOND_USER, Optional.empty());
+        purgeUserContent.execute(TestAuthConfig.SECOND_USER_ID, Optional.empty());
     }
 
     @Then("the MEME is gone from the gallery")
@@ -124,7 +124,7 @@ public class ErasureSagaSteps {
     public void aLateCompensationBringsNothingBack() {
         // the orchestrator never sends this after a closure — the state machine forbids it — but
         // if one did arrive, past the pivot there is nothing to restore and nothing to throw
-        restoreUserContent.execute(TestAuthConfig.SECOND_USER);
+        restoreUserContent.execute(TestAuthConfig.SECOND_USER_ID);
         assertEquals(404, RestAssured.given().port(port).get("/memes/" + memeId).statusCode());
         assertTrue(objectStore.get(memeId).isEmpty());
     }

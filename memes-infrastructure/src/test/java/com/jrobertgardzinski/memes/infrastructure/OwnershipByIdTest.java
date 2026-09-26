@@ -24,8 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Ownership over HTTP once the token carries an id: the id outranks the address in both
- * directions, and a token without one still gets the address rule.
+ * Ownership over HTTP is the id's: a new address changes nothing, a new account under the old
+ * address owns nothing.
  */
 @Epic("Infrastructure")
 @Feature("Ownership by id")
@@ -43,17 +43,16 @@ class OwnershipByIdTest {
     @Test
     @DisplayName("the same id under a new address still owns the meme; the same address under another id does not")
     void the_id_outranks_the_address() throws Exception {
-        String memeId = upload(TestAuthConfig.ALICE_ID_TOKEN);
+        String memeId = upload(TestAuthConfig.VALID_TOKEN);
 
-        assertTrue(own(memeId, TestAuthConfig.ALICE_ID_RENAMED_TOKEN), "same id, new address");
+        assertTrue(own(memeId, TestAuthConfig.RENAMED_TOKEN), "same id, new address");
         assertFalse(own(memeId, TestAuthConfig.IMPOSTOR_TOKEN), "same address, another id");
-        assertTrue(own(memeId, TestAuthConfig.VALID_TOKEN), "a token without an id falls back to the address");
 
         mockMvc.perform(delete("/memes/" + memeId)
                         .header("Authorization", "Bearer " + TestAuthConfig.IMPOSTOR_TOKEN))
                 .andExpect(status().isForbidden());
         mockMvc.perform(delete("/memes/" + memeId)
-                        .header("Authorization", "Bearer " + TestAuthConfig.ALICE_ID_RENAMED_TOKEN))
+                        .header("Authorization", "Bearer " + TestAuthConfig.RENAMED_TOKEN))
                 .andExpect(status().isOk());
     }
 

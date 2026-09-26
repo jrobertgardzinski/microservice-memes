@@ -90,8 +90,8 @@ public class AdminPolicySteps {
                 .jsonPath().getString("id");
         // both halves of the saga: the closure only ever erases what the MARK reserved, so a
         // purge driven without one would find nothing and this scenario would pass by accident
-        markForErasure.execute(TestAuthConfig.SECOND_USER);
-        purgeUserContent.execute(TestAuthConfig.SECOND_USER, Optional.empty());
+        markForErasure.execute(TestAuthConfig.SECOND_USER_ID);
+        purgeUserContent.execute(TestAuthConfig.SECOND_USER_ID, Optional.empty());
     }
 
     @Then("the leaver's MEME survives anonymised")

@@ -4,8 +4,8 @@
 -- rows of the gallery; the picture bytes live in meme_blobs (object storage in production)
 create table memes (
     id                    varchar(36)  primary key,
-    author                varchar(255) not null,       -- the address, on its way out
-    author_id             uuid,                        -- the stable identity; null only for rows the backfill missed
+    author                varchar(255) not null,       -- the address as an attribute: the placeholder once anonymised, never a key
+    author_id             uuid,                        -- the stable identity, the key; null once the row is anonymised
     format                varchar(10)  not null,
     published_at          timestamp    not null,
     -- the account-closure saga's reversible mark: hidden from every public read, destroyed by nothing but the closure
@@ -14,7 +14,6 @@ create table memes (
     constraint ck_memes_status check (status in ('ACTIVE', 'PENDING_ERASURE')),
     constraint ck_memes_erasure_mark check ((status = 'PENDING_ERASURE') = (marked_for_erasure_at is not null))
 );
-create index idx_memes_author on memes (author);
 create index idx_memes_author_id on memes (author_id);
 create index idx_memes_pending_erasure on memes (status, marked_for_erasure_at);
 
@@ -44,7 +43,7 @@ create index idx_meme_tags_tag on meme_tags (tag);
 
 create table meme_votes (
     meme_id   varchar(36)  not null,
-    voter     varchar(255) not null,
+    voter     varchar(255) not null,   -- the voter's id, in its wire form
     direction varchar(4)   not null,
     primary key (meme_id, voter),
     constraint fk_meme_votes_meme foreign key (meme_id) references memes (id) on delete cascade

@@ -61,9 +61,11 @@ class RequireSignInFilter extends OncePerRequestFilter {
             // sign-in service is down — but a write cannot, and must not be told to sign in again
             securityAnswered = false;
         }
+        // a token without an id predates the cutover (the address as subject); it is nobody here
+        caller = caller.filter(c -> c.userId().isPresent());
         caller.ifPresent(c -> {
             request.setAttribute(AUTHENTICATED_USER, c.email());
-            c.userId().ifPresent(id -> request.setAttribute(AUTHENTICATED_USER_ID, id));
+            request.setAttribute(AUTHENTICATED_USER_ID, c.userId().orElseThrow());
             request.setAttribute(AUTHENTICATED_ROLES, c.roles());
         });
         boolean write = admin || Set.of("POST", "PUT", "DELETE", "PATCH").contains(request.getMethod());

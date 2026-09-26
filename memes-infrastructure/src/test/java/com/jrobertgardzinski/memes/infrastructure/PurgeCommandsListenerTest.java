@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.purge.PurgeRule;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -48,7 +49,7 @@ import static org.mockito.Mockito.when;
 @Feature("Purge commands")
 class PurgeCommandsListenerTest {
 
-    private static final String LEAVER = "leaver@example.com";
+    private static final UserId LEAVER = UserId.of("0b7c1c2e-5d3a-4f1b-9e8d-6a5b4c3d2e1f");
     private static final String SAGA = "7d9f9e2a-1f0a-4f6e-9a1b-2c3d4e5f6a7b";
 
     private final MarkUserContentForErasure markForErasure = mock(MarkUserContentForErasure.class);
@@ -97,7 +98,7 @@ class PurgeCommandsListenerTest {
     @Test
     @DisplayName("a command with a blank email is dropped the same way")
     void blank_email_is_dropped_without_confirmation() throws Exception {
-        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"\","
+        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"userId\":\"\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
         verifyNoInteractions(markForErasure, restoreUserContent, purgeUserContent);
@@ -107,11 +108,11 @@ class PurgeCommandsListenerTest {
     @Test
     @DisplayName("a completed mark is logged by saga id — the leaver's address never reaches the log")
     void the_leavers_address_stays_out_of_the_log() throws Exception {
-        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
-        verify(markForErasure).execute(LEAVER, Optional.empty());
-        assertNothingLoggedContains(LEAVER);
+        verify(markForErasure).execute(LEAVER);
+        assertNothingLoggedContains(LEAVER.toString());
         assertTrue(logLines().stream().anyMatch(line -> line.contains(SAGA)),
                 "the saga id is what identifies the run in the log: " + logLines());
     }
@@ -119,15 +120,15 @@ class PurgeCommandsListenerTest {
     @Test
     @DisplayName("a completed mark confirms the SAME saga it was commanded for — and erases nothing")
     void a_completed_purge_confirms_its_own_saga() throws Exception {
-        when(markForErasure.execute(LEAVER, Optional.empty())).thenReturn(3);
+        when(markForErasure.execute(LEAVER)).thenReturn(3);
 
-        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
         InOrder order = inOrder(markForErasure, confirmations);
         // the mark first, the promise to report it second, both inside one transaction: a
         // confirmation announced before the mark would be a lie the outbox then made durable
-        order.verify(markForErasure).execute(LEAVER, Optional.empty());
+        order.verify(markForErasure).execute(LEAVER);
         // and the confirmation carries what the mark actually reserved, not just that it ran
         order.verify(confirmations).confirm(SAGA, LEAVER, 3);
         // and the point of the whole two-phase design: the command the orchestrator can still take
@@ -143,7 +144,7 @@ class PurgeCommandsListenerTest {
         // either a member who never uploaded anything or F-014 — a member whose memes are still
         // keyed by the address they used to have — and this service cannot tell the two apart,
         // so it stops claiming and starts reporting
-        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
         verify(confirmations).confirm(SAGA, LEAVER, 0);
@@ -152,7 +153,7 @@ class PurgeCommandsListenerTest {
         assertTrue(logLines().stream().anyMatch(line -> line.contains("reserved NOTHING")),
                 "and it says so where an operator reading the deletion's trace will see it: "
                         + logLines());
-        assertNothingLoggedContains(LEAVER);
+        assertNothingLoggedContains(LEAVER.toString());
     }
 
     @Test
@@ -160,31 +161,31 @@ class PurgeCommandsListenerTest {
     void the_closure_erases_what_the_mark_reserved() throws Exception {
         // an administrator's closure that states no rule: empty means "decide for me", so the
         // service's own override and default get their say (see PurgeUserContent)
-        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\"}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.empty());
+        verify(purgeUserContent).execute(LEAVER, Optional.empty());
         verifyNoInteractions(markForErasure, restoreUserContent);
         verifyNoInteractions(confirmations);
-        assertNothingLoggedContains(LEAVER);
+        assertNothingLoggedContains(LEAVER.toString());
     }
 
     @Test
     @DisplayName("the compensation restores, erases nothing and is not confirmed either")
     void the_compensation_restores() throws Exception {
-        listener.receive("{\"type\":\"RESTORE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"RESTORE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
-        verify(restoreUserContent).execute(LEAVER, Optional.empty());
+        verify(restoreUserContent).execute(LEAVER);
         verifyNoInteractions(markForErasure, purgeUserContent);
         verifyNoInteractions(confirmations);
-        assertNothingLoggedContains(LEAVER);
+        assertNothingLoggedContains(LEAVER.toString());
     }
 
     @Test
     @DisplayName("a command type this participant does not know is ignored, not guessed at")
     void an_unknown_command_type_is_ignored() throws Exception {
-        listener.receive("{\"type\":\"SOMETHING_ELSE\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"SOMETHING_ELSE\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
         verifyNoInteractions(markForErasure, restoreUserContent, purgeUserContent);
@@ -195,16 +196,16 @@ class PurgeCommandsListenerTest {
     @DisplayName("a mark that fails confirms nothing and lets the failure out — so Kafka redelivers")
     void a_failed_purge_confirms_nothing() {
         doThrow(new IllegalStateException("the store is down"))
-                .when(markForErasure).execute(LEAVER, Optional.empty());
+                .when(markForErasure).execute(LEAVER);
 
         assertThrows(IllegalStateException.class, () ->
-                listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+                listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                         + "\"sagaId\":\"" + SAGA + "\"}", null));
 
         // the failure must reach the container: that is what makes SagaRetryBudget retry the record
         // instead of the offset being committed over a purge that did not happen
         verifyNoInteractions(confirmations);
-        assertNothingLoggedContains(LEAVER);
+        assertNothingLoggedContains(LEAVER.toString());
     }
 
     @Test
@@ -216,13 +217,13 @@ class PurgeCommandsListenerTest {
         String forged = "DELETE\nERROR memes-service: seized by " + LEAVER + "\n";
         String rule = forged.repeat(100);
         // the policy rides the CLOSURE now — that is the command whose use case reads the rule
-        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\",\"policy\":{\"memes\":\""
                 + rule.replace("\n", "\\n") + "\"}}", null);
 
         // the erasure still runs, on the deployment default — an unreadable rule must not wedge the saga
-        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.empty());
-        assertNothingLoggedContains(LEAVER);
+        verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        assertNothingLoggedContains(LEAVER.toString());
         assertNothingLoggedContains("seized by");
         assertFalse(logLines().stream().anyMatch(line -> line.contains("\n")),
                 "no log line may carry a newline from the wire: " + logLines());
@@ -238,7 +239,7 @@ class PurgeCommandsListenerTest {
 
         verifyNoInteractions(markForErasure, restoreUserContent, purgeUserContent);
         verifyNoInteractions(confirmations);
-        assertNothingLoggedContains(LEAVER);
+        assertNothingLoggedContains(LEAVER.toString());
         assertTrue(logLines().stream().anyMatch(line -> line.contains(String.valueOf(broken.length()))),
                 "the size is enough to investigate: " + logLines());
     }
@@ -258,11 +259,11 @@ class PurgeCommandsListenerTest {
         // the command states the most generous rule there is, and it is the leaver's own request:
         // there is no ground on which a portal keeps the content of somebody exercising their right
         // to be forgotten, so the rule is discarded and the answer is stated rather than left open
-        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"SELF\","
                 + "\"policy\":{\"memes\":\"KEEP_POPULAR_ANONYMIZED:1\"}}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.of(new PurgeRule.Delete()));
+        verify(purgeUserContent).execute(LEAVER, Optional.of(new PurgeRule.Delete()));
     }
 
     @Test
@@ -270,20 +271,20 @@ class PurgeCommandsListenerTest {
     void an_absent_initiator_is_read_as_self() throws Exception {
         // a producer from before the field existed had exactly one deletion route, and it was the
         // account owner's — and a garbage value must never be the reason content survives
-        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"\","
                 + "\"policy\":{\"memes\":\"ANONYMIZE_AUTHOR\"}}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.of(new PurgeRule.Delete()));
+        verify(purgeUserContent).execute(LEAVER, Optional.of(new PurgeRule.Delete()));
     }
 
     @Test
     @DisplayName("an administrator's closure keeps what the community voted up")
     void an_administrators_closure_honours_the_rule() throws Exception {
-        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
+        listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"userId\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\","
                 + "\"policy\":{\"memes\":\"KEEP_POPULAR_ANONYMIZED:100\"}}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.of(new PurgeRule.KeepPopularAnonymized(100)));
+        verify(purgeUserContent).execute(LEAVER, Optional.of(new PurgeRule.KeepPopularAnonymized(100)));
     }
 }

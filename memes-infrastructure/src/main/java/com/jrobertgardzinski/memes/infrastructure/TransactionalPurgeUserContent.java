@@ -36,7 +36,7 @@ class TransactionalPurgeUserContent extends PurgeUserContent {
     }
 
     @Override
-    public void execute(String author, Optional<PurgeRule> requested) {
+    public void execute(com.jrobertgardzinski.identity.UserId author, Optional<PurgeRule> requested) {
         tx.executeWithoutResult(status -> super.execute(author, requested));
     }
 }

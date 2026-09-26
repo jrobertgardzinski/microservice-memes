@@ -52,7 +52,7 @@ public record MemeMetadata(String id, String author, Optional<UserId> authorId, 
      * A meme in the gallery — the shorthand for every caller that has nothing to do with erasure,
      * which is nearly all of them (an upload, a listing, an authorisation check).
      */
-    /** A row that predates the author id, or a test that does not care about it. */
+    /** An anonymised row, or a test that does not care about the id. */
     public MemeMetadata(String id, String author, String format, MemeStatus status, Instant markedForErasureAt) {
         this(id, author, Optional.empty(), format, status, markedForErasureAt);
     }
@@ -88,14 +88,8 @@ public record MemeMetadata(String id, String author, Optional<UserId> authorId, 
         return status == MemeStatus.PENDING_ERASURE;
     }
 
-    /**
-     * Whether this caller is the uploader: the ids decide when both sides have one, the address
-     * decides while either is still missing (a row before the backfill, a token before the cutover).
-     */
-    public boolean isOwnedBy(String callerEmail, Optional<UserId> callerId) {
-        if (authorId.isPresent() && callerId.isPresent()) {
-            return authorId.equals(callerId);
-        }
-        return author.equals(callerEmail);
+    /** Whether this caller is the uploader. An anonymised row (no id) is nobody's. */
+    public boolean isOwnedBy(UserId caller) {
+        return authorId.map(caller::equals).orElse(false);
     }
 }

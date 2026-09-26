@@ -32,15 +32,7 @@ class JdbcMemeErasure implements MemeErasure {
         this.jdbc = jdbc;
     }
 
-    @Override
-    public List<MemeMetadata> activeOf(String author) {
-        return byAuthor(author, MemeStatus.ACTIVE);
-    }
 
-    @Override
-    public List<MemeMetadata> pendingOf(String author) {
-        return byAuthor(author, MemeStatus.PENDING_ERASURE);
-    }
 
     @Override
     public List<MemeMetadata> activeOf(UserId author) {
@@ -59,12 +51,6 @@ class JdbcMemeErasure implements MemeErasure {
                 .query(JdbcMemeErasure::toMetadata).list();
     }
 
-    private List<MemeMetadata> byAuthor(String author, MemeStatus status) {
-        return jdbc.sql("SELECT id, author, author_id, format, status, marked_for_erasure_at "
-                        + "FROM memes WHERE author = ? AND status = ?")
-                .params(author, status.name())
-                .query(JdbcMemeErasure::toMetadata).list();
-    }
 
     @Override
     public void store(MemeMetadata state) {

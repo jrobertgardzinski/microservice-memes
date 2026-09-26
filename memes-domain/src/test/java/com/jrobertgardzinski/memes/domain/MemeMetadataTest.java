@@ -37,30 +37,15 @@ class MemeMetadataTest {
     }
 
     @Test
-    @DisplayName("ownership: the ids decide when both sides have one")
-    void ids_decide_when_both_are_present() {
+    @DisplayName("ownership is the id's: the same id under a new address still owns, an anonymised row is nobody's")
+    void ownership_is_the_ids() {
         UserId alice = UserId.random();
         MemeMetadata meme = new MemeMetadata("m1", "alice@example.com", Optional.of(alice), "png",
                 MemeStatus.ACTIVE, null);
 
-        assertTrue(meme.isOwnedBy("alice.new@example.com", Optional.of(alice)),
-                "the same id under a new address is still the uploader");
-        assertFalse(meme.isOwnedBy("alice@example.com", Optional.of(UserId.random())),
-                "the same address under another id is somebody else");
-    }
-
-    @Test
-    @DisplayName("ownership: the address decides while either side has no id")
-    void address_decides_while_an_id_is_missing() {
-        UserId alice = UserId.random();
-        MemeMetadata withId = new MemeMetadata("m1", "alice@example.com", Optional.of(alice), "png",
-                MemeStatus.ACTIVE, null);
-        MemeMetadata withoutId = inTheGallery();
-
-        assertTrue(withId.isOwnedBy("alice@example.com", Optional.empty()), "a token before the cutover");
-        assertTrue(withoutId.isOwnedBy("leaver@example.com", Optional.of(alice)), "a row before the backfill");
-        assertFalse(withoutId.isOwnedBy("stranger@example.com", Optional.of(alice)));
-        assertFalse(withId.isOwnedBy(null, Optional.empty()), "a signed-out viewer owns nothing");
+        assertTrue(meme.isOwnedBy(alice));
+        assertFalse(meme.isOwnedBy(UserId.random()), "the same address under another id is somebody else");
+        assertFalse(inTheGallery().isOwnedBy(alice), "a row without an id has been anonymised: nobody's");
     }
 
     @Test

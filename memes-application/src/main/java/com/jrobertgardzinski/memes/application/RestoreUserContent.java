@@ -3,7 +3,6 @@ package com.jrobertgardzinski.memes.application;
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 
-import java.util.Optional;
 
 /**
  * The compensation: every meme this service reserved for a leaver goes back into the gallery,
@@ -34,12 +33,8 @@ public class RestoreUserContent {
         this.erasure = erasure;
     }
 
-    public void execute(String author) {
-        execute(author, Optional.empty());
-    }
-
-    public void execute(String author, Optional<UserId> authorId) {
-        for (MemeMetadata meme : erasure.pendingOf(author, authorId)) {
+    public void execute(UserId author) {
+        for (MemeMetadata meme : erasure.pendingOf(author)) {
             erasure.store(meme.restore());
         }
     }

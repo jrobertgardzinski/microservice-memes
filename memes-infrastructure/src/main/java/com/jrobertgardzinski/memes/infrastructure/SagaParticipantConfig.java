@@ -68,10 +68,8 @@ class SagaParticipantConfig {
 
     /**
      * The single error handler Spring Boot wires into the listener container factory, so it governs
-     * every {@code @KafkaListener} in this service: the saga's purge commands and the address
-     * changes {@link SecurityEventsListener} re-keys on. The budget's reasoning is the saga's
-     * timeline (see {@link SagaRetryBudget}), and it fits the second listener for the same reason —
-     * a rename that cannot reach the database has to be retried, not committed over.
+     * every {@code @KafkaListener} in this service — the saga's purge commands. The budget's
+     * reasoning is the saga's timeline (see {@link SagaRetryBudget}).
      */
     @Bean
     @ConditionalOnProperty(name = "memes.kafka-enabled", havingValue = "true")

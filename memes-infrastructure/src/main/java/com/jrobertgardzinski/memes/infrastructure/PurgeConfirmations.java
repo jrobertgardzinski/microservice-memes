@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.closure.ClosureConfirmation;
 import com.jrobertgardzinski.closure.ClosureMessages;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,7 +59,7 @@ class PurgeConfirmations {
     }
 
     /** Announce the confirmation in the caller's transaction — see the class javadoc. */
-    void confirm(String sagaId, String leaver, int reserved) {
+    void confirm(String sagaId, UserId leaver, int reserved) {
         outbox.announce(confirmationOf(sagaId, leaver, reserved));
     }
 
@@ -66,7 +67,7 @@ class PurgeConfirmations {
      * The confirmation as it will be stored AND as it will be sent — the row is the record.
      *
      * <p>The envelope is the bare-send days' one plus a single field: {@code type},
-     * {@code sagaId}, {@code email}, {@code version} 1 — and {@code reserved}, the number of memes
+     * {@code sagaId}, {@code userId}, {@code version} 1 — and {@code reserved}, the number of memes
      * the mark actually took out of the gallery. Adding it is what workspace ADR 0004's "fields are
      * only ever added within a version" is for, and the orchestrator's committed pact pins only what
      * it reads, so nothing downstream moves.
@@ -97,7 +98,7 @@ class PurgeConfirmations {
      * <p>Package-private and free of the outbox so the contract tests can build the real payload
      * without a database — the shape is what they verify, and a table is not part of the shape.
      */
-    OutboxEvent confirmationOf(String sagaId, String leaver, int reserved) {
+    OutboxEvent confirmationOf(String sagaId, UserId leaver, int reserved) {
         String payload;
         try {
             // The FIELD SET is the agreement's, not this service's: ClosureConfirmation knows
@@ -120,7 +121,7 @@ class PurgeConfirmations {
     }
 
     /**
-     * The partition key: the saga run, NOT the leaver's address (which is what the bare send used).
+     * The partition key: the saga run, or the leaver's id when the command carried no saga.
      * Two hard reasons and one soft one.
      *
      * <p>The outbox's {@code event_key} column is {@code varchar(64)} and an address may be 254
@@ -141,9 +142,7 @@ class PurgeConfirmations {
      * {@code nameUUIDFromBytes} idiom the orchestrator uses for its own re-published outcomes: never
      * blank, because the outbox refuses a blank key, and never the address itself.
      */
-    private static String keyFor(String sagaId, String leaver) {
-        return sagaId != null && !sagaId.isBlank()
-                ? sagaId
-                : UUID.nameUUIDFromBytes(leaver.getBytes(StandardCharsets.UTF_8)).toString();
+    private static String keyFor(String sagaId, UserId leaver) {
+        return sagaId != null && !sagaId.isBlank() ? sagaId : leaver.toString();
     }
 }

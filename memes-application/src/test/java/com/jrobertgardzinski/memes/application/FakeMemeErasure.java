@@ -34,15 +34,7 @@ public class FakeMemeErasure implements MemeErasure {
         this.memes = memes;
     }
 
-    @Override
-    public List<MemeMetadata> activeOf(String author) {
-        return byAuthor(author, false);
-    }
 
-    @Override
-    public List<MemeMetadata> pendingOf(String author) {
-        return byAuthor(author, true);
-    }
 
     @Override
     public List<MemeMetadata> activeOf(UserId author) {
@@ -64,15 +56,6 @@ public class FakeMemeErasure implements MemeErasure {
         return found;
     }
 
-    private List<MemeMetadata> byAuthor(String author, boolean marked) {
-        List<MemeMetadata> found = new ArrayList<>();
-        for (Meme meme : memes.values()) {
-            if (meme.author().equals(author) && marks.containsKey(meme.id()) == marked) {
-                found.add(metadataOf(meme));
-            }
-        }
-        return found;
-    }
 
     @Override
     public void store(MemeMetadata state) {
