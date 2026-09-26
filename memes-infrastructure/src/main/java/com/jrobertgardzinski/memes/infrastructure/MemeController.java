@@ -49,6 +49,7 @@ class MemeController {
     private final com.jrobertgardzinski.memes.application.ContentFlags contentFlags;
     private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
     private final UploadAdmission uploadAdmission;
+    private final com.jrobertgardzinski.authors.AuthorDirectory authors;
 
     MemeController(PublishMeme publishMeme, MakeThumbnail makeThumbnail,
                    ListMemes listMemes,
@@ -59,7 +60,8 @@ class MemeController {
                    com.jrobertgardzinski.memes.application.FlagMeme flagMeme,
                    com.jrobertgardzinski.memes.application.ContentFlags contentFlags,
                    com.jrobertgardzinski.memes.config.RateLimit uploadRate,
-                   UploadAdmission uploadAdmission) {
+                   UploadAdmission uploadAdmission,
+                   com.jrobertgardzinski.authors.AuthorDirectory authors) {
         this.publishMeme = publishMeme;
         this.makeThumbnail = makeThumbnail;
         this.listMemes = listMemes;
@@ -71,12 +73,16 @@ class MemeController {
         this.contentFlags = contentFlags;
         this.uploadRate = uploadRate;
         this.uploadAdmission = uploadAdmission;
+        this.authors = authors;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file,
                                                @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER)
-                                               String uploader) throws IOException {
+                                               String uploader,
+                                               @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID,
+                                                       required = false)
+                                               com.jrobertgardzinski.identity.UserId uploaderId) throws IOException {
         if (!uploadRate.tryAcquire(uploader)) {
             return ResponseEntity.status(429).header("Retry-After", "60")
                     .body(Map.of("status", "RATE_LIMITED", "detail", "you are uploading too fast"));
@@ -87,7 +93,7 @@ class MemeController {
         // duration; releasing before that would bound nothing.
         String id = uploadAdmission.admit(() -> {
             try {
-                return publishMeme.execute(file.getBytes(), uploader);
+                return publishMeme.execute(file.getBytes(), uploader, java.util.Optional.ofNullable(uploaderId));
             } catch (IOException unreadableUpload) {
                 throw new UncheckedIOException(unreadableUpload);
             }
@@ -239,7 +245,7 @@ class MemeController {
         return viewMeme.execute(id)
                 .map(meme -> ResponseEntity.ok(Map.<String, Object>of(
                         "id", meme.id(),
-                        "author", maskAuthor(meme.author()),
+                        "author", nameOf(meme),
                         // the full author never leaves the service, so the UI cannot compare it
                         // against the signed-in user any more — "own" carries that answer instead
                         "own", meme.author().equals(viewer),
@@ -254,6 +260,17 @@ class MemeController {
      * account purge) the full e-mail still flows; only this representation masks. Non-e-mail
      * authors (the "deleted account" placeholder) pass through untouched.
      */
+    /**
+     * The name security shows for the author's id; a row that predates the id still shows its
+     * masked address. An id security no longer knows is a deleted account.
+     */
+    private String nameOf(com.jrobertgardzinski.memes.domain.MemeMetadata meme) {
+        return meme.authorId()
+                .map(id -> authors.namesOf(java.util.List.of(id)).getOrDefault(id,
+                        new com.jrobertgardzinski.authors.AuthorName("deleted account")).display())
+                .orElseGet(() -> maskAuthor(meme.author()));
+    }
+
     private static String maskAuthor(String author) {
         int at = author.indexOf('@');
         if (at <= 0) {

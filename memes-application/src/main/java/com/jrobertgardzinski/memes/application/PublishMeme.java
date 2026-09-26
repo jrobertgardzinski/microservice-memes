@@ -4,6 +4,9 @@ import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.image.OptimizedImage;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 
+import com.jrobertgardzinski.identity.UserId;
+
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -30,7 +33,12 @@ public class PublishMeme {
         this.objects = objects;
     }
 
+    /** Until every caller carries the id: an upload attributed by address alone. */
     public String execute(byte[] rawImage, String author) {
+        return execute(rawImage, author, Optional.empty());
+    }
+
+    public String execute(byte[] rawImage, String author, Optional<UserId> authorId) {
         OptimizedImage optimized = optimizer.optimize(rawImage);
         String candidate = UUID.randomUUID().toString();
         String owner = contentIndex.claim(optimized.data(), candidate);
@@ -38,7 +46,7 @@ public class PublishMeme {
             return owner;               // the picture is already up — nothing new is stored
         }
         try {
-            repository.save(new Meme(candidate, author, optimized.format(), optimized.data()));
+            repository.save(new Meme(candidate, author, authorId, optimized.format(), optimized.data()));
         } catch (RuntimeException saveFailed) {
             // compensate the won claim, or the hash stays owned by a meme that never got stored and
             // every future upload of this picture dedups into a ghost. A shared transaction cannot

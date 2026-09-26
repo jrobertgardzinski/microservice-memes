@@ -1,6 +1,9 @@
 package com.jrobertgardzinski.memes.domain;
 
+import com.jrobertgardzinski.identity.UserId;
+
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * A {@link Meme} without its image: the identifier, who uploaded it, the format its bytes are
@@ -29,8 +32,8 @@ import java.time.Instant;
  * FIRST timestamp, because the mark's age is what the reaper's query and the stuck-erasure alarm
  * are measured against, and a redelivered command must not make an old obligation look fresh.
  */
-public record MemeMetadata(String id, String author, String format, MemeStatus status,
-                           Instant markedForErasureAt) {
+public record MemeMetadata(String id, String author, Optional<UserId> authorId, String format,
+                           MemeStatus status, Instant markedForErasureAt) {
 
     /**
      * The invariant, in the one place that can enforce it: a mark and its timestamp exist together
@@ -49,8 +52,13 @@ public record MemeMetadata(String id, String author, String format, MemeStatus s
      * A meme in the gallery — the shorthand for every caller that has nothing to do with erasure,
      * which is nearly all of them (an upload, a listing, an authorisation check).
      */
+    /** A row that predates the author id, or a test that does not care about it. */
+    public MemeMetadata(String id, String author, String format, MemeStatus status, Instant markedForErasureAt) {
+        this(id, author, Optional.empty(), format, status, markedForErasureAt);
+    }
+
     public MemeMetadata(String id, String author, String format) {
-        this(id, author, format, MemeStatus.ACTIVE, null);
+        this(id, author, Optional.empty(), format, MemeStatus.ACTIVE, null);
     }
 
     /**
@@ -61,7 +69,7 @@ public record MemeMetadata(String id, String author, String format, MemeStatus s
     public MemeMetadata markForErasure(Instant at) {
         return status == MemeStatus.PENDING_ERASURE
                 ? this
-                : new MemeMetadata(id, author, format, MemeStatus.PENDING_ERASURE, at);
+                : new MemeMetadata(id, author, authorId, format, MemeStatus.PENDING_ERASURE, at);
     }
 
     /**
@@ -72,7 +80,7 @@ public record MemeMetadata(String id, String author, String format, MemeStatus s
     public MemeMetadata restore() {
         return status == MemeStatus.ACTIVE
                 ? this
-                : new MemeMetadata(id, author, format, MemeStatus.ACTIVE, null);
+                : new MemeMetadata(id, author, authorId, format, MemeStatus.ACTIVE, null);
     }
 
     /** Whether a running saga has this meme reserved for erasure. */

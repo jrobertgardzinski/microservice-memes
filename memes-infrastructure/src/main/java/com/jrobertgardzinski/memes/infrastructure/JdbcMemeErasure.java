@@ -42,7 +42,7 @@ class JdbcMemeErasure implements MemeErasure {
     }
 
     private List<MemeMetadata> byAuthor(String author, MemeStatus status) {
-        return jdbc.sql("SELECT id, author, format, status, marked_for_erasure_at "
+        return jdbc.sql("SELECT id, author, author_id, format, status, marked_for_erasure_at "
                         + "FROM memes WHERE author = ? AND status = ?")
                 .params(author, status.name())
                 .query(JdbcMemeErasure::toMetadata).list();
@@ -81,7 +81,7 @@ class JdbcMemeErasure implements MemeErasure {
         // the reaper's query, in full: a status and an instant, served by idx_memes_pending_erasure.
         // No queue table, no outbox, no scheduler state — the marks ARE the backlog. Ordered by age
         // so the operator reading the alarm sees the oldest obligation first.
-        return jdbc.sql("SELECT id, author, format, status, marked_for_erasure_at FROM memes "
+        return jdbc.sql("SELECT id, author, author_id, format, status, marked_for_erasure_at FROM memes "
                         + "WHERE status = ? AND marked_for_erasure_at < ? "
                         + "ORDER BY marked_for_erasure_at")
                 .params(MemeStatus.PENDING_ERASURE.name(), Timestamp.from(cutoff))
@@ -90,8 +90,8 @@ class JdbcMemeErasure implements MemeErasure {
 
     private static MemeMetadata toMetadata(ResultSet rs, int rowNum) throws SQLException {
         Timestamp marked = rs.getTimestamp("marked_for_erasure_at");
-        return new MemeMetadata(rs.getString("id"), rs.getString("author"), rs.getString("format"),
-                MemeStatus.valueOf(rs.getString("status")),
+        return new MemeMetadata(rs.getString("id"), rs.getString("author"), JdbcMemeRepository.authorIdOf(rs),
+                rs.getString("format"), MemeStatus.valueOf(rs.getString("status")),
                 marked == null ? null : marked.toInstant());
     }
 }

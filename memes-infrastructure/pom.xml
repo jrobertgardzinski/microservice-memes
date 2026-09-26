@@ -184,6 +184,14 @@
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>offline-jwt</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>user-id</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>author-directory</artifactId>
+        </dependency>
         <!-- the MEME_DELETED durability guarantee, now a kernel library: the framework-free core
              (table, delivered-first marking, republisher, retention) plus the Spring adapter that
              joins the ambient @Transactional unit of work. This service is where the library was

@@ -54,7 +54,8 @@ public interface MemeRepository {
      * this fallback exists to keep hand-rolled fakes compiling (same bargain as {@link #exists}).
      */
     default Optional<MemeMetadata> findMetadata(String id) {
-        return find(id).map(meme -> new MemeMetadata(meme.id(), meme.author(), meme.format()));
+        return find(id).map(meme -> new MemeMetadata(meme.id(), meme.author(), meme.authorId(), meme.format(),
+                com.jrobertgardzinski.memes.domain.MemeStatus.ACTIVE, null));
     }
 
     /**

@@ -41,8 +41,9 @@ class JdbcMemeRepository implements MemeRepository {
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void save(Meme meme) {
-        jdbc.sql("INSERT INTO memes (id, author, format, published_at) VALUES (?, ?, ?, ?)")
-                .params(meme.id(), meme.author(), meme.format(), Timestamp.from(Instant.now()))
+        jdbc.sql("INSERT INTO memes (id, author, author_id, format, published_at) VALUES (?, ?, ?, ?, ?)")
+                .params(meme.id(), meme.author(), meme.authorId().map(com.jrobertgardzinski.identity.UserId::value).orElse(null),
+                        meme.format(), Timestamp.from(Instant.now()))
                 .update();
         objects.put(meme.id(), meme.data());
     }
@@ -54,17 +55,18 @@ class JdbcMemeRepository implements MemeRepository {
         // object is absent from the active store is still a meme, and its author must be able to
         // delete it
         return findMetadata(id).flatMap(meta -> objects.get(meta.id()).map(bytes ->
-                new Meme(meta.id(), meta.author(), meta.format(), bytes)));
+                new Meme(meta.id(), meta.author(), meta.authorId(), meta.format(), bytes)));
     }
 
     @Override
     public Optional<MemeMetadata> findMetadata(String id) {
         // the row alone — no ObjectStore round trip. The port's default would go through find(),
         // which is exactly the blob read (and the false 404) this method exists to avoid.
-        return jdbc.sql("SELECT id, author, format FROM active_memes WHERE id = ?")
+        return jdbc.sql("SELECT id, author, author_id, format FROM active_memes WHERE id = ?")
                 .params(id)
                 .query((rs, n) -> new MemeMetadata(
-                        rs.getString("id"), rs.getString("author"), rs.getString("format")))
+                        rs.getString("id"), rs.getString("author"), authorIdOf(rs), rs.getString("format"),
+                        com.jrobertgardzinski.memes.domain.MemeStatus.ACTIVE, null))
                 .optional();
     }
 
@@ -154,5 +156,11 @@ class JdbcMemeRepository implements MemeRepository {
     @Override
     public void reassignAuthor(String memeId, String newAuthor) {
         jdbc.sql("UPDATE memes SET author = ? WHERE id = ?").params(newAuthor, memeId).update();
+    }
+
+    /** Empty for a row written before the id column: the backfill fills those in. */
+    static Optional<com.jrobertgardzinski.identity.UserId> authorIdOf(java.sql.ResultSet rs) throws java.sql.SQLException {
+        java.util.UUID id = rs.getObject("author_id", java.util.UUID.class);
+        return Optional.ofNullable(id).map(com.jrobertgardzinski.identity.UserId::new);
     }
 }

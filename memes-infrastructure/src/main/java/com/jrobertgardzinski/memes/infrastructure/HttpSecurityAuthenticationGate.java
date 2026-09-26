@@ -73,7 +73,9 @@ class HttpSecurityAuthenticationGate implements SecurityAuthenticationGate {
             // when the field is missing — an old security that doesn't report it withholds nothing
             // from ordinary users, only from privileged ones)
             boolean mfaCompliant = Boolean.TRUE.equals(body.get("mfaCompliant"));
-            return Optional.of(new Caller(email, Caller.withMfaFloor(roles, mfaCompliant)));
+            Optional<com.jrobertgardzinski.identity.UserId> userId = body.get("id") instanceof String id
+                    ? Caller.userIdFrom(id) : Optional.empty();
+            return Optional.of(new Caller(email, userId, Caller.withMfaFloor(roles, mfaCompliant)));
         } catch (HttpClientErrorException tokenRefused) {
             // security answered, and the answer is about the REQUEST (401 for a token it does not
             // know). This is the only way to be "not signed in": somebody was asked and said no

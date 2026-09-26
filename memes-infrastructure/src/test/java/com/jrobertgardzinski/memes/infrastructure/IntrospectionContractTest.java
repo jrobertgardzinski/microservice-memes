@@ -48,6 +48,7 @@ class IntrospectionContractTest {
                 .status(200)
                 .headers(Map.of("Content-Type", "application/json"))
                 .body(new PactDslJsonBody()
+                        .stringType("id", "0f8fad5b-d9cb-469f-a165-70867728950e")
                         .stringType("email", "user@example.com")
                         .minArrayLike("roles", 1, PactDslJsonRootValue.stringType("USER"), 1)
                         .booleanType("mfaCompliant", true))

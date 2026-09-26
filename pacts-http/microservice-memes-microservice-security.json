@@ -20,6 +20,7 @@
       "response": {
         "body": {
           "email": "user@example.com",
+          "id": "0f8fad5b-d9cb-469f-a165-70867728950e",
           "mfaCompliant": true,
           "roles": [
             "USER"
@@ -31,6 +32,14 @@
         "matchingRules": {
           "body": {
             "$.email": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.id": {
               "combine": "AND",
               "matchers": [
                 {

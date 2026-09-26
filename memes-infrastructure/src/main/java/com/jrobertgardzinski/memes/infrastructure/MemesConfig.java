@@ -77,6 +77,17 @@ class MemesConfig {
     }
 
     @Bean
+    com.jrobertgardzinski.authors.AuthorDirectory authorDirectory(
+            @Value("${security.url}") String securityUrl,
+            @Value("${memes.author-names.cache-seconds:60}") long cacheSeconds,
+            java.time.Clock clock) {
+        org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger("memes.author-names");
+        return com.jrobertgardzinski.authors.SecurityAuthorDirectory.overHttp(securityUrl,
+                new com.fasterxml.jackson.databind.ObjectMapper(), java.time.Duration.ofSeconds(cacheSeconds), clock,
+                failure -> log.warn("author names unavailable, showing content without them: {}", failure.toString()));
+    }
+
+    @Bean
     ViewMeme viewMeme(MemeRepository repository) {
         return new ViewMeme(repository);
     }

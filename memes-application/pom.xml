@@ -24,6 +24,10 @@
             <artifactId>memes-domain</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>user-id</artifactId>
+        </dependency>
+        <dependency>
             <!-- the voting bounded context: toggle semantics + tally, shared with microservice-comments -->
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>voting</artifactId>
