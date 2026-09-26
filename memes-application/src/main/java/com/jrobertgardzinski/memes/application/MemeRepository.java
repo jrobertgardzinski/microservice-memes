@@ -85,6 +85,6 @@ public interface MemeRepository {
 
     void deleteById(String memeId);
 
-    /** Replace one meme's author (account deletion may keep the meme, never the identity). */
+    /** Replace one meme's author (account deletion may keep the meme, never the identity); the author id goes too. */
     void reassignAuthor(String memeId, String newAuthor);
 }

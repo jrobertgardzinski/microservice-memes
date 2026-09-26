@@ -155,7 +155,8 @@ class JdbcMemeRepository implements MemeRepository {
 
     @Override
     public void reassignAuthor(String memeId, String newAuthor) {
-        jdbc.sql("UPDATE memes SET author = ? WHERE id = ?").params(newAuthor, memeId).update();
+        // the id goes with the old author: kept content of a closed account is not groupable by it
+        jdbc.sql("UPDATE memes SET author = ?, author_id = NULL WHERE id = ?").params(newAuthor, memeId).update();
     }
 
     /** Empty for a row written before the id column: the backfill fills those in. */
