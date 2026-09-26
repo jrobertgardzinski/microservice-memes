@@ -17,13 +17,18 @@ import java.util.Map;
  * <p>The marks live in their own map rather than on the {@link Meme} records, for the same reason
  * the real schema keeps them on the row: the meme's bytes have nothing to do with its erasure
  * state. Whatever is not marked is ACTIVE, which is exactly what the {@code active_memes} view says.
+ *
+ * <p>Public, and this module's own test-jar publishes it: it is the one reference stand-in for
+ * {@link MemeErasure}, right beside the port and {@link MemeErasureContractTest}, so a consumer
+ * that needs only the erasure axis (not a full {@link MemeRepository}) never has a reason to write
+ * its own.
  */
-class FakeMemeErasure implements MemeErasure {
+public class FakeMemeErasure implements MemeErasure {
 
     private final Map<String, Meme> memes;
     private final Map<String, Instant> marks = new HashMap<>();
 
-    FakeMemeErasure(Map<String, Meme> memes) {
+    public FakeMemeErasure(Map<String, Meme> memes) {
         this.memes = memes;
     }
 
