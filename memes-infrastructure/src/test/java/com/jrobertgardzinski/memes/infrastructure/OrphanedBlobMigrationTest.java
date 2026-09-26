@@ -36,7 +36,7 @@ class OrphanedBlobMigrationTest {
 
     @BeforeEach
     void freshDatabase() {
-        // an isolated H2, same DDL as V2__blobs.sql — no Spring context needed to pin this
+        // an isolated H2, same DDL as meme_blobs in V1__schema.sql — no Spring context needed to pin this
         SimpleDriverDataSource dataSource = new SimpleDriverDataSource(new org.h2.Driver(),
                 // DB_CLOSE_DELAY=-1 because this data source hands out a NEW connection per
                 // statement — without it the database (and the table) would vanish with the first
