@@ -87,4 +87,15 @@ public record MemeMetadata(String id, String author, Optional<UserId> authorId, 
     public boolean isPendingErasure() {
         return status == MemeStatus.PENDING_ERASURE;
     }
+
+    /**
+     * Whether this caller is the uploader: the ids decide when both sides have one, the address
+     * decides while either is still missing (a row before the backfill, a token before the cutover).
+     */
+    public boolean isOwnedBy(String callerEmail, Optional<UserId> callerId) {
+        if (authorId.isPresent() && callerId.isPresent()) {
+            return authorId.equals(callerId);
+        }
+        return author.equals(callerEmail);
+    }
 }

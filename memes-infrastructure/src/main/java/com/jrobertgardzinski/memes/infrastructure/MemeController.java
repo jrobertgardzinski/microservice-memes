@@ -19,6 +19,7 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Web boundary: upload a meme image (any format ImageIO reads; signed-in users only, enforced by
@@ -241,14 +242,17 @@ class MemeController {
     @GetMapping("/{id}/meta")
     ResponseEntity<Map<String, Object>> meta(@PathVariable("id") String id,
                                              @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER,
-                                                     required = false) String viewer) {
+                                                     required = false) String viewer,
+                                             @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID,
+                                                     required = false)
+                                             com.jrobertgardzinski.identity.UserId viewerId) {
         return viewMeme.execute(id)
                 .map(meme -> ResponseEntity.ok(Map.<String, Object>of(
                         "id", meme.id(),
                         "author", nameOf(meme),
                         // the full author never leaves the service, so the UI cannot compare it
                         // against the signed-in user any more — "own" carries that answer instead
-                        "own", meme.author().equals(viewer),
+                        "own", meme.isOwnedBy(viewer, Optional.ofNullable(viewerId)),
                         "nsfw", contentFlags.isNsfw(id))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -310,6 +314,8 @@ class MemeController {
     @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
     ResponseEntity<?> delete(@PathVariable("id") String id,
                              @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String caller,
+                             @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID,
+                                     required = false) com.jrobertgardzinski.identity.UserId callerId,
                              @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
                                      required = false) java.util.Set<String> roles) {
         boolean moderator = roles != null && (roles.contains("MODERATOR") || roles.contains("ADMIN"));
@@ -317,12 +323,13 @@ class MemeController {
         if (meme.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        if (!moderator && !meme.get().author().equals(caller)) {
+        boolean own = meme.get().isOwnedBy(caller, Optional.ofNullable(callerId));
+        if (!moderator && !own) {
             return ResponseEntity.status(403).body(Map.of("status", "NOT_YOURS",
                     "detail", "only the author or a moderator can delete this meme"));
         }
         deleteMeme.execute(id);
         return ResponseEntity.ok(Map.of("status", "DELETED", "id", id,
-                "by", moderator && !meme.get().author().equals(caller) ? "MODERATOR" : "AUTHOR"));
+                "by", moderator && !own ? "MODERATOR" : "AUTHOR"));
     }
 }

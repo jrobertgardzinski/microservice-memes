@@ -5,8 +5,11 @@ import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.jrobertgardzinski.identity.UserId;
+
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,6 +34,33 @@ class MemeMetadataTest {
 
     private static MemeMetadata inTheGallery() {
         return new MemeMetadata("m1", "leaver@example.com", "png");
+    }
+
+    @Test
+    @DisplayName("ownership: the ids decide when both sides have one")
+    void ids_decide_when_both_are_present() {
+        UserId alice = UserId.random();
+        MemeMetadata meme = new MemeMetadata("m1", "alice@example.com", Optional.of(alice), "png",
+                MemeStatus.ACTIVE, null);
+
+        assertTrue(meme.isOwnedBy("alice.new@example.com", Optional.of(alice)),
+                "the same id under a new address is still the uploader");
+        assertFalse(meme.isOwnedBy("alice@example.com", Optional.of(UserId.random())),
+                "the same address under another id is somebody else");
+    }
+
+    @Test
+    @DisplayName("ownership: the address decides while either side has no id")
+    void address_decides_while_an_id_is_missing() {
+        UserId alice = UserId.random();
+        MemeMetadata withId = new MemeMetadata("m1", "alice@example.com", Optional.of(alice), "png",
+                MemeStatus.ACTIVE, null);
+        MemeMetadata withoutId = inTheGallery();
+
+        assertTrue(withId.isOwnedBy("alice@example.com", Optional.empty()), "a token before the cutover");
+        assertTrue(withoutId.isOwnedBy("leaver@example.com", Optional.of(alice)), "a row before the backfill");
+        assertFalse(withoutId.isOwnedBy("stranger@example.com", Optional.of(alice)));
+        assertFalse(withId.isOwnedBy(null, Optional.empty()), "a signed-out viewer owns nothing");
     }
 
     @Test
