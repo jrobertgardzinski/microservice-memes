@@ -105,6 +105,14 @@ class StuckErasureWatchTest {
             return List.of();
         }
 
+        public List<MemeMetadata> activeOf(com.jrobertgardzinski.identity.UserId author) {
+            return List.of();
+        }
+
+        public List<MemeMetadata> pendingOf(com.jrobertgardzinski.identity.UserId author) {
+            return List.of();
+        }
+
         public void store(MemeMetadata state) {
         }
 

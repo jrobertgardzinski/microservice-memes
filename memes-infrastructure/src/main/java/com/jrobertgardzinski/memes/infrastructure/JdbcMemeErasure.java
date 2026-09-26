@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeErasure;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import com.jrobertgardzinski.memes.domain.MemeStatus;
@@ -39,6 +40,23 @@ class JdbcMemeErasure implements MemeErasure {
     @Override
     public List<MemeMetadata> pendingOf(String author) {
         return byAuthor(author, MemeStatus.PENDING_ERASURE);
+    }
+
+    @Override
+    public List<MemeMetadata> activeOf(UserId author) {
+        return byAuthorId(author, MemeStatus.ACTIVE);
+    }
+
+    @Override
+    public List<MemeMetadata> pendingOf(UserId author) {
+        return byAuthorId(author, MemeStatus.PENDING_ERASURE);
+    }
+
+    private List<MemeMetadata> byAuthorId(UserId author, MemeStatus status) {
+        return jdbc.sql("SELECT id, author, author_id, format, status, marked_for_erasure_at "
+                        + "FROM memes WHERE author_id = ? AND status = ?")
+                .params(author.value(), status.name())
+                .query(JdbcMemeErasure::toMetadata).list();
     }
 
     private List<MemeMetadata> byAuthor(String author, MemeStatus status) {

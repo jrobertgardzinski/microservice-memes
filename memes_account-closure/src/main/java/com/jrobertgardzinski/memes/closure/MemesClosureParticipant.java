@@ -13,6 +13,8 @@ import com.jrobertgardzinski.observation.Observations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.jrobertgardzinski.identity.UserId;
+
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -62,20 +64,21 @@ public final class MemesClosureParticipant {
             return new ClosureOutcome.Unaddressed(type);
         }
         String email = command.email();   // PII: never logged
+        Optional<UserId> leaver = command.userId();
         return switch (type) {
             case MARK -> {
-                int reserved = markAndConfirm(sagaId, email);
+                int reserved = markAndConfirm(sagaId, email, leaver);
                 LOG.info("marked {} of one leaver's memes for erasure (saga {})", reserved, sagaId);
                 yield new ClosureOutcome.Reserved(reserved);
             }
             case ERASE -> {
                 Optional<PurgeRule> rule = requestedRule(command);   // pure reading, kept outside the step
-                atomically.run(() -> purgeUserContent.execute(email, rule));
+                atomically.run(() -> purgeUserContent.execute(email, leaver, rule));
                 LOG.info("erased one leaver's marked memes on the saga's closure (saga {})", sagaId);
                 yield new ClosureOutcome.Erased();
             }
             case RESTORE -> {
-                atomically.run(() -> restoreUserContent.execute(email));
+                atomically.run(() -> restoreUserContent.execute(email, leaver));
                 LOG.info("restored one leaver's marked memes: the saga compensated (saga {})", sagaId);
                 yield new ClosureOutcome.Restored();
             }
@@ -84,10 +87,10 @@ public final class MemesClosureParticipant {
     }
 
     /** The confirmation is made INSIDE the unit of work: hidden memes with no word owed is the failure mode. */
-    private int markAndConfirm(String sagaId, String email) {
+    private int markAndConfirm(String sagaId, String email, Optional<UserId> leaver) {
         AtomicInteger reserved = new AtomicInteger();
         atomically.run(() -> {
-            int marked = markForErasure.execute(email);
+            int marked = markForErasure.execute(email, leaver);
             confirmations.confirm(sagaId, email, marked);
             reserved.set(marked);
         });

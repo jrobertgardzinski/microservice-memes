@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import java.util.Optional;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeErasure;
 import com.jrobertgardzinski.memes.application.MemeErasureContractTest;
 import com.jrobertgardzinski.memes.application.MemeRepository;
@@ -31,7 +33,7 @@ class JdbcMemeErasureTest extends MemeErasureContractTest {
     }
 
     @Override
-    protected void givenActiveMeme(String id, String author) {
-        memes.save(new Meme(id, author, "png", new byte[]{1}));
+    protected void givenActiveMeme(String id, String author, Optional<UserId> authorId) {
+        memes.save(new Meme(id, author, authorId, "png", new byte[]{1}));
     }
 }

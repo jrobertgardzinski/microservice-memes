@@ -2,8 +2,12 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 
+import com.jrobertgardzinski.identity.UserId;
+
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The erasure-aware side of meme storage: the only port in this service that can see a meme which
@@ -30,6 +34,39 @@ public interface MemeErasure {
      * so neither can touch a meme the saga never marked (one uploaded after the mark, say).
      */
     List<MemeMetadata> pendingOf(String author);
+
+    /** The same two halves keyed by identity: rows whose author_id is this one. */
+    List<MemeMetadata> activeOf(UserId author);
+
+    List<MemeMetadata> pendingOf(UserId author);
+
+    /**
+     * The leaver's active rows during the dual period: by id when the closure carries one, plus
+     * the rows under their address that have no id yet (the backfill has not reached them). A row
+     * with another id under the same address is somebody else's.
+     */
+    default List<MemeMetadata> activeOf(String author, Optional<UserId> authorId) {
+        return ofLeaver(author, authorId, activeOf(author), authorId.map(this::activeOf));
+    }
+
+    default List<MemeMetadata> pendingOf(String author, Optional<UserId> authorId) {
+        return ofLeaver(author, authorId, pendingOf(author), authorId.map(this::pendingOf));
+    }
+
+    private static List<MemeMetadata> ofLeaver(String author, Optional<UserId> authorId,
+                                               List<MemeMetadata> byAddress,
+                                               Optional<List<MemeMetadata>> byId) {
+        if (byId.isEmpty()) {
+            return byAddress;
+        }
+        List<MemeMetadata> rows = new ArrayList<>(byId.get());
+        for (MemeMetadata row : byAddress) {
+            if (row.authorId().isEmpty()) {
+                rows.add(row);
+            }
+        }
+        return rows;
+    }
 
     /**
      * Persist the erasure state the aggregate computed — {@code status} and

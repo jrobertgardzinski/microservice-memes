@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
+import java.util.Optional;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import com.jrobertgardzinski.memes.domain.MemeStatus;
@@ -42,6 +44,26 @@ public class FakeMemeErasure implements MemeErasure {
         return byAuthor(author, true);
     }
 
+    @Override
+    public List<MemeMetadata> activeOf(UserId author) {
+        return byAuthorId(author, false);
+    }
+
+    @Override
+    public List<MemeMetadata> pendingOf(UserId author) {
+        return byAuthorId(author, true);
+    }
+
+    private List<MemeMetadata> byAuthorId(UserId author, boolean marked) {
+        List<MemeMetadata> found = new ArrayList<>();
+        for (Meme meme : memes.values()) {
+            if (meme.authorId().equals(Optional.of(author)) && marks.containsKey(meme.id()) == marked) {
+                found.add(metadataOf(meme));
+            }
+        }
+        return found;
+    }
+
     private List<MemeMetadata> byAuthor(String author, boolean marked) {
         List<MemeMetadata> found = new ArrayList<>();
         for (Meme meme : memes.values()) {
@@ -82,7 +104,7 @@ public class FakeMemeErasure implements MemeErasure {
 
     private MemeMetadata metadataOf(Meme meme) {
         Instant marked = marks.get(meme.id());
-        return new MemeMetadata(meme.id(), meme.author(), meme.format(),
+        return new MemeMetadata(meme.id(), meme.author(), meme.authorId(), meme.format(),
                 marked == null ? MemeStatus.ACTIVE : MemeStatus.PENDING_ERASURE, marked);
     }
 }

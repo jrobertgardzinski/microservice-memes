@@ -110,7 +110,7 @@ class PurgeCommandsListenerTest {
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
-        verify(markForErasure).execute(LEAVER);
+        verify(markForErasure).execute(LEAVER, Optional.empty());
         assertNothingLoggedContains(LEAVER);
         assertTrue(logLines().stream().anyMatch(line -> line.contains(SAGA)),
                 "the saga id is what identifies the run in the log: " + logLines());
@@ -119,7 +119,7 @@ class PurgeCommandsListenerTest {
     @Test
     @DisplayName("a completed mark confirms the SAME saga it was commanded for — and erases nothing")
     void a_completed_purge_confirms_its_own_saga() throws Exception {
-        when(markForErasure.execute(LEAVER)).thenReturn(3);
+        when(markForErasure.execute(LEAVER, Optional.empty())).thenReturn(3);
 
         listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
@@ -127,7 +127,7 @@ class PurgeCommandsListenerTest {
         InOrder order = inOrder(markForErasure, confirmations);
         // the mark first, the promise to report it second, both inside one transaction: a
         // confirmation announced before the mark would be a lie the outbox then made durable
-        order.verify(markForErasure).execute(LEAVER);
+        order.verify(markForErasure).execute(LEAVER, Optional.empty());
         // and the confirmation carries what the mark actually reserved, not just that it ran
         order.verify(confirmations).confirm(SAGA, LEAVER, 3);
         // and the point of the whole two-phase design: the command the orchestrator can still take
@@ -163,7 +163,7 @@ class PurgeCommandsListenerTest {
         listener.receive("{\"type\":\"ERASE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\"}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.empty());
         verifyNoInteractions(markForErasure, restoreUserContent);
         verifyNoInteractions(confirmations);
         assertNothingLoggedContains(LEAVER);
@@ -175,7 +175,7 @@ class PurgeCommandsListenerTest {
         listener.receive("{\"type\":\"RESTORE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
                 + "\"sagaId\":\"" + SAGA + "\"}", null);
 
-        verify(restoreUserContent).execute(LEAVER);
+        verify(restoreUserContent).execute(LEAVER, Optional.empty());
         verifyNoInteractions(markForErasure, purgeUserContent);
         verifyNoInteractions(confirmations);
         assertNothingLoggedContains(LEAVER);
@@ -195,7 +195,7 @@ class PurgeCommandsListenerTest {
     @DisplayName("a mark that fails confirms nothing and lets the failure out — so Kafka redelivers")
     void a_failed_purge_confirms_nothing() {
         doThrow(new IllegalStateException("the store is down"))
-                .when(markForErasure).execute(LEAVER);
+                .when(markForErasure).execute(LEAVER, Optional.empty());
 
         assertThrows(IllegalStateException.class, () ->
                 listener.receive("{\"type\":\"PURGE_USER_CONTENT\",\"email\":\"" + LEAVER + "\","
@@ -221,7 +221,7 @@ class PurgeCommandsListenerTest {
                 + rule.replace("\n", "\\n") + "\"}}", null);
 
         // the erasure still runs, on the deployment default — an unreadable rule must not wedge the saga
-        verify(purgeUserContent).execute(LEAVER, Optional.empty());
+        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.empty());
         assertNothingLoggedContains(LEAVER);
         assertNothingLoggedContains("seized by");
         assertFalse(logLines().stream().anyMatch(line -> line.contains("\n")),
@@ -262,7 +262,7 @@ class PurgeCommandsListenerTest {
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"SELF\","
                 + "\"policy\":{\"memes\":\"KEEP_POPULAR_ANONYMIZED:1\"}}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.of(new PurgeRule.Delete()));
+        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.of(new PurgeRule.Delete()));
     }
 
     @Test
@@ -274,7 +274,7 @@ class PurgeCommandsListenerTest {
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"\","
                 + "\"policy\":{\"memes\":\"ANONYMIZE_AUTHOR\"}}", null);
 
-        verify(purgeUserContent).execute(LEAVER, Optional.of(new PurgeRule.Delete()));
+        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.of(new PurgeRule.Delete()));
     }
 
     @Test
@@ -284,7 +284,6 @@ class PurgeCommandsListenerTest {
                 + "\"sagaId\":\"" + SAGA + "\",\"initiatedBy\":\"ADMIN\","
                 + "\"policy\":{\"memes\":\"KEEP_POPULAR_ANONYMIZED:100\"}}", null);
 
-        verify(purgeUserContent).execute(LEAVER,
-                Optional.of(new PurgeRule.KeepPopularAnonymized(100)));
+        verify(purgeUserContent).execute(LEAVER, Optional.empty(), Optional.of(new PurgeRule.KeepPopularAnonymized(100)));
     }
 }

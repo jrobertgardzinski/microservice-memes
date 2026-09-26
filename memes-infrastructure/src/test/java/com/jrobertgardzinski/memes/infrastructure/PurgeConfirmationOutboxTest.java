@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import java.util.Optional;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.observation.Observations;
@@ -121,7 +122,7 @@ class PurgeConfirmationOutboxTest {
         listener.receive(COMMAND, "cid-of-the-deletion");
 
         // the command is the MARK, so the mark is what ran: the erasure waits for the closure
-        verify(markForErasure).execute(LEAVER);
+        verify(markForErasure).execute(LEAVER, Optional.empty());
         verifyNoInteractions(purgeUserContent);
         ArgumentCaptor<ProducerRecord<String, String>> firstTry =
                 ArgumentCaptor.forClass(ProducerRecord.class);
@@ -198,7 +199,7 @@ class PurgeConfirmationOutboxTest {
     @DisplayName("a mark that throws writes nothing at all and lets the failure out to the container")
     void a_failing_purge_writes_nothing() {
         doThrow(new org.springframework.dao.DataAccessResourceFailureException("no database"))
-                .when(markForErasure).execute(LEAVER);
+                .when(markForErasure).execute(LEAVER, Optional.empty());
 
         assertThrows(org.springframework.dao.DataAccessResourceFailureException.class,
                 () -> listener.receive(COMMAND, null));

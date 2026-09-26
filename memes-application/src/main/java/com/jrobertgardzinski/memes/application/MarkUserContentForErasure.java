@@ -2,8 +2,11 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 
+import com.jrobertgardzinski.identity.UserId;
+
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * The meme service's REVERSIBLE step of an account deletion: every meme the leaver still has in the
@@ -47,9 +50,13 @@ public class MarkUserContentForErasure {
 
     /** Returns how many memes this run reserved — see the paragraph above on what zero means. */
     public int execute(String author) {
+        return execute(author, Optional.empty());
+    }
+
+    public int execute(String author, Optional<UserId> authorId) {
         Instant at = Instant.now(clock);
         int reserved = 0;
-        for (MemeMetadata meme : erasure.activeOf(author)) {
+        for (MemeMetadata meme : erasure.activeOf(author, authorId)) {
             // the transition is the aggregate's, never a setter and never an UPDATE spelled out
             // here: the record decides what "marked" means (including keeping the first instant on
             // a redelivery), and the port only stores the answer

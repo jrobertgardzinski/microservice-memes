@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
+import java.util.Optional;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
@@ -21,7 +23,7 @@ class FakeMemeErasureTest extends MemeErasureContractTest {
     }
 
     @Override
-    protected void givenActiveMeme(String id, String author) {
-        memes.put(id, new Meme(id, author, "png", new byte[]{1}));
+    protected void givenActiveMeme(String id, String author, Optional<UserId> authorId) {
+        memes.put(id, new Meme(id, author, authorId, "png", new byte[]{1}));
     }
 }
