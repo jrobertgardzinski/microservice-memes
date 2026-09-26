@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.MemeErasure;
-import com.jrobertgardzinski.memes.application.MemeErasureContract;
+import com.jrobertgardzinski.memes.application.MemeErasureContractTest;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
 import io.qameta.allure.Epic;
@@ -17,7 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @Epic("Architecture")
 @Feature("A stand-in behaves like the adapter it stands in for")
 @SpringBootTest(classes = MemesApplication.class)
-class JdbcMemeErasureContractTest extends MemeErasureContract {
+class JdbcMemeErasureTest extends MemeErasureContractTest {
 
     @Autowired
     MemeErasure erasure;

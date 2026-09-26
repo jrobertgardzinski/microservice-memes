@@ -10,7 +10,7 @@ import java.util.Map;
 /** The stand-in these use-case tests run on, held to the same promises as the real adapter. */
 @Epic("Architecture")
 @Feature("A stand-in behaves like the adapter it stands in for")
-class FakeMemeErasureContractTest extends MemeErasureContract {
+class FakeMemeErasureTest extends MemeErasureContractTest {
 
     private final Map<String, Meme> memes = new HashMap<>();
     private final FakeMemeErasure erasure = new FakeMemeErasure(memes);
