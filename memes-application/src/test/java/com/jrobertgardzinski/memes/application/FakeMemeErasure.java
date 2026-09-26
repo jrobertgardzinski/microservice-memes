@@ -71,12 +71,12 @@ public class FakeMemeErasure implements MemeErasure {
     }
 
     /** Whether this meme is hidden from the gallery right now — what a read-side assertion asks. */
-    boolean isMarked(String memeId) {
+    protected boolean isMarked(String memeId) {
         return marks.containsKey(memeId);
     }
 
     /** The reservations, for a test that fingerprints the whole world (idempotence). */
-    Map<String, Instant> marks() {
+    protected Map<String, Instant> marks() {
         return Map.copyOf(marks);
     }
 
