@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.closure;
 
-import com.jrobertgardzinski.closure.Atomically;
+import com.jrobertgardzinski.closure.UnitOfWork;
 import com.jrobertgardzinski.closure.ClosureCommand;
 import com.jrobertgardzinski.closure.ClosureConfirmations;
 import com.jrobertgardzinski.closure.ClosureMessages;
@@ -36,20 +36,20 @@ public final class MemesClosureParticipant {
     private final PurgeUserContent purgeUserContent;
     private final ClosureConfirmations confirmations;
     private final Observations<Observation> observations;
-    private final Atomically atomically;
+    private final UnitOfWork unitOfWork;
 
     public MemesClosureParticipant(MarkUserContentForErasure markForErasure,
                                    RestoreUserContent restoreUserContent,
                                    PurgeUserContent purgeUserContent,
                                    ClosureConfirmations confirmations,
                                    Observations<Observation> observations,
-                                   Atomically atomically) {
+                                   UnitOfWork unitOfWork) {
         this.markForErasure = markForErasure;
         this.restoreUserContent = restoreUserContent;
         this.purgeUserContent = purgeUserContent;
         this.confirmations = confirmations;
         this.observations = observations;
-        this.atomically = atomically;
+        this.unitOfWork = unitOfWork;
     }
 
     public ClosureOutcome handle(ClosureCommand command) {
@@ -72,12 +72,12 @@ public final class MemesClosureParticipant {
             }
             case ERASE -> {
                 Optional<PurgeRule> rule = requestedRule(command);   // pure reading, kept outside the step
-                atomically.run(() -> purgeUserContent.execute(leaver, rule));
+                unitOfWork.run(() -> purgeUserContent.execute(leaver, rule));
                 LOG.info("erased one leaver's marked memes on the saga's closure (saga {})", sagaId);
                 yield new ClosureOutcome.Erased();
             }
             case RESTORE -> {
-                atomically.run(() -> restoreUserContent.execute(leaver));
+                unitOfWork.run(() -> restoreUserContent.execute(leaver));
                 LOG.info("restored one leaver's marked memes: the saga compensated (saga {})", sagaId);
                 yield new ClosureOutcome.Restored();
             }
@@ -88,7 +88,7 @@ public final class MemesClosureParticipant {
     /** The confirmation is made INSIDE the unit of work: hidden memes with no word owed is the failure mode. */
     private int markAndConfirm(String sagaId, UserId leaver) {
         AtomicInteger reserved = new AtomicInteger();
-        atomically.run(() -> {
+        unitOfWork.run(() -> {
             int marked = markForErasure.execute(leaver);
             confirmations.confirm(sagaId, leaver, marked);
             reserved.set(marked);
