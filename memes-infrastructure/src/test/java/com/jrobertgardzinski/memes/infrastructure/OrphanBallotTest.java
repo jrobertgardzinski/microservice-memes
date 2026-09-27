@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
@@ -33,6 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @SpringBootTest(classes = MemesApplication.class)
 class OrphanBallotTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     @Autowired
     MemeRepository memes;
 
@@ -45,7 +48,7 @@ class OrphanBallotTest {
     @Test
     @DisplayName("a meme row deleted by ANY path takes its ballots with it — the schema guarantees it")
     void the_cascade_takes_the_ballots() {
-        memes.save(new Meme("cascade-me", "author@example.com", "png", new byte[]{1}));
+        memes.save(new Meme("cascade-me", SOMEBODY, "png", new byte[]{1}));
         votes.cast("cascade-me", "voter@example.com", VoteDirection.UP);
         assertEquals(1, ballotsFor("cascade-me"), "the ballot is in the table to begin with");
 
@@ -61,7 +64,7 @@ class OrphanBallotTest {
     @Test
     @DisplayName("a vote that loses the race with a delete casts nothing, rather than an orphan")
     void a_vote_that_races_a_delete_is_a_no_op() {
-        memes.save(new Meme("vanishing", "author@example.com", "png", new byte[]{1}));
+        memes.save(new Meme("vanishing", SOMEBODY, "png", new byte[]{1}));
         // the interleaving CastVote cannot close: its exists() said yes, and the meme goes before
         // the ballot's own transaction runs
         jdbc.sql("DELETE FROM memes WHERE id = ?").param("vanishing").update();

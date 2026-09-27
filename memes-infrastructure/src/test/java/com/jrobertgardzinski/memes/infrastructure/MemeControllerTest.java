@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
@@ -30,6 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(classes = {MemesApplication.class, TestAuthConfig.class})
 @AutoConfigureMockMvc
 class MemeControllerTest {
+
+    private static final UserId SOMEBODY = UserId.random();
 
     @Autowired
     MockMvc mockMvc;
@@ -129,7 +132,7 @@ class MemeControllerTest {
         // are the server's data gone bad — the thumbnail must answer 500 (our fault, generic
         // body), never the 400 the same decoder failure earns a broken UPLOAD
         memes.save(new com.jrobertgardzinski.memes.domain.Meme(
-                "rotten", "author@example.com", "png", "these were pixels once".getBytes()));
+                "rotten", SOMEBODY, "png", "these were pixels once".getBytes()));
 
         mockMvc.perform(get("/memes/{id}/thumbnail", "rotten"))
                 .andExpect(status().isInternalServerError())

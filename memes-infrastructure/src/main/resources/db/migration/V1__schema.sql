@@ -4,8 +4,7 @@
 -- rows of the gallery; the picture bytes live in meme_blobs (object storage in production)
 create table memes (
     id                    varchar(36)  primary key,
-    author                varchar(255) not null,       -- the address as an attribute: the placeholder once anonymised, never a key
-    author_id             uuid,                        -- the stable identity, the key; null once the row is anonymised
+    author_id             uuid,                        -- the only identity a row carries: the key; null once anonymised, and then it belongs to nobody
     format                varchar(10)  not null,
     published_at          timestamp    not null,
     -- the account-closure saga's reversible mark: hidden from every public read, destroyed by nothing but the closure
@@ -19,7 +18,7 @@ create index idx_memes_pending_erasure on memes (status, marked_for_erasure_at);
 
 -- every public read goes through the view and never sees a marked meme (MemeReadFilterTest enforces it)
 create view active_memes as
-    select id, author, author_id, format, published_at
+    select id, author_id, format, published_at
     from memes
     where status = 'ACTIVE';
 

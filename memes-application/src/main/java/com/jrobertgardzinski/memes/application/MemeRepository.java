@@ -44,7 +44,7 @@ public interface MemeRepository {
      * uploaded it (deletion and tagging are the author's privileges) or in what format it is kept.
      *
      * <p>Two reasons this is not {@code find(id).map(...)}. It loads no bytes, so an authorisation
-     * check stops paying a full image transfer from object storage for one e-mail address. And it
+     * check stops paying a full image transfer from object storage for one id. And it
      * answers about the ROW: {@code find} joins the row to its object, so a meme whose bytes are
      * absent from the ACTIVE store (a store switch left them behind, an operator removed the
      * object) used to look deleted to /meta and to DELETE, and its owner could not take it down —
@@ -54,7 +54,7 @@ public interface MemeRepository {
      * this fallback exists to keep hand-rolled fakes compiling (same bargain as {@link #exists}).
      */
     default Optional<MemeMetadata> findMetadata(String id) {
-        return find(id).map(meme -> new MemeMetadata(meme.id(), meme.author(), meme.authorId(), meme.format(),
+        return find(id).map(meme -> new MemeMetadata(meme.id(), meme.authorId(), meme.format(),
                 com.jrobertgardzinski.memes.domain.MemeStatus.ACTIVE, null));
     }
 
@@ -85,6 +85,10 @@ public interface MemeRepository {
 
     void deleteById(String memeId);
 
-    /** Replace one meme's author (account deletion may keep the meme, never the identity); the author id goes too. */
-    void reassignAuthor(String memeId, String newAuthor);
+    /**
+     * Cut one meme loose from its author: the account is gone, the community keeps the picture, and
+     * the row keeps no trace of whose it was. Nothing is written in the id's place — a meme nobody
+     * owns is a meme with no author id, and the gallery renders that as a deleted account.
+     */
+    void anonymise(String memeId);
 }

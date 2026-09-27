@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
@@ -17,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Feature("Serve meme")
 class ServeMemeTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G'};
     private static final byte[] WEBP = {'R', 'I', 'F', 'F'};
 
@@ -25,14 +28,14 @@ class ServeMemeTest {
 
         public Optional<Meme> find(String id) {
             return "cat".equals(id)
-                    ? Optional.of(new Meme("cat", "a@example.com", "png", PNG))
+                    ? Optional.of(new Meme("cat", SOMEBODY, "png", PNG))
                     : Optional.empty();
         }
 
         public List<String> allIds() { return List.of("cat"); }
         public List<String> findIdsByAuthor(String author) { return List.of(); }
         public void deleteById(String memeId) { }
-        public void reassignAuthor(String memeId, String newAuthor) { }
+        public void anonymise(String memeId) { }
     };
 
     /** A store whose writes always fail — the disk-full / S3-blip case. */
@@ -99,7 +102,7 @@ class ServeMemeTest {
 
             public Optional<Meme> find(String id) {
                 // the read that started this request — the meme was still there
-                return Optional.of(new Meme("cat", "a@example.com", "png", PNG));
+                return Optional.of(new Meme("cat", SOMEBODY, "png", PNG));
             }
 
             public boolean exists(String id) {
@@ -112,7 +115,7 @@ class ServeMemeTest {
             public List<String> allIds() { return List.of(); }
             public List<String> findIdsByAuthor(String author) { return List.of(); }
             public void deleteById(String memeId) { }
-            public void reassignAuthor(String memeId, String newAuthor) { }
+            public void anonymise(String memeId) { }
         };
         java.util.Map<String, byte[]> blobs = new java.util.HashMap<>();
         ServeMeme serve = new ServeMeme(deletedMidFlight, mapStore(blobs), png -> Optional.of(WEBP));
@@ -133,7 +136,7 @@ class ServeMemeTest {
         MemeRepository counting = new MemeRepository() {
             public Optional<Meme> find(String id) {
                 imageReads.add(id);
-                return Optional.of(new Meme("cat", "a@example.com", "png", PNG));
+                return Optional.of(new Meme("cat", SOMEBODY, "png", PNG));
             }
 
             public boolean exists(String id) { return "cat".equals(id); }
@@ -142,7 +145,7 @@ class ServeMemeTest {
             public List<String> allIds() { return List.of("cat"); }
             public List<String> findIdsByAuthor(String author) { return List.of(); }
             public void deleteById(String memeId) { }
-            public void reassignAuthor(String memeId, String newAuthor) { }
+            public void anonymise(String memeId) { }
         };
         java.util.Map<String, byte[]> blobs = new java.util.HashMap<>();
         blobs.put("cat.webp", WEBP);
@@ -168,7 +171,7 @@ class ServeMemeTest {
             public List<String> allIds() { return List.of("cat"); }
             public List<String> findIdsByAuthor(String author) { return List.of(); }
             public void deleteById(String memeId) { }
-            public void reassignAuthor(String memeId, String newAuthor) { }
+            public void anonymise(String memeId) { }
         };
         ServeMeme serve = new ServeMeme(rowWithoutBytes, mapStore(new java.util.HashMap<>()),
                 png -> Optional.of(WEBP));

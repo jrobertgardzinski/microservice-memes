@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.ObjectStore;
 import com.jrobertgardzinski.memes.domain.Meme;
@@ -34,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class WebErrorHandlerTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     @Autowired
     MockMvc mockMvc;
 
@@ -46,7 +49,7 @@ class WebErrorHandlerTest {
     @Test
     @DisplayName("a store failure while serving a stored meme is a 500 with a generic body, not a 400")
     void store_failure_on_get_is_a_500_not_a_400() throws Exception {
-        memes.save(new Meme("sick", "author@example.com", "png", new byte[]{1, 2, 3}));
+        memes.save(new Meme("sick", SOMEBODY, "png", new byte[]{1, 2, 3}));
         doThrow(new UncheckedIOException("cannot read sick", new IOException("disk I/O error at /var/lib/memes/blobs/sick")))
                 .when(objects).get("sick");
 

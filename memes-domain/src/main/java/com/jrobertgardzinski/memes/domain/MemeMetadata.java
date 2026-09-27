@@ -6,15 +6,15 @@ import java.time.Instant;
 import java.util.Optional;
 
 /**
- * A {@link Meme} without its image: the identifier, who uploaded it, the format its bytes are
- * stored in, and — since the offboarding saga learnt to compensate — whether the row is part of the
+ * A {@link Meme} without its image: the identifier, the id of whoever uploaded it, the format its
+ * bytes are stored in, and — since the offboarding saga learnt to compensate — whether the row is part of the
  * gallery at all. This is what the questions ABOUT a meme need: "is there such a meme?", "who may
  * delete it?", "whose tags are these?", "is this waiting to be erased?" — and none of them needs
  * the picture.
  *
  * <p>The type exists because {@link Meme} made the bytes unavoidable: every authorisation check
- * dragged the full image out of object storage just to read one e-mail address off it, and a meme
- * whose bytes were missing from the active store answered "no such meme" to its own author. A row
+ * dragged the full image out of object storage just to read one field off it, and a meme whose
+ * bytes were missing from the active store answered "no such meme" to its own author. A row
  * and its picture are two different facts; this record is the first one alone.
  *
  * <p><strong>This is where the erasure state lives, and deliberately not on {@link Meme}.</strong>
@@ -32,7 +32,7 @@ import java.util.Optional;
  * FIRST timestamp, because the mark's age is what the reaper's query and the stuck-erasure alarm
  * are measured against, and a redelivered command must not make an old obligation look fresh.
  */
-public record MemeMetadata(String id, String author, Optional<UserId> authorId, String format,
+public record MemeMetadata(String id, Optional<UserId> authorId, String format,
                            MemeStatus status, Instant markedForErasureAt) {
 
     /**
@@ -52,13 +52,13 @@ public record MemeMetadata(String id, String author, Optional<UserId> authorId, 
      * A meme in the gallery — the shorthand for every caller that has nothing to do with erasure,
      * which is nearly all of them (an upload, a listing, an authorisation check).
      */
-    /** An anonymised row, or a test that does not care about the id. */
-    public MemeMetadata(String id, String author, String format, MemeStatus status, Instant markedForErasureAt) {
-        this(id, author, Optional.empty(), format, status, markedForErasureAt);
+    public MemeMetadata(String id, UserId author, String format) {
+        this(id, Optional.of(author), format, MemeStatus.ACTIVE, null);
     }
 
-    public MemeMetadata(String id, String author, String format) {
-        this(id, author, Optional.empty(), format, MemeStatus.ACTIVE, null);
+    /** An anonymised row: the account is gone, the meme stayed, and it belongs to nobody. */
+    public MemeMetadata(String id, String format, MemeStatus status, Instant markedForErasureAt) {
+        this(id, Optional.empty(), format, status, markedForErasureAt);
     }
 
     /**
@@ -69,7 +69,7 @@ public record MemeMetadata(String id, String author, Optional<UserId> authorId, 
     public MemeMetadata markForErasure(Instant at) {
         return status == MemeStatus.PENDING_ERASURE
                 ? this
-                : new MemeMetadata(id, author, authorId, format, MemeStatus.PENDING_ERASURE, at);
+                : new MemeMetadata(id, authorId, format, MemeStatus.PENDING_ERASURE, at);
     }
 
     /**
@@ -80,7 +80,7 @@ public record MemeMetadata(String id, String author, Optional<UserId> authorId, 
     public MemeMetadata restore() {
         return status == MemeStatus.ACTIVE
                 ? this
-                : new MemeMetadata(id, author, authorId, format, MemeStatus.ACTIVE, null);
+                : new MemeMetadata(id, authorId, format, MemeStatus.ACTIVE, null);
     }
 
     /** Whether a running saga has this meme reserved for erasure. */

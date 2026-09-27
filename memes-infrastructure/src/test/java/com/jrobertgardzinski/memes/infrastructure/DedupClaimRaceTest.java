@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeContentIndex;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
@@ -35,6 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @SpringBootTest(classes = MemesApplication.class)
 class DedupClaimRaceTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     @Autowired
     MemeContentIndex contentIndex;
 
@@ -62,7 +65,7 @@ class DedupClaimRaceTest {
         byte[] picture = ("pixels-" + UUID.randomUUID()).getBytes(StandardCharsets.UTF_8);
         String winner = UUID.randomUUID().toString();
         contentIndex.claim(picture, winner);
-        memes.save(new Meme(winner, "alice@example.com", "png", picture));
+        memes.save(new Meme(winner, SOMEBODY, "png", picture));
 
         assertEquals(winner, contentIndex.claim(picture, UUID.randomUUID().toString()),
                 "the ordinary dedup path, unchanged");

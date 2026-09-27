@@ -32,20 +32,26 @@ class MemeMetadataTest {
     private static final Instant FIRST_DELIVERY = Instant.parse("2026-08-08T10:00:00Z");
     private static final Instant REDELIVERY = FIRST_DELIVERY.plus(Duration.ofHours(1));
 
+    private static final UserId LEAVER = UserId.random();
+
     private static MemeMetadata inTheGallery() {
-        return new MemeMetadata("m1", "leaver@example.com", "png");
+        return new MemeMetadata("m1", LEAVER, "png");
+    }
+
+    /** What a kept meme of a closed account looks like: no id, so nobody's. */
+    private static MemeMetadata anonymised() {
+        return new MemeMetadata("m1", "png", MemeStatus.ACTIVE, null);
     }
 
     @Test
     @DisplayName("ownership is the id's: the same id under a new address still owns, an anonymised row is nobody's")
     void ownership_is_the_ids() {
         UserId alice = UserId.random();
-        MemeMetadata meme = new MemeMetadata("m1", "alice@example.com", Optional.of(alice), "png",
-                MemeStatus.ACTIVE, null);
+        MemeMetadata meme = new MemeMetadata("m1", Optional.of(alice), "png", MemeStatus.ACTIVE, null);
 
         assertTrue(meme.isOwnedBy(alice));
-        assertFalse(meme.isOwnedBy(UserId.random()), "the same address under another id is somebody else");
-        assertFalse(inTheGallery().isOwnedBy(alice), "a row without an id has been anonymised: nobody's");
+        assertFalse(meme.isOwnedBy(UserId.random()), "another id is somebody else");
+        assertFalse(anonymised().isOwnedBy(alice), "a row without an id has been anonymised: nobody's");
     }
 
     @Test
@@ -65,7 +71,7 @@ class MemeMetadataTest {
 
         assertTrue(marked.isPendingErasure());
         assertEquals(FIRST_DELIVERY, marked.markedForErasureAt());
-        assertEquals("leaver@example.com", marked.author(), "and nothing else moves");
+        assertEquals(Optional.of(LEAVER), marked.authorId(), "and nothing else moves");
         assertEquals("png", marked.format());
     }
 
@@ -109,10 +115,10 @@ class MemeMetadataTest {
     @DisplayName("a mark without its instant — or an instant without its mark — cannot be built")
     void the_invariant_is_unrepresentable_not_merely_discouraged() {
         assertThrows(IllegalArgumentException.class,
-                () -> new MemeMetadata("m1", "a@b.c", "png", MemeStatus.PENDING_ERASURE, null),
+                () -> new MemeMetadata("m1", "png", MemeStatus.PENDING_ERASURE, null),
                 "a mark with no instant would be invisible to the backlog alarm for ever");
         assertThrows(IllegalArgumentException.class,
-                () -> new MemeMetadata("m1", "a@b.c", "png", MemeStatus.ACTIVE, FIRST_DELIVERY),
+                () -> new MemeMetadata("m1", "png", MemeStatus.ACTIVE, FIRST_DELIVERY),
                 "an instant with no mark would be a meme the gallery shows and the reaper counts");
     }
 }

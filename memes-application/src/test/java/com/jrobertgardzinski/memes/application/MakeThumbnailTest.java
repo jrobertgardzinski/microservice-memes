@@ -2,6 +2,7 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.config.ThumbnailSize;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import io.qameta.allure.Epic;
@@ -26,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Feature("Make thumbnail")
 class MakeThumbnailTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     private final Map<String, Meme> memes = new HashMap<>();
     private final MemeRepository memeRepository = new MemeRepository() {
         public void save(Meme meme) {
@@ -40,16 +43,14 @@ class MakeThumbnailTest {
             return List.copyOf(memes.keySet());
         }
 
-        public List<String> findIdsByAuthor(String author) {
-            return memes.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
-        }
 
         public void deleteById(String memeId) {
             memes.remove(memeId);
         }
 
-        public void reassignAuthor(String memeId, String newAuthor) {
-            memes.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
+        public void anonymise(String memeId) {
+            memes.computeIfPresent(memeId, (id, m) ->
+                    new Meme(m.id(), Optional.empty(), m.format(), m.data()));
         }
     };
     private final Map<String, byte[]> blobs = new HashMap<>();
@@ -80,7 +81,7 @@ class MakeThumbnailTest {
     @Test
     @DisplayName("makes a small PNG thumbnail of a stored meme")
     void makes_a_thumbnail() throws Exception {
-        memes.put("m1", new Meme("m1", "alice@example.com", "png", png(400, 200)));
+        memes.put("m1", new Meme("m1", SOMEBODY, "png", png(400, 200)));
 
         Optional<byte[]> thumb = makeThumbnail.execute("m1");
 
@@ -99,7 +100,7 @@ class MakeThumbnailTest {
     @Test
     @DisplayName("the second request is served from the {id}.thumb cache — one decode, ever")
     void second_request_does_not_decode_again() throws Exception {
-        memes.put("m1", new Meme("m1", "alice@example.com", "png", png(400, 200)));
+        memes.put("m1", new Meme("m1", SOMEBODY, "png", png(400, 200)));
 
         byte[] first = makeThumbnail.execute("m1").orElseThrow();
         byte[] second = makeThumbnail.execute("m1").orElseThrow();
@@ -115,7 +116,7 @@ class MakeThumbnailTest {
     void cache_write_racing_a_delete_is_taken_back() throws Exception {
         // the delete-race guard, same as ServeMeme's WebP: the store hands out the put, then the
         // meme turns out to be gone — the freshly written variant must not stay orphaned
-        memes.put("racy", new Meme("racy", "alice@example.com", "png", png(100, 100)));
+        memes.put("racy", new Meme("racy", SOMEBODY, "png", png(100, 100)));
         ObjectStore vanishingStore = new ObjectStore() {
             public void put(String key, byte[] data) {
                 blobs.put(key, data);

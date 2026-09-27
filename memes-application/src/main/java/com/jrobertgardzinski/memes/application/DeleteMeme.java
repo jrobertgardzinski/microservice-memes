@@ -14,7 +14,7 @@ public class DeleteMeme {
 
     public enum Status { DELETED, NO_SUCH_MEME }
 
-    public record Result(Status status, String author) {}
+    public record Result(Status status) {}
 
     private final MemeRepository memes;
     private final VoteRepository votes;
@@ -39,13 +39,13 @@ public class DeleteMeme {
         // the gallery lists; the bytes are removed by id further down, present or not.
         Optional<MemeMetadata> meme = memes.findMetadata(memeId);
         if (meme.isEmpty()) {
-            return new Result(Status.NO_SUCH_MEME, null);
+            return new Result(Status.NO_SUCH_MEME);
         }
         votes.purgeMeme(memeId);
         contentIndex.remove(memeId);
         tags.removeMeme(memeId);
         memes.deleteById(memeId);
         memeEvents.memeDeleted(memeId);
-        return new Result(Status.DELETED, meme.get().author());
+        return new Result(Status.DELETED);
     }
 }

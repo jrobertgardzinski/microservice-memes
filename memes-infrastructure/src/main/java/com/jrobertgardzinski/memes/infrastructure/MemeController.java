@@ -79,11 +79,10 @@ class MemeController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file,
-                                               @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER)
-                                               String uploader,
                                                @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
-                                               com.jrobertgardzinski.identity.UserId uploaderId) throws IOException {
-        if (!uploadRate.tryAcquire(uploader)) {
+                                               com.jrobertgardzinski.identity.UserId uploaderId)
+            throws IOException {
+        if (!uploadRate.tryAcquire(uploaderId.toString())) {
             return ResponseEntity.status(429).header("Retry-After", "60")
                     .body(Map.of("status", "RATE_LIMITED", "detail", "you are uploading too fast"));
         }
@@ -93,7 +92,7 @@ class MemeController {
         // duration; releasing before that would bound nothing.
         String id = uploadAdmission.admit(() -> {
             try {
-                return publishMeme.execute(file.getBytes(), uploader, java.util.Optional.of(uploaderId));
+                return publishMeme.execute(file.getBytes(), uploaderId);
             } catch (IOException unreadableUpload) {
                 throw new UncheckedIOException(unreadableUpload);
             }

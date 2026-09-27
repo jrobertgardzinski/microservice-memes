@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
@@ -27,9 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Epic("Infrastructure")
 @Feature("Schema")
 class SchemaReachesItsRowsTest {
-
-    /** An address this portal really can mint: security stores 255, the e-mail domain caps nothing. */
-    private static final String LONG_ADDRESS = "a".repeat(200) + "@example.com";
 
     @SpringBootTest(classes = MemesApplication.class)
     static class Indexes {
@@ -73,17 +71,18 @@ class SchemaReachesItsRowsTest {
         VoteRepository votes;
 
         @Test
-        @DisplayName("an address as long as security allows can publish and vote")
-        void a_long_address_is_not_a_500() {
+        @DisplayName("what the schema stores of a person is their id: it round-trips through both tables")
+        void the_id_round_trips() {
             String id = UUID.randomUUID().toString();
+            UserId author = UserId.random();
 
-            memes.save(new Meme(id, LONG_ADDRESS, "png", new byte[]{1, 2, 3}));
-            votes.cast(id, LONG_ADDRESS, VoteDirection.UP);
+            memes.save(new Meme(id, author, "png", new byte[]{1, 2, 3}));
+            votes.cast(id, author.toString(), VoteDirection.UP);
 
-            assertEquals(LONG_ADDRESS, memes.findMetadata(id).orElseThrow().author(),
-                    "the gallery stores the whole address it was handed, not a prefix");
-            assertEquals(Optional.of(VoteDirection.UP), votes.voteOf(id, LONG_ADDRESS),
-                    "and the ballot is cast under the same address");
+            assertEquals(Optional.of(author), memes.findMetadata(id).orElseThrow().authorId(),
+                    "the row comes back under the id it was written with");
+            assertEquals(Optional.of(VoteDirection.UP), votes.voteOf(id, author.toString()),
+                    "and the ballot is cast under the same id, in its wire form");
         }
     }
 }

@@ -87,7 +87,7 @@ public class FakeMemeErasure implements MemeErasure {
 
     private MemeMetadata metadataOf(Meme meme) {
         Instant marked = marks.get(meme.id());
-        return new MemeMetadata(meme.id(), meme.author(), meme.authorId(), meme.format(),
+        return new MemeMetadata(meme.id(), meme.authorId(), meme.format(),
                 marked == null ? MemeStatus.ACTIVE : MemeStatus.PENDING_ERASURE, marked);
     }
 }

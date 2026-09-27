@@ -23,7 +23,7 @@ class FakeMemeErasureTest extends MemeErasureContractTest {
     }
 
     @Override
-    protected void givenActiveMeme(String id, String author, Optional<UserId> authorId) {
-        memes.put(id, new Meme(id, author, authorId, "png", new byte[]{1}));
+    protected void givenActiveMeme(String id, Optional<UserId> authorId) {
+        memes.put(id, new Meme(id, authorId, "png", new byte[]{1}));
     }
 }

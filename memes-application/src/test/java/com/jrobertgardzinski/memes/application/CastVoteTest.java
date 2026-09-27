@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.domain.ScoredMeme;
 import com.jrobertgardzinski.voting.VoteDirection;
@@ -21,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Feature("Cast vote")
 class CastVoteTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     private final Map<String, Meme> memes = new HashMap<>();
     private final Map<String, Map<String, VoteDirection>> votes = new HashMap<>();
 
@@ -37,16 +40,14 @@ class CastVoteTest {
             return List.copyOf(memes.keySet());
         }
 
-        public List<String> findIdsByAuthor(String author) {
-            return memes.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
-        }
 
         public void deleteById(String memeId) {
             memes.remove(memeId);
         }
 
-        public void reassignAuthor(String memeId, String newAuthor) {
-            memes.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
+        public void anonymise(String memeId) {
+            memes.computeIfPresent(memeId, (id, m) ->
+                    new Meme(m.id(), Optional.empty(), m.format(), m.data()));
         }
     };
     private final VoteRepository voteRepository = new FakeVoteRepository(votes);
@@ -55,7 +56,7 @@ class CastVoteTest {
     @Test
     @DisplayName("the library's toggle applies, anchored to an existing meme")
     void toggles_on_an_existing_meme() {
-        memes.put("m1", new Meme("m1", "alice@example.com", "png", new byte[]{1}));
+        memes.put("m1", new Meme("m1", SOMEBODY, "png", new byte[]{1}));
 
         assertEquals(Optional.of(new VoteTally(1, Optional.of(VoteDirection.UP))),
                 castVote.execute("m1", "alice", VoteDirection.UP));

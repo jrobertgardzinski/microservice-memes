@@ -52,14 +52,10 @@ class IdempotentCommandsTest {
             public void save(Meme meme) { memes.put(meme.id(), meme); }
             public Optional<Meme> find(String id) { return Optional.ofNullable(memes.get(id)); }
             public List<String> allIds() { return List.copyOf(memes.keySet()); }
-            public List<String> findIdsByAuthor(String author) {
-                return memes.values().stream().filter(m -> m.author().equals(author))
-                        .map(Meme::id).toList();
-            }
             public void deleteById(String memeId) { memes.remove(memeId); }
-            public void reassignAuthor(String memeId, String newAuthor) {
+            public void anonymise(String memeId) {
                 memes.computeIfPresent(memeId,
-                        (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
+                        (id, m) -> new Meme(m.id(), Optional.empty(), m.format(), m.data()));
             }
         };
         final VoteRepository voteRepository = new CastVoteTest.FakeVoteRepository(votes);
@@ -95,8 +91,8 @@ class IdempotentCommandsTest {
         final FakeMemeErasure erasure = new FakeMemeErasure(memes);
 
         World() {
-            memes.put("m1", new Meme("m1", "alice@example.com", Optional.of(ALICE), "png", new byte[]{1}));
-            memes.put("m2", new Meme("m2", "bob@example.com", Optional.of(BOB), "png", new byte[]{2}));
+            memes.put("m1", new Meme("m1", ALICE, "png", new byte[]{1}));
+            memes.put("m2", new Meme("m2", BOB, "png", new byte[]{2}));
             contentIndex.put(new String(new byte[]{1}), "m1");
             contentIndex.put(new String(new byte[]{2}), "m2");
             votes.put("m1", new HashMap<>(Map.of("bob@example.com", VoteDirection.UP)));
@@ -107,7 +103,8 @@ class IdempotentCommandsTest {
             Map<String, Object> f = new LinkedHashMap<>();
             // Meme is a record over byte[] — array equality is identity, so flatten to text
             f.put("memes", memes.values().stream()
-                    .map(m -> m.id() + "|" + m.author() + "|" + m.format() + "|"
+                    .map(m -> m.id() + "|" + m.authorId().map(Object::toString).orElse("-")
+                            + "|" + m.format() + "|"
                             + java.util.Arrays.toString(m.data()))
                     .sorted().toList());
             f.put("votes", votes.entrySet().stream().collect(LinkedHashMap::new,

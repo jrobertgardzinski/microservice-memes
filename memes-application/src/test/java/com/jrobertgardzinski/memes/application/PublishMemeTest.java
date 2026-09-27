@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.config.ImageLimits;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import io.qameta.allure.Epic;
@@ -23,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Epic("Use case")
 @Feature("Publish meme")
 class PublishMemeTest {
+
+    private static final UserId ALICE = UserId.random();
+    private static final UserId RACER = UserId.random();
 
     private final Map<String, Meme> store = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<String, String> idByContent = new java.util.concurrent.ConcurrentHashMap<>();
@@ -55,16 +59,14 @@ class PublishMemeTest {
             return List.copyOf(store.keySet());
         }
 
-        public List<String> findIdsByAuthor(String author) {
-            return store.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
-        }
 
         public void deleteById(String memeId) {
             store.remove(memeId);
         }
 
-        public void reassignAuthor(String memeId, String newAuthor) {
-            store.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
+        public void anonymise(String memeId) {
+            store.computeIfPresent(memeId, (id, m) ->
+                    new Meme(m.id(), Optional.empty(), m.format(), m.data()));
         }
     };
     private final MemeContentIndex contentIndex = new MemeContentIndex() {
@@ -87,7 +89,7 @@ class PublishMemeTest {
     @Test
     @DisplayName("publishes an optimized meme")
     void publishes_an_optimized_meme() throws Exception {
-        String id = publishMeme.execute(bmp(), "alice@example.com");
+        String id = publishMeme.execute(bmp(), ALICE);
 
         Meme stored = store.get(id);
         assertEquals("png", stored.format());
@@ -100,8 +102,8 @@ class PublishMemeTest {
     void deduplicates_identical_uploads() throws Exception {
         byte[] image = bmp();
 
-        String first = publishMeme.execute(image, "alice@example.com");
-        String second = publishMeme.execute(image, "alice@example.com");
+        String first = publishMeme.execute(image, ALICE);
+        String second = publishMeme.execute(image, ALICE);
 
         assertEquals(first, second);
         assertEquals(1, store.size());
@@ -126,13 +128,13 @@ class PublishMemeTest {
             public List<String> allIds() { return List.of(); }
             public List<String> findIdsByAuthor(String author) { return List.of(); }
             public void deleteById(String memeId) { }
-            public void reassignAuthor(String memeId, String newAuthor) { }
+            public void anonymise(String memeId) { }
         };
         PublishMeme publish =
                 new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), failing, contentIndex, objects);
 
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
-                () -> publish.execute(bmp(), "alice@example.com"));
+                () -> publish.execute(bmp(), ALICE));
 
         assertTrue(idByContent.isEmpty(),
                 "the orphaned claim must be compensated, or identical re-uploads dedup into a ghost");
@@ -153,13 +155,13 @@ class PublishMemeTest {
             public List<String> allIds() { return List.of(); }
             public List<String> findIdsByAuthor(String author) { return List.of(); }
             public void deleteById(String memeId) { }
-            public void reassignAuthor(String memeId, String newAuthor) { }
+            public void anonymise(String memeId) { }
         };
         PublishMeme publish =
                 new PublishMeme(new WebImageOptimizer(new ImageLimits(1024)), failingAfterUpload, contentIndex, objects);
 
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
-                () -> publish.execute(bmp(), "alice@example.com"));
+                () -> publish.execute(bmp(), ALICE));
 
         assertTrue(blobs.isEmpty(),
                 "no blob (nor any variant) may survive a failed publish — nothing references it, ever");
@@ -182,7 +184,7 @@ class PublishMemeTest {
             public List<String> allIds() { return List.of(); }
             public List<String> findIdsByAuthor(String author) { return List.of(); }
             public void deleteById(String memeId) { }
-            public void reassignAuthor(String memeId, String newAuthor) { }
+            public void anonymise(String memeId) { }
         };
         MemeContentIndex failingRemove = new MemeContentIndex() {
             public String claim(byte[] data, String candidateId) {
@@ -197,7 +199,7 @@ class PublishMemeTest {
                 new WebImageOptimizer(new ImageLimits(1024)), failingAfterUpload, failingRemove, objects);
 
         IllegalStateException surfaced = org.junit.jupiter.api.Assertions.assertThrows(
-                IllegalStateException.class, () -> publish.execute(bmp(), "alice@example.com"));
+                IllegalStateException.class, () -> publish.execute(bmp(), ALICE));
 
         assertEquals("commit failed after the bytes went up", surfaced.getMessage(),
                 "the SAVE's failure is the story — the failed compensation must not replace it");
@@ -215,7 +217,7 @@ class PublishMemeTest {
         var gate = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.Callable<String> upload = () -> {
             gate.await();
-            return publishMeme.execute(image, "racer@example.com");
+            return publishMeme.execute(image, RACER);
         };
         var first = executor.submit(upload);
         var second = executor.submit(upload);

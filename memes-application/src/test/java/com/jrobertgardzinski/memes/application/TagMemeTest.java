@@ -42,7 +42,7 @@ class TagMemeTest {
             store.remove(memeId);
         }
 
-        public void reassignAuthor(String memeId, String newAuthor) {
+        public void anonymise(String memeId) {
         }
     };
 
@@ -74,7 +74,7 @@ class TagMemeTest {
     private static final UserId MALLORY = UserId.of("22222222-2222-4222-8222-222222222222");
 
     private String meme(String id, UserId author) {
-        memes.save(new Meme(id, "a***@x", Optional.of(author), "png", new byte[]{1}));
+        memes.save(new Meme(id, author, "png", new byte[]{1}));
         return id;
     }
 

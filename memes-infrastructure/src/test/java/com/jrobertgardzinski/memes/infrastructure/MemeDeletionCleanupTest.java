@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.ObjectStore;
 import com.jrobertgardzinski.memes.domain.Meme;
@@ -25,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = MemesApplication.class)
 class MemeDeletionCleanupTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     @Autowired
     MemeRepository memes;
 
@@ -37,7 +40,7 @@ class MemeDeletionCleanupTest {
     @Test
     @DisplayName("deleteById removes the stored bytes AND the cached WebP and thumbnail variants")
     void delete_takes_the_cached_variants_along() {
-        memes.save(new Meme("doomed", "author@example.com", "png", new byte[]{1, 2, 3}));
+        memes.save(new Meme("doomed", SOMEBODY, "png", new byte[]{1, 2, 3}));
         objects.put("doomed.webp", "RIFF....WEBP".getBytes());
         objects.put("doomed.thumb", new byte[]{(byte) 0x89, 'P', 'N', 'G'});
 
@@ -53,7 +56,7 @@ class MemeDeletionCleanupTest {
     void exists_follows_save_and_delete() {
         assertFalse(memes.exists("fleeting"), "never saved — must not exist");
 
-        memes.save(new Meme("fleeting", "author@example.com", "png", new byte[]{9}));
+        memes.save(new Meme("fleeting", SOMEBODY, "png", new byte[]{9}));
         assertTrue(memes.exists("fleeting"));
 
         memes.deleteById("fleeting");
@@ -71,7 +74,7 @@ class MemeDeletionCleanupTest {
         // delete commits. Before the after-commit re-sweep such a variant was orphaned forever.
         // The interleaving is pinned with a TransactionTemplate: the variants land from a second
         // thread (its own autocommit connection) after the deleteById steps but before the commit.
-        memes.save(new Meme("raced", "author@example.com", "png", new byte[]{4, 5, 6}));
+        memes.save(new Meme("raced", SOMEBODY, "png", new byte[]{4, 5, 6}));
         var cacheWriter = java.util.concurrent.Executors.newSingleThreadExecutor();
         try {
             tx.executeWithoutResult(status -> {
@@ -98,7 +101,7 @@ class MemeDeletionCleanupTest {
     @Test
     @DisplayName("deleteById tolerates a meme that never got a WebP variant")
     void delete_without_a_variant_is_fine() {
-        memes.save(new Meme("plain", "author@example.com", "png", new byte[]{1}));
+        memes.save(new Meme("plain", SOMEBODY, "png", new byte[]{1}));
 
         memes.deleteById("plain");   // no {id}.webp was ever cached — must not throw
 

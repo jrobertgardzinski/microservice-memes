@@ -126,10 +126,10 @@ at read time from security through `AuthorDirectory` (`GET /users?ids=`, masked 
 for 60 s), and when the directory is unreachable the page still renders while the log says the
 names are unavailable. "deleted account" is likewise not a name in a row — it is `author_id NULL`,
 written by an anonymising closure, which also means kept content cannot be grouped back together by
-the id of the account that is gone. Two addresses survive on purpose: `memes.author` as an
-attribute, the placeholder the anonymisation writes into, and `settings.updated_by` as an audit
-snapshot of who changed a setting. Neither is a key, and a build-time guard
-(`RetiredAddressKeyTest`) fails the suite on any query that makes one into a key again. The
+the id of the account that is gone. One address survives, and it is not on a meme:
+`settings.updated_by`, an audit snapshot of who changed a setting. The gallery's own tables hold
+no address at all — a build-time guard (`RetiredAddressKeyTest`) fails the suite if the column,
+or a query keyed by one, comes back. The
 confirmation sent back on `memes-events` still carries `reserved` — how many memes the mark
 actually took out of the gallery — and a zero still raises
 `memes_saga_purge_reserved_nothing_total` instead of reading as a successful erasure: a closure that

@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
+import java.util.Optional;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -40,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Feature("Stuck erasure alarm")
 class StuckErasureWatchTest {
 
-    private static final String LEAVER = "leaver@example.com";
+    private static final UserId LEAVER = UserId.random();
     private static final Instant MARKED_AT = Instant.parse("2026-08-08T10:00:00Z");
 
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
@@ -117,7 +119,7 @@ class StuckErasureWatchTest {
     }
 
     private static MemeMetadata marked() {
-        return new MemeMetadata("m1", LEAVER, "png", MemeStatus.PENDING_ERASURE, MARKED_AT);
+        return new MemeMetadata("m1", Optional.of(LEAVER), "png", MemeStatus.PENDING_ERASURE, MARKED_AT);
     }
 
     @Test
@@ -144,9 +146,9 @@ class StuckErasureWatchTest {
                 "an operator must be told what state the data is in: " + said);
         assertTrue(said.contains("delete it on a"),
                 "and that nothing will fix it by itself — that is the design, not a bug: " + said);
-        assertFalse(said.contains(LEAVER),
-                "but never the address: the authors of these memes are exactly the people this"
-                        + " service is trying to forget — " + said);
+        assertFalse(said.contains(LEAVER.toString()),
+                "but never who they belong to: the authors of these memes are exactly the people"
+                        + " this service is trying to forget — " + said);
     }
 
     @Test

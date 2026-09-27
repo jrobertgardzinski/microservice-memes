@@ -23,6 +23,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest(classes = MemesApplication.class)
 class JdbcMemeErasureTest extends MemeErasureContractTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     @Autowired
     MemeErasure erasure;
 
@@ -35,16 +37,16 @@ class JdbcMemeErasureTest extends MemeErasureContractTest {
     }
 
     @Override
-    protected void givenActiveMeme(String id, String author, Optional<UserId> authorId) {
-        memes.save(new Meme(id, author, authorId, "png", new byte[]{1}));
+    protected void givenActiveMeme(String id, Optional<UserId> authorId) {
+        memes.save(new Meme(id, authorId, "png", new byte[]{1}));
     }
 
     @Test
-    void anonymising_drops_the_author_id_with_the_address() {
+    void anonymising_drops_the_author_id() {
         String id = java.util.UUID.randomUUID().toString();
-        memes.save(new Meme(id, "leaver@example.com", Optional.of(UserId.random()), "png", new byte[]{1}));
+        memes.save(new Meme(id, UserId.random(), "png", new byte[]{1}));
 
-        memes.reassignAuthor(id, com.jrobertgardzinski.memes.domain.DeletedAccount.AUTHOR);
+        memes.anonymise(id);
 
         assertEquals(Optional.empty(), memes.findMetadata(id).orElseThrow().authorId(),
                 "kept content of a closed account must not be groupable by its old id");

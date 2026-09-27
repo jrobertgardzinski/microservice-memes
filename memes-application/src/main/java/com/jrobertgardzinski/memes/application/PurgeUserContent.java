@@ -2,7 +2,6 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.purge.PurgeRule;
-import com.jrobertgardzinski.memes.domain.DeletedAccount;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 
 import java.util.Optional;
@@ -76,7 +75,7 @@ public class PurgeUserContent {
         voteRepository.purgeVoter(author.toString());   // ballots are keyed by the voter's id, in its wire form
         for (MemeMetadata meme : erasure.pendingOf(author)) {
             if (rule.keeps(voteRepository.scoreOf(meme.id()))) {
-                memeRepository.reassignAuthor(meme.id(), DeletedAccount.AUTHOR);
+                memeRepository.anonymise(meme.id());
                 // and out of the reservation: the community keeps the meme, so it belongs in the
                 // gallery again. Leaving it PENDING_ERASURE would hide a meme nobody is erasing and
                 // hold it in the backlog alarm for ever.

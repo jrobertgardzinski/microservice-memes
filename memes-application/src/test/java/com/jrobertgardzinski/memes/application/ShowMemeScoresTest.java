@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.domain.RankedMeme;
 import com.jrobertgardzinski.voting.VoteDirection;
@@ -34,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Feature("Show meme scores")
 class ShowMemeScoresTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     private static final Instant NOW = Instant.parse("2026-07-26T12:00:00Z");
 
     private final Map<String, Meme> memes = new HashMap<>();
@@ -58,7 +61,7 @@ class ShowMemeScoresTest {
     private final ShowMemeScores showMemeScores = new ShowMemeScores(memeRepository, voteRepository);
 
     private void meme(String id) {
-        memes.put(id, new Meme(id, "alice@example.com", "png", new byte[]{1}));
+        memes.put(id, new Meme(id, SOMEBODY, "png", new byte[]{1}));
     }
 
     private void voteUp(String memeId, String voter) {
@@ -174,16 +177,14 @@ class ShowMemeScoresTest {
             return List.copyOf(memes.keySet());
         }
 
-        public List<String> findIdsByAuthor(String author) {
-            return memes.values().stream().filter(m -> m.author().equals(author)).map(Meme::id).toList();
-        }
 
         public void deleteById(String memeId) {
             memes.remove(memeId);
         }
 
-        public void reassignAuthor(String memeId, String newAuthor) {
-            memes.computeIfPresent(memeId, (id, m) -> new Meme(m.id(), newAuthor, m.format(), m.data()));
+        public void anonymise(String memeId) {
+            memes.computeIfPresent(memeId, (id, m) ->
+                    new Meme(m.id(), Optional.empty(), m.format(), m.data()));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.DeleteMeme;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.TagRepository;
@@ -31,6 +32,8 @@ import static org.mockito.Mockito.doThrow;
 @SpringBootTest(classes = MemesApplication.class)
 class DeleteMemeTransactionTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     @Autowired
     DeleteMeme deleteMeme;
 
@@ -43,7 +46,7 @@ class DeleteMemeTransactionTest {
     @Test
     @DisplayName("a teardown that dies on its last DB step leaves nothing half-deleted")
     void failed_teardown_rolls_back_the_earlier_steps() {
-        memes.save(new Meme("half-dead", "author@example.com", "png", new byte[]{7}));
+        memes.save(new Meme("half-dead", SOMEBODY, "png", new byte[]{7}));
         tags.replaceTags("half-dead", Set.of(Tag.of("pinned")));
         // tags.removeMeme runs BEFORE deleteById in the use case — so if this rollback did not
         // happen, the meme would survive the failed delete stripped of its tags

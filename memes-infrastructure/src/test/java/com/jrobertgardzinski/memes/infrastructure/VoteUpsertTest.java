@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.application.VoteRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
@@ -40,6 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Feature("Concurrent first casts")
 @SpringBootTest(classes = MemesApplication.class)
 class VoteUpsertTest {
+
+    private static final UserId SOMEBODY = UserId.random();
 
     @Autowired
     MemeRepository memes;
@@ -99,7 +102,7 @@ class VoteUpsertTest {
 
     private String savedMeme() {
         String id = UUID.randomUUID().toString();
-        memes.save(new Meme(id, "author@example.com", "png", new byte[]{1}));
+        memes.save(new Meme(id, SOMEBODY, "png", new byte[]{1}));
         return id;
     }
 

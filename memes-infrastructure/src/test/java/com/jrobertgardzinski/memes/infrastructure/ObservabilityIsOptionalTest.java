@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import java.util.Optional;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MemeErasure;
 import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.WatchErasureBacklog;
@@ -43,6 +45,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Feature("Observability is a layer, not a dependency")
 class ObservabilityIsOptionalTest {
 
+    private static final UserId SOMEBODY = UserId.random();
+
     /** The layers that must not name a tool — everything except the adapters. */
     private static final List<Path> ABOVE_INFRASTRUCTURE = List.of(
             Path.of("../memes-domain/src/main/java"),
@@ -80,7 +84,7 @@ class ObservabilityIsOptionalTest {
     void the_service_works_unwatched() {
         Instant markedAt = Instant.parse("2026-08-08T10:00:00Z");
         MemeErasure backlog = holding(List.of(
-                new MemeMetadata("m1", "leaver@example.com", "png", MemeStatus.PENDING_ERASURE, markedAt)));
+                new MemeMetadata("m1", Optional.of(SOMEBODY), "png", MemeStatus.PENDING_ERASURE, markedAt)));
         Observations<Observation> silence = observation -> { };
 
         Observation.ErasureBacklog said = new WatchErasureBacklog(backlog,

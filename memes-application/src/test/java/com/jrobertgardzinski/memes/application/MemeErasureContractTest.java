@@ -33,10 +33,10 @@ public abstract class MemeErasureContractTest {
     protected abstract MemeErasure erasure();
 
     /** Put an ACTIVE meme in, however this implementation stores one. */
-    protected abstract void givenActiveMeme(String id, String author, Optional<UserId> authorId);
+    protected abstract void givenActiveMeme(String id, Optional<UserId> authorId);
 
     private void givenActiveMeme(String id, UserId author) {
-        givenActiveMeme(id, "someone+" + run + "@example.com", Optional.of(author));
+        givenActiveMeme(id, Optional.of(author));
     }
 
     private MemeMetadata theOnly(List<MemeMetadata> found) {
@@ -61,13 +61,14 @@ public abstract class MemeErasureContractTest {
     }
 
     @Test
-    @DisplayName("the id is the key: the address a row was written under plays no part")
+    @DisplayName("the id is the key, and a row without one belongs to nobody")
     protected void rows_are_keyed_by_the_authors_id() {
-        givenActiveMeme(first, "old+" + run + "@example.com", Optional.of(alice));
-        givenActiveMeme(second, "new+" + run + "@example.com", Optional.of(alice));
-        givenActiveMeme(third, "old+" + run + "@example.com", Optional.empty());
+        givenActiveMeme(first, Optional.of(alice));
+        givenActiveMeme(second, Optional.of(alice));
+        givenActiveMeme(third, Optional.empty());
 
-        assertEquals(2, erasure().activeOf(alice).size(), "both addresses, one person");
+        assertEquals(2, erasure().activeOf(alice).size(), "two rows, one person");
+        assertEquals(List.of(), erasure().activeOf(bob), "and the anonymised row is nobody's");
     }
 
     @Test
@@ -85,18 +86,18 @@ public abstract class MemeErasureContractTest {
 
     @Test
     @DisplayName("store writes the ERASURE state and nothing else — the author is not this port's business")
-    protected void store_does_not_write_the_author() {
+    protected void store_does_not_write_the_author_id() {
         givenActiveMeme(first, alice);
         MemeMetadata held = theOnly(erasure().activeOf(alice));
 
         // a stale copy carrying somebody else's identity — which is what the closure hands over a
-        // line after it has anonymised the row. If this port wrote the author back, the
+        // line after it has anonymised the row. If this port wrote the author id back, the
         // anonymisation would be undone by the very next call
-        erasure().store(new MemeMetadata(held.id(), "somebody.else+" + run + "@example.com", Optional.of(bob),
+        erasure().store(new MemeMetadata(held.id(), Optional.of(bob),
                 held.format(), held.markForErasure(NOON).status(), NOON));
 
         assertEquals(List.of(), erasure().pendingOf(bob),
-                "the author moved: this port wrote a column that is not its own");
+                "the author id moved: this port wrote a column that is not its own");
         assertEquals(first, theOnly(erasure().pendingOf(alice)).id());
     }
 

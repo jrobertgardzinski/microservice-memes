@@ -1,6 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.config.ErasureTolerance;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import com.jrobertgardzinski.memes.domain.MemeStatus;
 import com.jrobertgardzinski.memes.domain.Observation;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 @Epic("Saga")
 @Feature("Stuck erasure alarm")
 class WatchErasureBacklogTest {
+
+    private static final UserId SOMEBODY = UserId.random();
 
     private static final Instant MARKED_AT = Instant.parse("2026-08-08T10:00:00Z");
     private static final ErasureTolerance HALF_AN_HOUR =
@@ -89,7 +93,7 @@ class WatchErasureBacklogTest {
     }
 
     private static MemeMetadata marked(String id, Instant at) {
-        return new MemeMetadata(id, "leaver@example.com", "png", MemeStatus.PENDING_ERASURE, at);
+        return new MemeMetadata(id, Optional.of(SOMEBODY), "png", MemeStatus.PENDING_ERASURE, at);
     }
 
     /** Answers whatever the test holds, and remembers the cutoff it was asked for. */
