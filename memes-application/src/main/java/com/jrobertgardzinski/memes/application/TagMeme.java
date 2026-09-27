@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.config.TagLimits;
 import com.jrobertgardzinski.memes.tags.Tag;
 
@@ -32,8 +33,14 @@ public class TagMeme {
         this.limits = limits;
     }
 
-    /** @throws IllegalArgumentException when any raw tag is not a legal {@link Tag} */
-    public Result execute(String memeId, String caller, List<String> rawTags) {
+    /**
+     * The caller is an id, not an address: an address moves and is handed on to whoever registers it
+     * next, so authorising a curation by one would refuse a renamed author their own meme and let
+     * the address's next owner rewrite it.
+     *
+     * @throws IllegalArgumentException when any raw tag is not a legal {@link Tag}
+     */
+    public Result execute(String memeId, UserId caller, List<String> rawTags) {
         // findMetadata(), not find(): tagging needs to know who the author is, not what the picture
         // looks like — and a meme whose bytes are missing from the active store must still be
         // curatable by its owner
@@ -41,7 +48,7 @@ public class TagMeme {
         if (meme.isEmpty()) {
             return Result.of(Status.NO_SUCH_MEME);
         }
-        if (!meme.get().author().equals(caller)) {
+        if (!meme.get().isOwnedBy(caller)) {
             return Result.of(Status.NOT_THE_AUTHOR);
         }
         Set<Tag> parsed = new LinkedHashSet<>();

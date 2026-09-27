@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.config.TagLimits;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.tags.Tag;
@@ -37,10 +38,6 @@ class TagMemeTest {
             return List.copyOf(store.keySet()).reversed();
         }
 
-        public List<String> findIdsByAuthor(String author) {
-            return List.of();
-        }
-
         public void deleteById(String memeId) {
             store.remove(memeId);
         }
@@ -73,45 +70,48 @@ class TagMemeTest {
     private final TagMeme tagMeme = new TagMeme(memes, tags, new TagLimits(3));
     private final SearchMemesByTag search = new SearchMemesByTag(memes, tags);
 
-    private String meme(String id, String author) {
-        memes.save(new Meme(id, author, "png", new byte[]{1}));
+    private static final UserId ALICE = UserId.of("11111111-1111-4111-8111-111111111111");
+    private static final UserId MALLORY = UserId.of("22222222-2222-4222-8222-222222222222");
+
+    private String meme(String id, UserId author) {
+        memes.save(new Meme(id, "a***@x", Optional.of(author), "png", new byte[]{1}));
         return id;
     }
 
     @Test
     @DisplayName("the author curates the whole tag set in one move")
     void author_replaces_the_set() {
-        meme("m1", "alice@x");
+        meme("m1", ALICE);
         assertEquals(TagMeme.Status.TAGGED,
-                tagMeme.execute("m1", "alice@x", List.of("Cats", "monday-mood")).status());
+                tagMeme.execute("m1", ALICE, List.of("Cats", "monday-mood")).status());
         assertEquals(Set.of(Tag.of("cats"), Tag.of("monday-mood")), tags.tagsOf("m1"));
 
-        tagMeme.execute("m1", "alice@x", List.of("dogs"));
+        tagMeme.execute("m1", ALICE, List.of("dogs"));
         assertEquals(Set.of(Tag.of("dogs")), tags.tagsOf("m1"), "a replace, not an append");
     }
 
     @Test
     @DisplayName("only the uploader tags their meme; ghosts and spam are refused")
     void refusals() {
-        meme("m1", "alice@x");
+        meme("m1", ALICE);
         assertEquals(TagMeme.Status.NOT_THE_AUTHOR,
-                tagMeme.execute("m1", "mallory@x", List.of("cats")).status());
+                tagMeme.execute("m1", MALLORY, List.of("cats")).status());
         assertEquals(TagMeme.Status.NO_SUCH_MEME,
-                tagMeme.execute("ghost", "alice@x", List.of("cats")).status());
+                tagMeme.execute("ghost", ALICE, List.of("cats")).status());
         assertEquals(TagMeme.Status.TOO_MANY_TAGS,
-                tagMeme.execute("m1", "alice@x", List.of("a1", "a2", "a3", "a4")).status());
+                tagMeme.execute("m1", ALICE, List.of("a1", "a2", "a3", "a4")).status());
         assertThrows(IllegalArgumentException.class,
-                () -> tagMeme.execute("m1", "alice@x", List.of("not a tag!")));
+                () -> tagMeme.execute("m1", ALICE, List.of("not a tag!")));
     }
 
     @Test
     @DisplayName("search narrows the gallery to the tag, in gallery order, existing memes only")
     void search_by_tag() {
-        meme("m1", "alice@x");
-        meme("m2", "alice@x");
-        meme("m3", "alice@x");
-        tagMeme.execute("m1", "alice@x", List.of("cats"));
-        tagMeme.execute("m3", "alice@x", List.of("cats", "dogs"));
+        meme("m1", ALICE);
+        meme("m2", ALICE);
+        meme("m3", ALICE);
+        tagMeme.execute("m1", ALICE, List.of("cats"));
+        tagMeme.execute("m3", ALICE, List.of("cats", "dogs"));
 
         assertEquals(memes.allIds().stream().filter(Set.of("m1", "m3")::contains).toList(),
                 search.execute(Tag.of("cats"), 0, 50), "the gallery's own order, narrowed");

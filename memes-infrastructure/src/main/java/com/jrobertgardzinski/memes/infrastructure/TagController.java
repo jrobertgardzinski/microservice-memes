@@ -35,7 +35,8 @@ class TagController {
 
     @PostMapping
     ResponseEntity<?> tag(@PathVariable("memeId") String memeId,
-                          @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String caller,
+                          @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
+                          com.jrobertgardzinski.identity.UserId caller,
                           @RequestBody TagsRequest request) {
         if (request.tags() == null) {
             return ResponseEntity.badRequest().body(Map.of("status", "TAGS_REQUIRED"));

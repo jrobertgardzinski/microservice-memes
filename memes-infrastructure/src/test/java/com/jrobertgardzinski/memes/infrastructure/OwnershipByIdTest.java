@@ -21,11 +21,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Ownership over HTTP is the id's: a new address changes nothing, a new account under the old
- * address owns nothing.
+ * address owns nothing. Every decision that asks "is this caller the author" belongs here —
+ * {@code own} on /meta, deletion, and curating the tags.
  */
 @Epic("Infrastructure")
 @Feature("Ownership by id")
@@ -54,6 +56,28 @@ class OwnershipByIdTest {
         mockMvc.perform(delete("/memes/" + memeId)
                         .header("Authorization", "Bearer " + TestAuthConfig.RENAMED_TOKEN))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("curating the tags follows the same law: the renamed author may, the address's next owner may not")
+    void tagging_is_the_id_s_too() throws Exception {
+        String memeId = upload(TestAuthConfig.VALID_TOKEN);
+
+        // the pair that matters: with the check written on the address, these two came out the wrong
+        // way round — the author who renamed was refused their own meme, and whoever registered the
+        // freed address could rewrite its tags
+        mockMvc.perform(tag(memeId, TestAuthConfig.IMPOSTOR_TOKEN, "hijack"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(tag(memeId, TestAuthConfig.RENAMED_TOKEN, "cats"))
+                .andExpect(status().isOk());
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder tag(
+            String memeId, String token, String tag) {
+        return post("/memes/" + memeId + "/tags")
+                .header("Authorization", "Bearer " + token)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"tags\":[\"" + tag + "\"]}");
     }
 
     private boolean own(String id, String token) throws Exception {
