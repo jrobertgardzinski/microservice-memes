@@ -1,9 +1,14 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.MemeEvents;
+import com.jrobertgardzinski.deletion.DeletionMessages;
+import com.jrobertgardzinski.deletion.MemeDeleted;
 import com.jrobertgardzinski.outbox.OutboxEvent;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
 import org.slf4j.MDC;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Publishes meme lifecycle events on {@code memes-events}; microservice-comments drops a deleted
@@ -49,7 +54,7 @@ class KafkaMemeEvents implements MemeEvents {
      */
     static final String TOPIC = "memes-events";
 
-    static final String MEME_DELETED = "MEME_DELETED";
+    static final String MEME_DELETED = DeletionMessages.MEME_DELETED;
 
     private final SpringOutbox outbox;
 
@@ -78,11 +83,29 @@ class KafkaMemeEvents implements MemeEvents {
      */
     static OutboxEvent deletionOf(String memeId) {
         String eventId = OutboxEvent.newId();
-        String payload = "{\"type\":\"" + MEME_DELETED + "\",\"memeId\":\"" + memeId
-                + "\",\"eventId\":\"" + eventId + "\"}";
+        // the field set is the library's: add a field to the agreement and every service that
+        // speaks it gains the field in the same commit. The envelope id is pasted in here,
+        // spelled eventId as the pacts pin it — COMMENTS_DELETED spells the same thing id, and
+        // the vocabulary keeps both names rather than pretending otherwise
+        Map<String, Object> fields = new LinkedHashMap<>(new MemeDeleted(memeId).fields());
+        fields.put(DeletionMessages.Field.EVENT_ID, eventId);
+        String payload = json(fields);
         // keyed by the meme, so its whole cascade stays on one partition: a consumer never sees a
         // later hop of the cascade before this one
         return new OutboxEvent(eventId, TOPIC, MEME_DELETED, memeId,
                 MDC.get(CorrelationIdFilter.MDC_KEY), payload);
+    }
+
+    /**
+     * Three string fields, written by hand for the reason they always were: this adapter has no
+     * ObjectMapper, and a payload the outbox stores verbatim must be byte-identical on every
+     * redelivery — which a hand-built string of known fields is by construction.
+     */
+    private static String json(Map<String, Object> fields) {
+        StringBuilder payload = new StringBuilder("{");
+        fields.forEach((field, value) -> payload
+                .append(payload.length() > 1 ? "," : "")
+                .append('"').append(field).append("\":\"").append(value).append('"'));
+        return payload.append('}').toString();
     }
 }
