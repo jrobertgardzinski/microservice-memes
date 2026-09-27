@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.closure;
 
-import com.jrobertgardzinski.closure.UnitOfWork;
+import com.jrobertgardzinski.unitofwork.UnitOfWork;
 import com.jrobertgardzinski.closure.ClosureCommand;
 import com.jrobertgardzinski.closure.ClosureConfirmations;
 import com.jrobertgardzinski.closure.ClosureMessages;
