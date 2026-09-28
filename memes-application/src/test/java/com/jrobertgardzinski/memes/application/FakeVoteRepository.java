@@ -61,8 +61,15 @@ public class FakeVoteRepository implements VoteRepository {
 
     @Override
     public List<ScoredMeme> allScores() {
-        return votes.keySet().stream()
-                .map(id -> new ScoredMeme(id, scoreOf(id), Optional.<Instant>empty()))
+        // memes with no ballot LEFT are left out, exactly as the adapter's aggregate leaves them
+        // out: a retraction deletes the row there, while here it leaves an empty tally behind, and
+        // a meme reported at 0 by one implementation and not at all by the other is the drift
+        // VoteRepositoryContractTest exists to catch. The ranking reads this answer, and an
+        // implementation that kept them would put memes nobody votes on above ones voted down.
+        return votes.entrySet().stream()
+                .filter(meme -> !meme.getValue().isEmpty())
+                .map(meme -> new ScoredMeme(meme.getKey(), scoreOf(meme.getKey()),
+                        Optional.<Instant>empty()))
                 .toList();
     }
 
