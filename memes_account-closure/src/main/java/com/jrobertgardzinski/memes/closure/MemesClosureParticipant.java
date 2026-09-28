@@ -1,42 +1,36 @@
 package com.jrobertgardzinski.memes.closure;
 
-import com.jrobertgardzinski.unitofwork.UnitOfWork;
+import com.jrobertgardzinski.closure.AtomicClosureParticipant;
 import com.jrobertgardzinski.closure.ClosureCommand;
 import com.jrobertgardzinski.closure.ClosureConfirmations;
-import com.jrobertgardzinski.closure.ClosureMessages;
+import com.jrobertgardzinski.closure.ClosureOutcome;
+import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RestoreUserContent;
-import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.domain.Observation;
 import com.jrobertgardzinski.observation.Observations;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.jrobertgardzinski.identity.UserId;
-
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.jrobertgardzinski.purge.RequestedRule;
+import com.jrobertgardzinski.unitofwork.UnitOfWork;
 
 /**
  * The meme service's side of the account-closure saga. MARK hides and confirms; ERASE destroys;
- * RESTORE compensates. Only MARK is confirmed, and all three are idempotent. Knows nothing about
- * Kafka, so the same class runs in one process.
+ * RESTORE compensates. Only MARK is confirmed, and all three are idempotent.
+ *
+ * <p>The guard in front of the three commands, the switch between them and the mark's confirmation
+ * are {@link AtomicClosureParticipant}'s, shared with the comment service's participant — what is
+ * left here is this axis: which use cases run, the rule this axis reads, and what it says about it.
+ * Knows nothing about Kafka, so the same class runs in one process.
  */
-public final class MemesClosureParticipant {
+public final class MemesClosureParticipant extends AtomicClosureParticipant {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MemesClosureParticipant.class);
-
-    public static final String MARK = ClosureMessages.PURGE_USER_CONTENT;
-    public static final String ERASE = ClosureMessages.ERASE_USER_CONTENT;
-    public static final String RESTORE = ClosureMessages.RESTORE_USER_CONTENT;
+    /** This axis's own word for itself, and only for the log line that names it. */
+    private static final String AXIS = "memes";
 
     private final MarkUserContentForErasure markForErasure;
     private final RestoreUserContent restoreUserContent;
     private final PurgeUserContent purgeUserContent;
-    private final ClosureConfirmations confirmations;
     private final Observations<Observation> observations;
-    private final UnitOfWork unitOfWork;
 
     public MemesClosureParticipant(MarkUserContentForErasure markForErasure,
                                    RestoreUserContent restoreUserContent,
@@ -44,79 +38,44 @@ public final class MemesClosureParticipant {
                                    ClosureConfirmations confirmations,
                                    Observations<Observation> observations,
                                    UnitOfWork unitOfWork) {
+        super(confirmations, unitOfWork);
         this.markForErasure = markForErasure;
         this.restoreUserContent = restoreUserContent;
         this.purgeUserContent = purgeUserContent;
-        this.confirmations = confirmations;
         this.observations = observations;
-        this.unitOfWork = unitOfWork;
     }
 
-    public ClosureOutcome handle(ClosureCommand command) {
-        String type = command.type();
-        if (!MARK.equals(type) && !ERASE.equals(type) && !RESTORE.equals(type)) {
-            return new ClosureOutcome.NotOurs(type);
-        }
-        String sagaId = command.sagaId();
-        if (!command.isAddressed()) {
-            // confirming would advance the saga on a deletion that never happened
-            LOG.warn("dropping {} without a user id (saga {})", type, sagaId);
-            return new ClosureOutcome.Unaddressed(type);
-        }
-        UserId leaver = command.userId();
-        return switch (type) {
-            case MARK -> {
-                int reserved = markAndConfirm(sagaId, leaver);
-                LOG.info("marked {} of one leaver's memes for erasure (saga {})", reserved, sagaId);
-                yield new ClosureOutcome.Reserved(reserved);
-            }
-            case ERASE -> {
-                Optional<PurgeRule> rule = requestedRule(command);   // pure reading, kept outside the step
-                unitOfWork.run(() -> purgeUserContent.execute(leaver, rule));
-                LOG.info("erased one leaver's marked memes on the saga's closure (saga {})", sagaId);
-                yield new ClosureOutcome.Erased();
-            }
-            case RESTORE -> {
-                unitOfWork.run(() -> restoreUserContent.execute(leaver));
-                LOG.info("restored one leaver's marked memes: the saga compensated (saga {})", sagaId);
-                yield new ClosureOutcome.Restored();
-            }
-            default -> throw new IllegalStateException("unreachable: " + type);
-        };
+    @Override
+    protected int mark(String sagaId, UserId leaver) {
+        return markForErasure.execute(leaver);
     }
 
-    /** The confirmation is made INSIDE the unit of work: hidden memes with no word owed is the failure mode. */
-    private int markAndConfirm(String sagaId, UserId leaver) {
-        AtomicInteger reserved = new AtomicInteger();
-        unitOfWork.run(() -> {
-            int marked = markForErasure.execute(leaver);
-            confirmations.confirm(sagaId, leaver, marked);
-            reserved.set(marked);
-        });
-        if (reserved.get() == 0) {
-            // "nothing of theirs" and "rows still under their old address" look the same from here
-            observations.record(new Observation.PurgeReservedNothing());
-            LOG.warn("confirmed a purge that reserved NOTHING (saga {})", sagaId);
-        }
-        return reserved.get();
+    @Override
+    protected void marked(String sagaId, int rows) {
+        log.info("marked {} of one leaver's memes for erasure (saga {})", rows, sagaId);
     }
 
-    /** A self-closure always deletes; an administrator's rule is honoured; an unreadable one falls back. */
-    private Optional<PurgeRule> requestedRule(ClosureCommand command) {
-        if (!command.allowsConditions()) {
-            if (command.rule().isPresent()) {
-                LOG.warn("a self-requested closure arrived carrying a memes purge rule; ignoring it and deleting");
-            }
-            return Optional.of(new PurgeRule.Delete());
-        }
-        if (command.rule().isEmpty()) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(PurgeRule.parse(command.rule().get()));
-        } catch (IllegalArgumentException invalid) {
-            LOG.warn("ignoring an unparseable memes purge rule, using the default: {}", invalid.getMessage());
-            return Optional.empty();
-        }
+    @Override
+    protected ClosureOutcome erase(ClosureCommand command, UserId leaver) {
+        RequestedRule requested =
+                RequestedRule.of(command.allowsConditions(), command.rule(), AXIS);   // pure reading, kept outside the step
+        requested.complaint().ifPresent(log::warn);
+        inUnitOfWork(() -> purgeUserContent.execute(leaver, requested.rule()));
+        log.info("erased one leaver's marked memes on the saga's closure (saga {})", command.sagaId());
+        // this axis's closure reports no numbers: the use case answers nothing, and inventing a
+        // count here would be inventing it
+        return ClosureOutcome.Erased.uncounted();
+    }
+
+    @Override
+    protected ClosureOutcome restore(String sagaId, UserId leaver) {
+        inUnitOfWork(() -> restoreUserContent.execute(leaver));
+        log.info("restored one leaver's marked memes: the saga compensated (saga {})", sagaId);
+        return ClosureOutcome.Restored.uncounted();
+    }
+
+    @Override
+    protected void reservedNothing() {
+        observations.record(new Observation.PurgeReservedNothing());
     }
 }
