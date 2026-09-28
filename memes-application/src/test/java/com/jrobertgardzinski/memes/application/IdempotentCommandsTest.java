@@ -58,7 +58,7 @@ class IdempotentCommandsTest {
                         (id, m) -> new Meme(m.id(), Optional.empty(), m.format(), m.data()));
             }
         };
-        final VoteRepository voteRepository = new CastVoteTest.FakeVoteRepository(votes);
+        final VoteRepository voteRepository = new FakeVoteRepository(votes);
         final MemeContentIndex index = new MemeContentIndex() {
             public String claim(byte[] data, String candidateId) {
                 String earlier = contentIndex.putIfAbsent(new String(data), candidateId);
@@ -121,11 +121,7 @@ class IdempotentCommandsTest {
         }
     }
 
-    private static final PurgePolicyOverride NO_OVERRIDE = new PurgePolicyOverride() {
-        public Optional<PurgeRule> current() { return Optional.empty(); }
-        public void set(PurgeRule rule, String updatedBy) { }
-        public void clear(String clearedBy) { }
-    };
+    private static final PurgePolicyOverride NO_OVERRIDE = new FakePurgePolicyOverride();
 
     /** A stopped clock: two runs of the same command must not differ by when they ran. */
     private static final java.time.Clock CLOCK = java.time.Clock.fixed(

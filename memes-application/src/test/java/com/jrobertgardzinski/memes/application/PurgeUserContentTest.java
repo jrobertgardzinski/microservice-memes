@@ -51,7 +51,7 @@ class PurgeUserContentTest {
                     new Meme(m.id(), Optional.empty(), m.format(), m.data()));
         }
     };
-    private final VoteRepository voteRepository = new CastVoteTest.FakeVoteRepository(memeVotes);
+    private final VoteRepository voteRepository = new FakeVoteRepository(memeVotes);
     private final MemeContentIndex index = new MemeContentIndex() {
         public String claim(byte[] data, String candidateId) {
             String earlier = contentIndex.putIfAbsent(new String(data), candidateId);
@@ -83,20 +83,7 @@ class PurgeUserContentTest {
         }
     };
 
-    private Optional<PurgeRule> adminOverride = Optional.empty();
-    private final PurgePolicyOverride override = new PurgePolicyOverride() {
-        public Optional<PurgeRule> current() {
-            return adminOverride;
-        }
-
-        public void set(PurgeRule rule, String updatedBy) {
-            adminOverride = Optional.of(rule);
-        }
-
-        public void clear(String clearedBy) {
-            adminOverride = Optional.empty();
-        }
-    };
+    private final FakePurgePolicyOverride override = new FakePurgePolicyOverride();
 
     private static final UserId SOMEBODY_ELSE = UserId.random();
     private static final UserId LEAVER = UserId.random();
@@ -168,7 +155,7 @@ class PurgeUserContentTest {
     @Test
     @DisplayName("the admin's override beats the deployment default")
     void admin_override_beats_the_default() {
-        adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
+        override.set(new PurgeRule.AnonymizeAuthor(), "an admin");
         memes.put("kept", new Meme("kept", LEAVER, "png", new byte[]{1}));
 
         markThenErase(LEAVER, Optional.empty());   // default says DELETE
@@ -180,7 +167,7 @@ class PurgeUserContentTest {
     @Test
     @DisplayName("a rule stated on the closure beats the admin's override")
     void a_stated_rule_beats_the_override() {
-        adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
+        override.set(new PurgeRule.AnonymizeAuthor(), "an admin");
         memes.put("gone", new Meme("gone", LEAVER, "png", new byte[]{1}));
 
         markThenErase(LEAVER, Optional.of(new PurgeRule.Delete()));
@@ -234,7 +221,7 @@ class PurgeUserContentTest {
     @Test
     @DisplayName("a meme the rule KEEPS comes back to the gallery anonymised, not hidden for ever")
     void kept_memes_leave_the_reservation() {
-        adminOverride = Optional.of(new PurgeRule.AnonymizeAuthor());
+        override.set(new PurgeRule.AnonymizeAuthor(), "an admin");
         memes.put("kept", new Meme("kept", LEAVER, "png", new byte[]{1}));
 
         markThenErase(LEAVER, Optional.empty());

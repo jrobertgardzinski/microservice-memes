@@ -51,7 +51,7 @@ class ShowMemeScoresTest {
             return super.existingOf(ids);
         }
     };
-    private final VoteRepository voteRepository = new CastVoteTest.FakeVoteRepository(votes) {
+    private final VoteRepository voteRepository = new FakeVoteRepository(votes) {
         @Override
         public Map<String, Integer> scoresOf(Collection<String> memeIds) {
             voteReads.incrementAndGet();

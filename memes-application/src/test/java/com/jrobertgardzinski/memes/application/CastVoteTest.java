@@ -2,7 +2,6 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
-import com.jrobertgardzinski.memes.domain.ScoredMeme;
 import com.jrobertgardzinski.voting.VoteDirection;
 import com.jrobertgardzinski.voting.VoteTally;
 import io.qameta.allure.Epic;
@@ -69,45 +68,5 @@ class CastVoteTest {
     void refuses_missing_meme() {
         assertTrue(castVote.execute("nope", "alice", VoteDirection.UP).isEmpty());
         assertTrue(votes.isEmpty());
-    }
-
-    /** Shared in-memory {@link VoteRepository} fake for the use-case tests. */
-    static class FakeVoteRepository implements VoteRepository {
-        private final Map<String, Map<String, VoteDirection>> votes;
-
-        FakeVoteRepository(Map<String, Map<String, VoteDirection>> votes) {
-            this.votes = votes;
-        }
-
-        public void cast(String memeId, String voter, VoteDirection direction) {
-            votes.computeIfAbsent(memeId, id -> new HashMap<>()).put(voter, direction);
-        }
-
-        public void retract(String memeId, String voter) {
-            votes.getOrDefault(memeId, Map.of()).remove(voter);
-        }
-
-        public Optional<VoteDirection> voteOf(String memeId, String voter) {
-            return Optional.ofNullable(votes.getOrDefault(memeId, Map.of()).get(voter));
-        }
-
-        public int scoreOf(String memeId) {
-            return votes.getOrDefault(memeId, Map.of()).values().stream()
-                    .mapToInt(d -> d == VoteDirection.UP ? 1 : -1).sum();
-        }
-
-        public List<ScoredMeme> allScores() {
-            return votes.keySet().stream()
-                    .map(id -> new ScoredMeme(id, scoreOf(id), Optional.<java.time.Instant>empty()))
-                    .toList();
-        }
-
-        public void purgeMeme(String memeId) {
-            votes.remove(memeId);
-        }
-
-        public void purgeVoter(String voter) {
-            votes.values().forEach(v -> v.remove(voter));
-        }
     }
 }

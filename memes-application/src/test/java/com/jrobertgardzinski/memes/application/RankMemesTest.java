@@ -33,7 +33,7 @@ class RankMemesTest {
     /** A vote store that answers with the given page and counts how often it is asked. */
     private VoteRepository repositoryReturning(List<ScoredMeme> scored, AtomicInteger reads) {
         var votes = new HashMap<String, java.util.Map<String, com.jrobertgardzinski.voting.VoteDirection>>();
-        return new CastVoteTest.FakeVoteRepository(votes) {
+        return new FakeVoteRepository(votes) {
             @Override
             public List<ScoredMeme> allScores() {
                 reads.incrementAndGet();
