@@ -9,6 +9,7 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import io.restassured.RestAssured;
+import io.restassured.response.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
@@ -49,6 +50,7 @@ public class ErasureSagaSteps {
     ObjectStore objectStore;
 
     private String memeId;
+    private Response lastTakedown;
 
     @Given("a leaver with one MEME in the gallery")
     public void aLeaverWithOneMeme() throws Exception {
@@ -86,6 +88,28 @@ public class ErasureSagaSteps {
         purgeUserContent.execute(TestAuthConfig.SECOND_USER_ID, Optional.empty());
     }
 
+    @When("the AUTHOR tries to delete their own MEME")
+    public void theAuthorTriesToDeleteTheirMeme() {
+        // the leaver themself, holding the very token the meme was uploaded with
+        lastTakedown = takedown(TestAuthConfig.SECOND_TOKEN);
+    }
+
+    @When("a MODERATOR tries to delete the MEME")
+    public void aModeratorTriesToDeleteTheMeme() {
+        // and the one caller who may delete anybody's meme: the reservation outranks the role
+        lastTakedown = takedown(TestAuthConfig.MODERATOR_TOKEN);
+    }
+
+    @Then("the takedown finds nothing")
+    public void theTakedownFindsNothing() {
+        // 404 and nothing else: the delete endpoint asks the gallery for the meme first, and a
+        // reserved meme is not in it — so the refusal is "no such meme" for the author and for a
+        // moderator alike, rather than a permission verdict. Nothing downstream of that check
+        // runs: no ballots purged, no announcement, no row deleted
+        assertEquals(404, lastTakedown.statusCode(),
+                "a meme the saga has reserved was taken down anyway");
+    }
+
     @Then("the MEME is gone from the gallery")
     public void theMemeIsGoneFromTheGallery() {
         assertEquals(404, RestAssured.given().port(port).get("/memes/" + memeId).statusCode(),
@@ -118,6 +142,12 @@ public class ErasureSagaSteps {
         // THE PIVOT. Everything before this line was undoable; nothing after it is
         assertTrue(objectStore.get(memeId).isEmpty(),
                 "the closure must take the image out of object storage, not just the row");
+    }
+
+    private Response takedown(String token) {
+        return RestAssured.given().port(port)
+                .header("Authorization", "Bearer " + token)
+                .delete("/memes/{id}", memeId);
     }
 
     @Then("a late compensation brings nothing back")

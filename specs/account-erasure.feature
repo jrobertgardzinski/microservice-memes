@@ -41,6 +41,26 @@ Feature: What a leaver's pictures are owed
       And the image itself is gone for good
       And a late compensation brings nothing back
 
+  Rule: While the SAGA holds a MEME, nobody takes it down
+
+    # the reservation is only worth making if it HOLDS: everything the orchestrator may still
+    # undo has to be there to undo. A MEME set aside is out of the gallery, and a takedown —
+    # its author's or a MODERATOR's — reaches what the gallery lists, so it finds nothing and
+    # changes nothing. Without this, an ordinary delete arriving between the two halves of the
+    # SAGA would take the row out from under it: the count already confirmed to the ORCHESTRATOR
+    # would be a lie, and the compensation would give back less than it took.
+
+    Example:
+      When the ORCHESTRATOR commands the PURGE of their content
+      And the AUTHOR tries to delete their own MEME
+      Then the takedown finds nothing
+      When a MODERATOR tries to delete the MEME
+      Then the takedown finds nothing
+      And the MEME is still stored
+      When the comments service never confirms and the ORCHESTRATOR compensates
+      Then the MEME is back in the gallery
+      And the MEME is still stored
+
   Rule: Being asked twice is the same as being asked once
 
     Example:
