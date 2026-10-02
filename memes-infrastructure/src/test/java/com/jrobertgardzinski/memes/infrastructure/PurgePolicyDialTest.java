@@ -3,7 +3,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
+import com.jrobertgardzinski.memes.domain.PurgePolicyOverride;
 import com.jrobertgardzinski.purge.PurgeRule;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;

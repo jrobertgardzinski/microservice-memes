@@ -41,7 +41,7 @@ class MemeControllerTest {
     ObjectMapper objectMapper;
 
     @Autowired
-    com.jrobertgardzinski.memes.application.MemeRepository memes;
+    com.jrobertgardzinski.memes.domain.MemeRepository memes;
 
     @Test
     void uploads_and_serves_an_optimized_meme() throws Exception {

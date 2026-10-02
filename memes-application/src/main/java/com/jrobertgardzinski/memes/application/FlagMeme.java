@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.MemeRepository;
+
 /**
  * Flag (or unflag) a meme as NSFW. Unlike deletion — where the author may act on their own work —
  * the safe-for-work judgement belongs to moderators alone: an author self-labelling is fine

@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.application.TagMeme;
-import com.jrobertgardzinski.memes.application.TagRepository;
+import com.jrobertgardzinski.memes.domain.TagRepository;
 import com.jrobertgardzinski.memes.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;

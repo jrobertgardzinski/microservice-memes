@@ -1,6 +1,5 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.domain;
 
-import com.jrobertgardzinski.memes.domain.ScoredMeme;
 import com.jrobertgardzinski.voting.VoteDirection;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,10 +1,7 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.domain;
 
 import java.util.Optional;
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.domain.Meme;
-import com.jrobertgardzinski.memes.domain.MemeMetadata;
-import com.jrobertgardzinski.memes.domain.MemeStatus;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -76,12 +73,12 @@ public class FakeMemeErasure implements MemeErasure {
     }
 
     /** Whether this meme is hidden from the gallery right now — what a read-side assertion asks. */
-    protected boolean isMarked(String memeId) {
+    public boolean isMarked(String memeId) {
         return marks.containsKey(memeId);
     }
 
     /** The reservations, for a test that fingerprints the whole world (idempotence). */
-    protected Map<String, Instant> marks() {
+    public Map<String, Instant> marks() {
         return Map.copyOf(marks);
     }
 

@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.MemeRepository;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;

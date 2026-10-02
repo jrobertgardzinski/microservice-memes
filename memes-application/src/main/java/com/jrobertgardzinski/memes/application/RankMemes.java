@@ -2,6 +2,7 @@ package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.RankedMeme;
 import com.jrobertgardzinski.memes.domain.ScoredMeme;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 
 import java.time.Clock;
 import java.time.Duration;

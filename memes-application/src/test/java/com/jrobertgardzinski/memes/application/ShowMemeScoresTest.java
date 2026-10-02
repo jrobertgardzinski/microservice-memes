@@ -1,5 +1,8 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.FakeVoteRepository;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.domain.RankedMeme;

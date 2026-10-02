@@ -1,6 +1,8 @@
 package com.jrobertgardzinski.memes.application;
 
 import com.jrobertgardzinski.memes.domain.Meme;
+import com.jrobertgardzinski.memes.domain.MemeContentIndex;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
 import com.jrobertgardzinski.memes.image.OptimizedImage;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 

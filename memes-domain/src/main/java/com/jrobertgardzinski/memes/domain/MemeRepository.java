@@ -1,7 +1,4 @@
-package com.jrobertgardzinski.memes.application;
-
-import com.jrobertgardzinski.memes.domain.Meme;
-import com.jrobertgardzinski.memes.domain.MemeMetadata;
+package com.jrobertgardzinski.memes.domain;
 
 import java.util.Collection;
 import java.util.List;

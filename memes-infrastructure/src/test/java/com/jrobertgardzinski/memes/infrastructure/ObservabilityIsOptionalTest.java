@@ -2,7 +2,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import java.util.Optional;
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.application.MemeErasure;
+import com.jrobertgardzinski.memes.domain.MemeErasure;
 import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.WatchErasureBacklog;
 import com.jrobertgardzinski.memes.config.ErasureTolerance;

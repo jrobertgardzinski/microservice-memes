@@ -1,13 +1,13 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.MemeContentIndex;
-import com.jrobertgardzinski.memes.application.MemeErasure;
+import com.jrobertgardzinski.memes.domain.MemeContentIndex;
+import com.jrobertgardzinski.memes.domain.MemeErasure;
 import com.jrobertgardzinski.memes.application.MemeEvents;
-import com.jrobertgardzinski.memes.application.MemeRepository;
-import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
+import com.jrobertgardzinski.memes.domain.PurgePolicyOverride;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
-import com.jrobertgardzinski.memes.application.TagRepository;
-import com.jrobertgardzinski.memes.application.VoteRepository;
+import com.jrobertgardzinski.memes.domain.TagRepository;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 import com.jrobertgardzinski.purge.PurgeRule;
 import org.springframework.transaction.support.TransactionTemplate;
 

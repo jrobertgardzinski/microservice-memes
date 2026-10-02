@@ -1,6 +1,10 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.MemeContentIndex;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
+import com.jrobertgardzinski.memes.domain.TagRepository;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 
 import java.util.Optional;
 

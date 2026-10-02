@@ -1,8 +1,7 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.domain;
 
 import java.util.Optional;
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.domain.Meme;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 

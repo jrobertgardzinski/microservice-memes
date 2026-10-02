@@ -1,4 +1,4 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.domain;
 
 /**
  * Port for content-based deduplication: maps the bytes of a stored meme to its id, so uploading

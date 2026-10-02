@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.PurgePolicyOverride;
+import com.jrobertgardzinski.memes.domain.PurgePolicyOverride;
 import com.jrobertgardzinski.purge.PurgeRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

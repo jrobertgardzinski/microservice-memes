@@ -1,7 +1,9 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.FakeVoteRepository;
 import com.jrobertgardzinski.memes.domain.RankedMeme;
 import com.jrobertgardzinski.memes.domain.ScoredMeme;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;

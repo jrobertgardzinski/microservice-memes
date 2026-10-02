@@ -1,9 +1,9 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.application.MemeContentIndex;
-import com.jrobertgardzinski.memes.application.MemeRepository;
 import com.jrobertgardzinski.memes.domain.Meme;
+import com.jrobertgardzinski.memes.domain.MemeContentIndex;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;

@@ -5,7 +5,7 @@ import java.util.Optional;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.jrobertgardzinski.memes.application.MemeErasure;
+import com.jrobertgardzinski.memes.domain.MemeErasure;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import com.jrobertgardzinski.memes.domain.MemeStatus;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

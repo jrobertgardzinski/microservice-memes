@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.TagRepository;
+import com.jrobertgardzinski.memes.domain.TagRepository;
 import com.jrobertgardzinski.memes.tags.Tag;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;

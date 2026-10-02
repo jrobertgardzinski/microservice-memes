@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.MemeErasure;
 import com.jrobertgardzinski.memes.config.ErasureTolerance;
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;

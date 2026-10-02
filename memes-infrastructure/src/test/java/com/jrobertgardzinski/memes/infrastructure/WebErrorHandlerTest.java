@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.application.MemeRepository;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
 import com.jrobertgardzinski.memes.application.ObjectStore;
 import com.jrobertgardzinski.memes.domain.Meme;
 import io.qameta.allure.Epic;

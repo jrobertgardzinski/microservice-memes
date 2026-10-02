@@ -1,5 +1,11 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.MemeContentIndex;
+import com.jrobertgardzinski.memes.domain.MemeErasure;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
+import com.jrobertgardzinski.memes.domain.PurgePolicyOverride;
+import com.jrobertgardzinski.memes.domain.TagRepository;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;

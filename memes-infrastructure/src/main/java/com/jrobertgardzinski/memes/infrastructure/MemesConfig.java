@@ -4,19 +4,19 @@ import com.jrobertgardzinski.observation.Observations;
 import com.jrobertgardzinski.memes.application.CastVote;
 import com.jrobertgardzinski.memes.application.ListMemes;
 import com.jrobertgardzinski.memes.application.MakeThumbnail;
-import com.jrobertgardzinski.memes.application.MemeContentIndex;
-import com.jrobertgardzinski.memes.application.MemeRepository;
+import com.jrobertgardzinski.memes.domain.MemeContentIndex;
+import com.jrobertgardzinski.memes.domain.MemeRepository;
 import com.jrobertgardzinski.memes.application.MemeEvents;
 import com.jrobertgardzinski.memes.application.PublishMeme;
 import com.jrobertgardzinski.memes.application.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.SearchMemesByTag;
 import com.jrobertgardzinski.memes.application.TagMeme;
-import com.jrobertgardzinski.memes.application.TagRepository;
+import com.jrobertgardzinski.memes.domain.TagRepository;
 import com.jrobertgardzinski.memes.application.ShowMemeScores;
 import com.jrobertgardzinski.memes.application.ShowMemeVote;
 import com.jrobertgardzinski.memes.application.ViewMeme;
-import com.jrobertgardzinski.memes.application.VoteRepository;
+import com.jrobertgardzinski.memes.domain.VoteRepository;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.purge.PurgeRule;
 import com.jrobertgardzinski.memes.config.RateLimit;
@@ -167,7 +167,7 @@ class MemesConfig {
 
     @Bean
     com.jrobertgardzinski.memes.application.WatchErasureBacklog watchErasureBacklog(
-            com.jrobertgardzinski.memes.application.MemeErasure erasure,
+            com.jrobertgardzinski.memes.domain.MemeErasure erasure,
             com.jrobertgardzinski.memes.config.ErasureTolerance tolerance,
             com.jrobertgardzinski.observation.Observations<com.jrobertgardzinski.memes.domain.Observation> observations,
             java.time.Clock clock) {
@@ -182,11 +182,11 @@ class MemesConfig {
 
     @Bean
     PurgeUserContent purgeUserContent(MemeRepository memeRepository,
-                                      com.jrobertgardzinski.memes.application.MemeErasure erasure,
+                                      com.jrobertgardzinski.memes.domain.MemeErasure erasure,
                                       VoteRepository voteRepository,
                                       MemeContentIndex contentIndex, TagRepository tagRepository,
                                       MemeEvents memeEvents,
-                                      com.jrobertgardzinski.memes.application.PurgePolicyOverride override,
+                                      com.jrobertgardzinski.memes.domain.PurgePolicyOverride override,
                                       PurgeRule defaultMemesPurgeRule,
                                       org.springframework.transaction.support.TransactionTemplate tx) {
         // transactional decorator — a purge that dies halfway must not strand half the leaver's memes
@@ -202,13 +202,13 @@ class MemesConfig {
      */
     @Bean
     com.jrobertgardzinski.memes.application.MarkUserContentForErasure markUserContentForErasure(
-            com.jrobertgardzinski.memes.application.MemeErasure erasure, java.time.Clock clock) {
+            com.jrobertgardzinski.memes.domain.MemeErasure erasure, java.time.Clock clock) {
         return new com.jrobertgardzinski.memes.application.MarkUserContentForErasure(erasure, clock);
     }
 
     @Bean
     com.jrobertgardzinski.memes.application.RestoreUserContent restoreUserContent(
-            com.jrobertgardzinski.memes.application.MemeErasure erasure) {
+            com.jrobertgardzinski.memes.domain.MemeErasure erasure) {
         return new com.jrobertgardzinski.memes.application.RestoreUserContent(erasure);
     }
 

@@ -1,5 +1,6 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.MemeRepository;
 import com.jrobertgardzinski.memes.config.ImageLimits;
 import com.jrobertgardzinski.memes.config.ThumbnailSize;
 import com.jrobertgardzinski.identity.UserId;

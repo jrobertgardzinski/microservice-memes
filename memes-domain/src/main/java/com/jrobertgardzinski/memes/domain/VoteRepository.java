@@ -1,6 +1,5 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.domain;
 
-import com.jrobertgardzinski.memes.domain.ScoredMeme;
 import com.jrobertgardzinski.voting.Ballots;
 
 import java.util.Collection;

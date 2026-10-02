@@ -1,4 +1,4 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.domain;
 
 import com.jrobertgardzinski.purge.PurgeRule;
 
