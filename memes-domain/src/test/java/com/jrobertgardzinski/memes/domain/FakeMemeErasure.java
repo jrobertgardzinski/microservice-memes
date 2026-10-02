@@ -82,7 +82,9 @@ public class FakeMemeErasure implements MemeErasure {
         return Map.copyOf(marks);
     }
 
-    private MemeMetadata metadataOf(Meme meme) {
+    /** The port's view of a stored meme, reservation included — what the repository axis
+     *  built on top of this class ({@link FakeMemeRepository}) answers reads with. */
+    protected MemeMetadata metadataOf(Meme meme) {
         Instant marked = marks.get(meme.id());
         return new MemeMetadata(meme.id(), meme.authorId(), meme.format(),
                 marked == null ? MemeStatus.ACTIVE : MemeStatus.PENDING_ERASURE, marked);
