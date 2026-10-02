@@ -77,6 +77,21 @@ public class FakeMemeErasure implements MemeErasure {
         return marks.containsKey(memeId);
     }
 
+    /**
+     * The reservation goes with the row it was made against — for whoever destroys that row
+     * ({@link FakeMemeRepository#deleteById}).
+     *
+     * <p>Not a convenience: in the schema the status IS a column of the memes row, so a deleted
+     * meme cannot leave a mark behind, and this class keeps the marks in a map of their own purely
+     * because the bytes have nothing to do with the erasure state. Without this call the two part
+     * company the moment anything deletes — the map still answers {@link #isMarked} for a meme
+     * nothing holds any more, which is a state the adapter cannot reach and no caller should have
+     * to know about.
+     */
+    protected void forgetMark(String memeId) {
+        marks.remove(memeId);
+    }
+
     /** The reservations, for a test that fingerprints the whole world (idempotence). */
     public Map<String, Instant> marks() {
         return Map.copyOf(marks);

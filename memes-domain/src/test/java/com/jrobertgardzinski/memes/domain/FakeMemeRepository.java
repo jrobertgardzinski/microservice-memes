@@ -69,6 +69,9 @@ public class FakeMemeRepository extends FakeMemeErasure implements MemeRepositor
     @Override
     public void deleteById(String memeId) {
         memes.remove(memeId);
+        // the status is a column of the row in the schema, so it goes with it; here the marks live
+        // in a map of their own and have to be told
+        forgetMark(memeId);
     }
 
     @Override
