@@ -2,10 +2,10 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.memes.domain.MemeContentIndex;
 import com.jrobertgardzinski.memes.domain.MemeErasure;
-import com.jrobertgardzinski.memes.application.MemeEvents;
+import com.jrobertgardzinski.memes.domain.MemeEvents;
 import com.jrobertgardzinski.memes.domain.MemeRepository;
 import com.jrobertgardzinski.memes.domain.PurgePolicyOverride;
-import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.system.PurgeUserContent;
 import com.jrobertgardzinski.memes.domain.TagRepository;
 import com.jrobertgardzinski.memes.domain.VoteRepository;
 import com.jrobertgardzinski.purge.PurgeRule;

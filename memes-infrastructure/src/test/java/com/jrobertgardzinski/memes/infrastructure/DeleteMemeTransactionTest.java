@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.application.DeleteMeme;
+import com.jrobertgardzinski.memes.system.DeleteMeme;
 import com.jrobertgardzinski.memes.domain.Meme;
 import com.jrobertgardzinski.memes.domain.MemeRepository;
 import com.jrobertgardzinski.memes.domain.TagRepository;

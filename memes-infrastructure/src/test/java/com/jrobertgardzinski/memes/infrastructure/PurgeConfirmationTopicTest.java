@@ -2,9 +2,9 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.observation.Observations;
-import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
-import com.jrobertgardzinski.memes.application.PurgeUserContent;
-import com.jrobertgardzinski.memes.application.RestoreUserContent;
+import com.jrobertgardzinski.memes.system.MarkUserContentForErasure;
+import com.jrobertgardzinski.memes.system.PurgeUserContent;
+import com.jrobertgardzinski.memes.system.RestoreUserContent;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;

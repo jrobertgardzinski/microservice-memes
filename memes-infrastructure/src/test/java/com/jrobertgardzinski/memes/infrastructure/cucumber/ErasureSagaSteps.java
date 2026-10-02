@@ -1,9 +1,9 @@
 package com.jrobertgardzinski.memes.infrastructure.cucumber;
 
-import com.jrobertgardzinski.memes.application.MarkUserContentForErasure;
+import com.jrobertgardzinski.memes.system.MarkUserContentForErasure;
 import com.jrobertgardzinski.memes.application.ObjectStore;
-import com.jrobertgardzinski.memes.application.PurgeUserContent;
-import com.jrobertgardzinski.memes.application.RestoreUserContent;
+import com.jrobertgardzinski.memes.system.PurgeUserContent;
+import com.jrobertgardzinski.memes.system.RestoreUserContent;
 import com.jrobertgardzinski.memes.infrastructure.TestAuthConfig;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;

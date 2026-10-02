@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.MemeEvents;
+import com.jrobertgardzinski.memes.domain.MemeEvents;
 import com.jrobertgardzinski.deletion.DeletionMessages;
 import com.jrobertgardzinski.deletion.MemeDeleted;
 import com.jrobertgardzinski.outbox.OutboxEvent;

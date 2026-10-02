@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.MemeEvents;
+import com.jrobertgardzinski.memes.domain.MemeEvents;
 import com.jrobertgardzinski.outbox.OutboxTable;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
 import io.qameta.allure.Epic;

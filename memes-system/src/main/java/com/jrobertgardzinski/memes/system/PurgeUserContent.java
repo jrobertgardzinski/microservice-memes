@@ -1,5 +1,6 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.system;
 
+import com.jrobertgardzinski.memes.domain.MemeEvents;
 import com.jrobertgardzinski.memes.domain.MemeContentIndex;
 import com.jrobertgardzinski.memes.domain.MemeErasure;
 import com.jrobertgardzinski.memes.domain.MemeRepository;

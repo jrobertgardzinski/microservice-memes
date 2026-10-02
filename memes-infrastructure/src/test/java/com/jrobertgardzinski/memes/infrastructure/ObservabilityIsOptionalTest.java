@@ -4,7 +4,7 @@ import java.util.Optional;
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.MemeErasure;
 import com.jrobertgardzinski.observation.Observations;
-import com.jrobertgardzinski.memes.application.WatchErasureBacklog;
+import com.jrobertgardzinski.memes.system.WatchErasureBacklog;
 import com.jrobertgardzinski.memes.config.ErasureTolerance;
 import com.jrobertgardzinski.memes.domain.MemeMetadata;
 import com.jrobertgardzinski.memes.domain.MemeStatus;

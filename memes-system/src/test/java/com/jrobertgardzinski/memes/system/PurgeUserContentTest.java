@@ -1,5 +1,6 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.system;
 
+import com.jrobertgardzinski.memes.domain.MemeEvents;
 import com.jrobertgardzinski.memes.domain.FakeMemeErasure;
 import com.jrobertgardzinski.memes.domain.FakePurgePolicyOverride;
 import com.jrobertgardzinski.memes.domain.FakeVoteRepository;

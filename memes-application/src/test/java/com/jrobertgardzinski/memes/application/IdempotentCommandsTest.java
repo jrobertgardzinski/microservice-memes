@@ -1,5 +1,10 @@
 package com.jrobertgardzinski.memes.application;
 
+import com.jrobertgardzinski.memes.domain.MemeEvents;
+import com.jrobertgardzinski.memes.system.DeleteMeme;
+import com.jrobertgardzinski.memes.system.MarkUserContentForErasure;
+import com.jrobertgardzinski.memes.system.PurgeUserContent;
+import com.jrobertgardzinski.memes.system.RestoreUserContent;
 import com.jrobertgardzinski.memes.domain.FakeMemeErasure;
 import com.jrobertgardzinski.memes.domain.FakePurgePolicyOverride;
 import com.jrobertgardzinski.memes.domain.FakeVoteRepository;

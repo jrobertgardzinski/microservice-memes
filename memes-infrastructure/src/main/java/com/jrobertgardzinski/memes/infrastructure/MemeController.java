@@ -45,7 +45,7 @@ class MemeController {
     private final com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag;
     private final com.jrobertgardzinski.memes.application.ServeMeme serveMeme;
     private final com.jrobertgardzinski.memes.application.ViewMeme viewMeme;
-    private final com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme;
+    private final com.jrobertgardzinski.memes.system.DeleteMeme deleteMeme;
     private final com.jrobertgardzinski.memes.application.FlagMeme flagMeme;
     private final com.jrobertgardzinski.memes.application.ContentFlags contentFlags;
     private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
@@ -57,7 +57,7 @@ class MemeController {
                    com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag,
                    com.jrobertgardzinski.memes.application.ServeMeme serveMeme,
                    com.jrobertgardzinski.memes.application.ViewMeme viewMeme,
-                   com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme,
+                   com.jrobertgardzinski.memes.system.DeleteMeme deleteMeme,
                    com.jrobertgardzinski.memes.application.FlagMeme flagMeme,
                    com.jrobertgardzinski.memes.application.ContentFlags contentFlags,
                    com.jrobertgardzinski.memes.config.RateLimit uploadRate,

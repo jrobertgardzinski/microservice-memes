@@ -6,9 +6,9 @@ import com.jrobertgardzinski.memes.application.ListMemes;
 import com.jrobertgardzinski.memes.application.MakeThumbnail;
 import com.jrobertgardzinski.memes.domain.MemeContentIndex;
 import com.jrobertgardzinski.memes.domain.MemeRepository;
-import com.jrobertgardzinski.memes.application.MemeEvents;
+import com.jrobertgardzinski.memes.domain.MemeEvents;
 import com.jrobertgardzinski.memes.application.PublishMeme;
-import com.jrobertgardzinski.memes.application.PurgeUserContent;
+import com.jrobertgardzinski.memes.system.PurgeUserContent;
 import com.jrobertgardzinski.memes.application.RankMemes;
 import com.jrobertgardzinski.memes.application.SearchMemesByTag;
 import com.jrobertgardzinski.memes.application.TagMeme;
@@ -113,9 +113,9 @@ class MemesConfig {
     }
 
     @Bean
-    com.jrobertgardzinski.memes.application.DeleteMeme deleteMeme(
+    com.jrobertgardzinski.memes.system.DeleteMeme deleteMeme(
             MemeRepository memeRepository, VoteRepository voteRepository, MemeContentIndex contentIndex,
-            TagRepository tagRepository, com.jrobertgardzinski.memes.application.MemeEvents memeEvents,
+            TagRepository tagRepository, com.jrobertgardzinski.memes.domain.MemeEvents memeEvents,
             org.springframework.transaction.support.TransactionTemplate tx) {
         // the transactional decorator, not the plain use case: the DB part of a teardown is atomic
         // (the use case itself stays framework-free — the seam lives here, in infrastructure)
@@ -166,12 +166,12 @@ class MemesConfig {
     }
 
     @Bean
-    com.jrobertgardzinski.memes.application.WatchErasureBacklog watchErasureBacklog(
+    com.jrobertgardzinski.memes.system.WatchErasureBacklog watchErasureBacklog(
             com.jrobertgardzinski.memes.domain.MemeErasure erasure,
             com.jrobertgardzinski.memes.config.ErasureTolerance tolerance,
             com.jrobertgardzinski.observation.Observations<com.jrobertgardzinski.memes.domain.Observation> observations,
             java.time.Clock clock) {
-        return new com.jrobertgardzinski.memes.application.WatchErasureBacklog(
+        return new com.jrobertgardzinski.memes.system.WatchErasureBacklog(
                 erasure, tolerance, observations, clock);
     }
 
@@ -201,15 +201,15 @@ class MemesConfig {
      * a second template inside it would only nest a participation in the same transaction.
      */
     @Bean
-    com.jrobertgardzinski.memes.application.MarkUserContentForErasure markUserContentForErasure(
+    com.jrobertgardzinski.memes.system.MarkUserContentForErasure markUserContentForErasure(
             com.jrobertgardzinski.memes.domain.MemeErasure erasure, java.time.Clock clock) {
-        return new com.jrobertgardzinski.memes.application.MarkUserContentForErasure(erasure, clock);
+        return new com.jrobertgardzinski.memes.system.MarkUserContentForErasure(erasure, clock);
     }
 
     @Bean
-    com.jrobertgardzinski.memes.application.RestoreUserContent restoreUserContent(
+    com.jrobertgardzinski.memes.system.RestoreUserContent restoreUserContent(
             com.jrobertgardzinski.memes.domain.MemeErasure erasure) {
-        return new com.jrobertgardzinski.memes.application.RestoreUserContent(erasure);
+        return new com.jrobertgardzinski.memes.system.RestoreUserContent(erasure);
     }
 
 

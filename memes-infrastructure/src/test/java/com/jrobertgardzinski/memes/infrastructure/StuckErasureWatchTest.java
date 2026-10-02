@@ -75,7 +75,7 @@ class StuckErasureWatchTest {
         // the real chain, not a stand-in: the use case decides, the adapter names the gauge, and
         // this class only runs them on a schedule. Assembled here because that is what a
         // composition root does, and the assertions below are about the three working together
-        return new StuckErasureWatch(new com.jrobertgardzinski.memes.application.WatchErasureBacklog(
+        return new StuckErasureWatch(new com.jrobertgardzinski.memes.system.WatchErasureBacklog(
                 backlog, new com.jrobertgardzinski.memes.config.ErasureTolerance(Duration.ofMinutes(30)),
                 new MicrometerObservations(meters), Clock.fixed(now, ZoneOffset.UTC)));
     }

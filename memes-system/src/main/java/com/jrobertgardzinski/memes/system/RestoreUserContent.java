@@ -1,4 +1,4 @@
-package com.jrobertgardzinski.memes.application;
+package com.jrobertgardzinski.memes.system;
 
 import com.jrobertgardzinski.memes.domain.MemeErasure;
 import com.jrobertgardzinski.identity.UserId;

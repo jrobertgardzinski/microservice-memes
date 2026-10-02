@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.WatchErasureBacklog;
+import com.jrobertgardzinski.memes.system.WatchErasureBacklog;
 import com.jrobertgardzinski.memes.domain.Observation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

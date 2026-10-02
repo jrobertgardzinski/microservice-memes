@@ -33,6 +33,7 @@
         <module>memes-config</module>
         <module>memes-image</module>
         <module>memes-tags</module>
+        <module>memes-system</module>
         <module>memes-application</module>
         <module>memes_account-closure</module>
         <module>memes-ui</module>

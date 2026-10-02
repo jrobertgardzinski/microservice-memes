@@ -1,8 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.DeleteMeme;
+import com.jrobertgardzinski.memes.system.DeleteMeme;
 import com.jrobertgardzinski.memes.domain.MemeContentIndex;
-import com.jrobertgardzinski.memes.application.MemeEvents;
+import com.jrobertgardzinski.memes.domain.MemeEvents;
 import com.jrobertgardzinski.memes.domain.MemeRepository;
 import com.jrobertgardzinski.memes.domain.TagRepository;
 import com.jrobertgardzinski.memes.domain.VoteRepository;
