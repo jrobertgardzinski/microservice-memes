@@ -141,7 +141,7 @@ And the road NOT taken — the same picture when a participant stays silent:
 | the wizard, the step-up dialog | `memes-ui/src/DeleteAccountDialog.tsx` |
 | the lock, the outbox fact, the final deletion, the mails | `../../shared/microservice-security` (`AccountDeletionOrchestrator`, `OffboardingOutcomeListener`) |
 | the process manager, participants, the sweeper | `../microservice-offboarding` |
-| this service's mark, its compensation and the erasure | `memes-infrastructure/.../PurgeCommandsListener`, `memes-application/.../{MarkUserContentForErasure,RestoreUserContent,PurgeUserContent}` |
+| this service's mark, its compensation and the erasure | `memes-infrastructure/.../PurgeCommandsListener`, `memes-system/.../{MarkUserContentForErasure,RestoreUserContent,PurgeUserContent}` |
 | why it is a status and not a queue table, and where the pivot is | `../../shared/docs/adr/0007-soft-delete-by-status-for-a-compensatable-offboarding-saga.md` |
 | the two-phase road, executable | `specs/account-erasure.feature` |
 | the same road, executable | `memes-ui/e2e/features/account-deletion.feature` (real stack, no stubs) |

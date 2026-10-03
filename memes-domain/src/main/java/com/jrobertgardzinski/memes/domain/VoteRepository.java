@@ -16,14 +16,14 @@ public interface VoteRepository extends Ballots {
 
     /**
      * Every meme that has received a vote, with its current score AND its publication time
-     * (unordered) — everything {@link RankMemes} needs, in one read. The publication time is part
+     * (unordered) — everything {@code RankMemes} needs, in one read. The publication time is part
      * of the answer rather than a follow-up question per meme: that follow-up, asked from inside a
      * comparator, was the hot page's whole cost.
      */
     List<ScoredMeme> allScores();
 
     /**
-     * The ballot tally of EXACTLY these memes — what {@link ShowMemeScores} needs to put a number
+     * The ballot tally of EXACTLY these memes — what {@code ShowMemeScores} needs to put a number
      * under every tile of one page without asking per tile.
      *
      * <p>This port reports BALLOTS, so "nobody voted on it" and "no such meme" look identical from

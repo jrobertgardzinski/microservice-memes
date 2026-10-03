@@ -13,13 +13,6 @@
     <!-- Use cases + ports. Depends on the domain and the image lib; no framework. -->
     <dependencies>
         <dependency>
-            <!-- the three words that say what becomes of a leaver's content; shared with the
-                 twin service that also holds authored content -->
-            <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>purge-rule</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-domain</artifactId>
         </dependency>
@@ -57,6 +50,14 @@
             <!-- IdempotentCommandsTest drives the taking-down use cases too -->
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-system</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- and the rule they read: the taking-down use cases moved to memes-system, so the
+                 words that say what becomes of a leaver's content are a TEST dependency here -->
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>purge-rule</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>

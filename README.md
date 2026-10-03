@@ -14,8 +14,8 @@
 
 ## Highlights — what's worth a closer look
 
-- **The framework is a detail**: Spring Boot lives in **one module of seven**; domain, use cases,
-  image processing and tags compile and test without it.
+- **The framework is a detail**: Spring Boot lives in **one module of nine**; domain, use cases,
+  taking content down, image processing and tags compile and test without it.
 - **Upload pipeline doubles as a security boundary**: every image is re-encoded (a crafted JPEG
   with GPS EXIF goes in, a clean PNG comes out — there's a test), bounded by size limits and a
   per-uploader rate limit (429 + `Retry-After`).
@@ -54,17 +54,28 @@ and Quarkus (`microservice-email`, BCE).
 
 ## Modules
 
-- **memes-domain** — the entities: `Meme`, `RankedMeme`, `DeletedAccount`. Pure Java.
+- **memes-domain** — the entities (`Meme`, `MemeMetadata`, `MemeStatus`, `RankedMeme`,
+  `ScoredMeme`, `Observation`) **and every port they are read and written through**
+  (`MemeRepository`, `MemeErasure`, `MemeContentIndex`, `TagRepository`, `VoteRepository`,
+  `MemeEvents`, `PurgePolicyOverride`) — four of them with their fake and its contract test
+  beside them. Pure Java.
 - **memes-config** — typed, validated configuration values (`ImageLimits`, `ThumbnailSize`,
-  `TagLimits`, `RateLimit`, `PurgeRule` — what an account deletion does to the leaver's
-  content). Pure Java.
+  `TagLimits`, `RateLimit`, `ErasureTolerance` — how long a mark may stand before it reads as a
+  closure that never came). Pure Java. What an account deletion does to the leaver's content is
+  `PurgeRule`, and it is shared vocabulary: it lives in `portal-libs`.
 - **memes-image** — `WebImageOptimizer`: re-encodes any ImageIO-readable image (BMP, JPEG, …) to a
   browser-friendly PNG (which also drops EXIF), bounded by the configured limits. Pure JDK
   (`java.desktop`).
 - **memes-tags** — the `Tag` value object (normalisation and validation). Pure Java.
-- **memes-application** — use cases (`PublishMeme`, `ServeMeme`, `MakeThumbnail`, `CastVote`,
-  `RankMemes`, `TagMeme`, `DeleteMeme`, `PurgeUserContent`, …) + the ports (`MemeRepository`,
-  `VoteRepository`, `MemeContentIndex`, `TagRepository`, `ObjectStore`). No framework.
+- **memes-application** — the use cases that put content UP and read it back (`PublishMeme`,
+  `ServeMeme`, `MakeThumbnail`, `ViewMeme`, `ListMemes`, `SearchMemesByTag`, `TagMeme`,
+  `FlagMeme`, `CastVote`, `ShowMemeVote`, `ShowMemeScores`, `RankMemes`) + three technical ports
+  (`ObjectStore`, `ImageEncoder`, `ContentFlags`). No framework.
+- **memes-system** — the use cases that take content DOWN, below the ones that put it up and
+  reachable without them: `DeleteMeme`, and the account-closure trio
+  `MarkUserContentForErasure` / `PurgeUserContent` / `RestoreUserContent`, plus
+  `WatchErasureBacklog`. No framework — so a spec can drive the deletion semantics on domain +
+  system alone, with no transport and no decision about monolith versus services.
 - **memes_account-closure** — this service's side of ONE cross-service process: what happens to a
   person's memes when their account closes. The three commands (mark, erase, restore), which one
   is reversible, which rule applies and what gets confirmed — with no Kafka, no database and no

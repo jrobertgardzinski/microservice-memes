@@ -25,7 +25,7 @@
       who meets memes_account-closure and comments_account-closure knows they are the two ends of
       the same conversation, and that neither is a layer.
 
-      It sits between application and infrastructure and belongs to neither: a use case knows
+      It sits between the use cases and infrastructure and belongs to neither: a use case knows
       nothing of a saga, and an adapter should hold no decisions. What lives here is the decision —
       which use case a command means, which rule applies, what gets confirmed.
     -->
@@ -39,15 +39,7 @@
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-application</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.jrobertgardzinski</groupId>
             <artifactId>memes-domain</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-config</artifactId>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>

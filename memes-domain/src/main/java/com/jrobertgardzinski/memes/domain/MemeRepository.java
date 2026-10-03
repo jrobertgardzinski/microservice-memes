@@ -22,7 +22,7 @@ public interface MemeRepository {
 
     /**
      * The meme WITH its bytes — empty when either half is missing. Ask for this only when the
-     * answer is the picture itself ({@link ServeMeme}, {@link MakeThumbnail}); every other question
+     * answer is the picture itself ({@code ServeMeme}, {@code MakeThumbnail}); every other question
      * belongs to {@link #exists} or {@link #findMetadata}, which cost no blob read and — the part
      * that bit us — do not turn a meme whose object went missing into a meme that does not exist.
      */
@@ -58,7 +58,7 @@ public interface MemeRepository {
     /**
      * Which of these ids this service still has a meme for — {@link #exists} asked about a whole
      * set, in one read. The answer is the caller's licence to speak about those memes at all: an id
-     * that does not come back is one nothing is known about, and {@link ShowMemeScores} turns that
+     * that does not come back is one nothing is known about, and {@code ShowMemeScores} turns that
      * silence into "no tally" instead of a zero. Order and duplicates are not promised.
      *
      * <p>Adapters override it with a single lookup; this fallback keeps hand-rolled fakes working

@@ -18,7 +18,7 @@ import java.util.Optional;
  * orchestrator's closure command — after every participant has confirmed its reversible mark, so
  * after the last moment at which anything could still go wrong for a reason this service would have
  * to undo. It acts on exactly the memes this service reserved
- * ({@link MemeErasure#pendingOf(String)}), never on "everything by that author": a meme uploaded
+ * ({@link MemeErasure#pendingOf(UserId)}), never on "everything by that author": a meme uploaded
  * after the mark belongs to no saga and is not the closure's business.
  *
  * <p>The {@link PurgeRule} decides each reserved meme's fate by its score — delete it, or keep it
