@@ -11,6 +11,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * uploader's e-mail), so one account cannot flood the gallery while everyone else uploads freely.
  * Uploads are heavier than comments (decode + optimise), which is exactly why they get a ceiling.
  * Zero disables the guard. Pure logic; no framework.
+ *
+ * <p>A NEGATIVE ceiling is refused at construction. It would also disable the guard — {@code
+ * tryAcquire} short-circuits on {@code perMinute <= 0} — so a mistyped property would silently
+ * turn the abuse guard OFF and the gallery would look healthy while one account flooded it.
+ * Zero says that out loud; {@code -1} only looks like a number. Same reading as {@code TagLimits},
+ * which refuses a negative ceiling for the mirror-image reason.
  */
 public final class RateLimit {
 
@@ -26,6 +32,10 @@ public final class RateLimit {
 
     /** The clock is injectable so expiry (and the eviction it drives) is testable without waiting. */
     public RateLimit(int perMinute, Clock clock) {
+        if (perMinute < 0) {
+            throw new IllegalArgumentException(
+                    "perMinute cannot be negative (0 disables the guard), was " + perMinute);
+        }
         this.perMinute = perMinute;
         this.clock = clock;
     }

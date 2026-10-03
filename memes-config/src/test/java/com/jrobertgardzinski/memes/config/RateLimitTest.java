@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +31,15 @@ class RateLimitTest {
         for (int i = 0; i < 50; i++) {
             assertTrue(limit.tryAcquire("anyone"));
         }
+    }
+
+    @Test
+    @DisplayName("a negative ceiling is refused: it would disable the guard, not tighten it")
+    void negative_ceiling_is_refused() {
+        // tryAcquire short-circuits on perMinute <= 0, so -1 would silently turn the abuse guard
+        // off. Zero says that out loud; a mistyped property must not.
+        assertThrows(IllegalArgumentException.class, () -> new RateLimit(-1));
+        assertThrows(IllegalArgumentException.class, () -> new RateLimit(-1, java.time.Clock.systemUTC()));
     }
 
     @Test
