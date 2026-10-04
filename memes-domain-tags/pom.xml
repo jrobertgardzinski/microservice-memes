@@ -8,13 +8,14 @@
         <artifactId>microservice-memes</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>memes-image</artifactId>
+    <artifactId>memes-domain-tags</artifactId>
 
-    <!-- Image optimisation using only the JDK's ImageIO (java.desktop). No framework. -->
+    <!-- Pure domain: no framework, no I/O. -->
     <dependencies>
         <dependency>
+            <!-- TagRepository speaks in tags -->
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-config-image</artifactId>
+            <artifactId>memes-tags</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -22,4 +23,21 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <!-- the ports' FAKES and their CONTRACTS travel to whoever implements or drives the ports -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
