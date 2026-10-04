@@ -26,6 +26,7 @@ import java.util.Locale;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * The boundary, asserted instead of promised: observability is a layer this service can be
@@ -49,14 +50,19 @@ class ObservabilityIsOptionalTest {
 
     /** The layers that must not name a tool — everything except the adapters. */
     private static List<Path> aboveInfrastructure() throws IOException {
-        // every area's module of the split layers, found by name, so a new area is checked too
+        // domain and config are cut by area, one module each: found by name, so a new area is
+        // checked too — and a layer that finds no module at all fails, like a rotten path
         List<Path> layers = new java.util.ArrayList<>();
-        try (Stream<Path> modules = Files.list(Path.of(".."))) {
-            modules.filter(module -> module.getFileName().toString().matches("memes-(domain|config)-.+"))
-                    .map(module -> module.resolve("src/main/java"))
-                    .filter(Files::isDirectory)
-                    .sorted()
-                    .forEach(layers::add);
+        for (String layer : List.of("domain", "config")) {
+            try (Stream<Path> modules = Files.list(Path.of(".."))) {
+                List<Path> areas = modules
+                        .filter(module -> module.getFileName().toString().startsWith("memes-" + layer + "-"))
+                        .map(module -> module.resolve("src/main/java"))
+                        .sorted()
+                        .toList();
+                assertFalse(areas.isEmpty(), "no memes-" + layer + "-* module found");
+                layers.addAll(areas);
+            }
         }
         layers.add(Path.of("../memes-application/src/main/java"));
         return layers;
