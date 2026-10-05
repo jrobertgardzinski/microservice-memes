@@ -39,7 +39,7 @@
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-domain-erasure</artifactId>
+            <artifactId>memes-domain_erasure</artifactId>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
@@ -64,7 +64,7 @@
         <dependency>
             <!-- the use cases that take content down -->
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-system-erasure</artifactId>
+            <artifactId>memes-system_erasure</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>

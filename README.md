@@ -54,7 +54,7 @@ and Quarkus (`microservice-email`, BCE).
 
 ## Modules
 
-- **memes-domain-\*** — the entities **and every port they are read and written through**, one
+- **memes-domain_\*** — the entities **and every port they are read and written through**, one
   module per area, each port's fake and its contract test beside it. Pure Java.
   - **core** — `Meme`, `MemeMetadata`, `MemeStatus`, `MemeRepository`, `MemeContentIndex`,
     `MemeEvents`
@@ -62,7 +62,7 @@ and Quarkus (`microservice-email`, BCE).
   - **tags** — `TagRepository`
   - **erasure** (on core) — what a leaver's content goes through: `MemeErasure`,
     `PurgePolicyOverride`, `Observation`
-- **memes-config-\*** — typed, validated configuration values, one module per area: **core**
+- **memes-config_\*** — typed, validated configuration values, one module per area: **core**
   (`RateLimit`), **image** (`ImageLimits`, `ThumbnailSize`), **tags** (`TagLimits`) and
   **erasure** (`ErasureTolerance` — how long a mark may stand before it reads as a closure that
   never came). Pure Java. What an account deletion does to the leaver's content is `PurgeRule`,
@@ -75,7 +75,7 @@ and Quarkus (`microservice-email`, BCE).
   `ServeMeme`, `MakeThumbnail`, `ViewMeme`, `ListMemes`, `SearchMemesByTag`, `TagMeme`,
   `FlagMeme`, `CastVote`, `ShowMemeVote`, `ShowMemeScores`, `RankMemes`) + three technical ports
   (`ObjectStore`, `ImageEncoder`, `ContentFlags`). No framework.
-- **memes-system-\*** — the use cases that take content DOWN, below the ones that put it up and
+- **memes-system_\*** — the use cases that take content DOWN, below the ones that put it up and
   reachable without them: **core** holds `DeleteMeme`, **erasure** the account-closure trio
   `MarkUserContentForErasure` / `PurgeUserContent` / `RestoreUserContent`, plus
   `WatchErasureBacklog`. No framework — so a spec can drive the deletion semantics on domain +
@@ -84,8 +84,8 @@ and Quarkus (`microservice-email`, BCE).
   person's memes when their account closes. The three commands (mark, erase, restore), which one
   is reversible, which rule applies and what gets confirmed — with no Kafka, no database and no
   Spring anywhere in it, so the flow can be read and tested before anyone decides whether the
-  portal is six services or one. The underscore says it is not a layer: `memes-<x>` is a layer of
-  this service, `memes_<x>` is its part in the process named after the shared library `<x>`
+  portal is six services or one. The underscore straight after the service's name says it is not a layer: `memes-<x>` is a layer
+  of this service (and `memes-<layer>_<area>` one area of it), `memes_<x>` is its part in the process named after the shared library `<x>`
   (here `account-closure`), and `comments_account-closure` would be the other end of the same
   conversation.
 - **memes-ui** — the gallery UI: React + TypeScript + Material UI, built by Vite through

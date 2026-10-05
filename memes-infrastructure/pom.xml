@@ -14,42 +14,42 @@
     <dependencies>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-domain-core</artifactId>
+            <artifactId>memes-domain_core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-domain-tags</artifactId>
+            <artifactId>memes-domain_tags</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-domain-erasure</artifactId>
+            <artifactId>memes-domain_erasure</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-config-core</artifactId>
+            <artifactId>memes-config_core</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-config-tags</artifactId>
+            <artifactId>memes-config_tags</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-config-image</artifactId>
+            <artifactId>memes-config_image</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-domain-votes</artifactId>
+            <artifactId>memes-domain_votes</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-config-erasure</artifactId>
+            <artifactId>memes-config_erasure</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -277,7 +277,7 @@
         <dependency>
             <!-- the port contracts, asked of the JDBC adapters -->
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-domain-votes</artifactId>
+            <artifactId>memes-domain_votes</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <type>test-jar</type>
             <scope>test</scope>
@@ -285,7 +285,7 @@
         <dependency>
             <!-- the port contracts, asked of the JDBC adapters -->
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-domain-erasure</artifactId>
+            <artifactId>memes-domain_erasure</artifactId>
             <version>1.0.0-SNAPSHOT</version>
             <type>test-jar</type>
             <scope>test</scope>
@@ -293,13 +293,13 @@
         <dependency>
             <!-- the use cases that take content down -->
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-system-core</artifactId>
+            <artifactId>memes-system_core</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <!-- the use cases that take content down -->
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>memes-system-erasure</artifactId>
+            <artifactId>memes-system_erasure</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>

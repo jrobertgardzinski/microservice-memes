@@ -29,18 +29,18 @@
     </properties>
 
     <modules>
-        <module>memes-domain-core</module>
-        <module>memes-domain-votes</module>
-        <module>memes-domain-tags</module>
-        <module>memes-domain-erasure</module>
-        <module>memes-config-core</module>
-        <module>memes-config-tags</module>
-        <module>memes-config-image</module>
-        <module>memes-config-erasure</module>
+        <module>memes-domain_core</module>
+        <module>memes-domain_votes</module>
+        <module>memes-domain_tags</module>
+        <module>memes-domain_erasure</module>
+        <module>memes-config_core</module>
+        <module>memes-config_tags</module>
+        <module>memes-config_image</module>
+        <module>memes-config_erasure</module>
         <module>memes-image</module>
         <module>memes-tags</module>
-        <module>memes-system-core</module>
-        <module>memes-system-erasure</module>
+        <module>memes-system_core</module>
+        <module>memes-system_erasure</module>
         <module>memes-application</module>
         <module>memes_account-closure</module>
         <module>memes-ui</module>
@@ -73,42 +73,42 @@
             <!-- the family's own modules: one version, the reactor's -->
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-domain-core</artifactId>
+                <artifactId>memes-domain_core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-domain-votes</artifactId>
+                <artifactId>memes-domain_votes</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-domain-tags</artifactId>
+                <artifactId>memes-domain_tags</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-domain-erasure</artifactId>
+                <artifactId>memes-domain_erasure</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-config-core</artifactId>
+                <artifactId>memes-config_core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-config-tags</artifactId>
+                <artifactId>memes-config_tags</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-config-image</artifactId>
+                <artifactId>memes-config_image</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.jrobertgardzinski</groupId>
-                <artifactId>memes-config-erasure</artifactId>
+                <artifactId>memes-config_erasure</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

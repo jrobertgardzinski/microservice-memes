@@ -8,36 +8,29 @@
         <artifactId>microservice-memes</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>memes-domain-votes</artifactId>
+    <artifactId>memes-system_core</artifactId>
 
-    <!-- Pure domain: no framework, no I/O. -->
+    <!-- The use cases that take content down: one meme at a time, or everything one leaver
+         posted. They are the two protocols the portal has to be right about, so they sit in
+         their own module — below the use cases that put content up, and reachable without them. -->
     <dependencies>
         <dependency>
-            <!-- VoteRepository speaks in ballots and tallies -->
             <groupId>com.jrobertgardzinski</groupId>
-            <artifactId>voting</artifactId>
+            <artifactId>memes-domain_core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>memes-domain_votes</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>memes-domain_tags</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <!-- the ports' FAKES and their CONTRACTS travel to whoever implements or drives the ports -->
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
 </project>

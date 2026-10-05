@@ -8,7 +8,7 @@
         <artifactId>microservice-memes</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>memes-config-erasure</artifactId>
+    <artifactId>memes-config_erasure</artifactId>
 
     <!-- Typed, validated configuration values. Pure Java, no framework. -->
     <dependencies>
