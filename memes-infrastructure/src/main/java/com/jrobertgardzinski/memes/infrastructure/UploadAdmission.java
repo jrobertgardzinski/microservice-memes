@@ -1,5 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
+import com.jrobertgardzinski.memes.application.UploadGate;
+
 import java.time.Duration;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +32,7 @@ import java.util.concurrent.TimeUnit;
  * surface. Sizing them together is what makes the arithmetic in {@code k8s/base/memes.yaml}
  * checkable at all.
  */
-final class UploadAdmission {
+final class UploadAdmission implements UploadGate {
 
     private final Semaphore permits;
     private final Duration patience;
@@ -51,7 +53,8 @@ final class UploadAdmission {
      * @throws ImageDecodeInterruptedException on shutdown, as a 503: a 429 would invite the client
      *                                         to retry against the instance being torn down
      */
-    <T> T admit(java.util.function.Supplier<T> upload) {
+    @Override
+    public <T> T admit(java.util.function.Supplier<T> upload) {
         boolean acquired;
         try {
             acquired = permits.tryAcquire(patience.toMillis(), TimeUnit.MILLISECONDS);

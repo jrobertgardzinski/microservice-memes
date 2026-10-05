@@ -1,9 +1,9 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.domain.MemeRepository;
-import com.jrobertgardzinski.memes.application.ObjectStore;
-import com.jrobertgardzinski.memes.domain.Meme;
-import com.jrobertgardzinski.memes.domain.MemeMetadata;
+import com.jrobertgardzinski.memes.domain.core.MemeRepository;
+import com.jrobertgardzinski.memes.domain.core.ObjectStore;
+import com.jrobertgardzinski.memes.domain.core.Meme;
+import com.jrobertgardzinski.memes.domain.core.MemeMetadata;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -66,7 +66,7 @@ class JdbcMemeRepository implements MemeRepository {
                 .params(id)
                 .query((rs, n) -> new MemeMetadata(
                         rs.getString("id"), authorIdOf(rs), rs.getString("format"),
-                        com.jrobertgardzinski.memes.domain.MemeStatus.ACTIVE, null))
+                        com.jrobertgardzinski.memes.domain.core.MemeStatus.ACTIVE, null))
                 .optional();
     }
 

@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.observation.Observations;
-import com.jrobertgardzinski.memes.domain.Observation;
+import com.jrobertgardzinski.memes.domain.erasure.Observation;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

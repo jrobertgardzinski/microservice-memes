@@ -2,7 +2,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jrobertgardzinski.observation.Observations;
-import com.jrobertgardzinski.memes.domain.Observation;
+import com.jrobertgardzinski.memes.domain.erasure.Observation;
 import com.jrobertgardzinski.outbox.spring.SpringOutbox;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

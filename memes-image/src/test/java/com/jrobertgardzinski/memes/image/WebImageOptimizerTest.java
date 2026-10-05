@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.image;
 
-import com.jrobertgardzinski.memes.config.ImageLimits;
+import com.jrobertgardzinski.memes.config.image.ImageLimits;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import org.junit.jupiter.api.DisplayName;

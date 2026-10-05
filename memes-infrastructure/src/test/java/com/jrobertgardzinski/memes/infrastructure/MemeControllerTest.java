@@ -41,7 +41,7 @@ class MemeControllerTest {
     ObjectMapper objectMapper;
 
     @Autowired
-    com.jrobertgardzinski.memes.domain.MemeRepository memes;
+    com.jrobertgardzinski.memes.domain.core.MemeRepository memes;
 
     @Test
     void uploads_and_serves_an_optimized_meme() throws Exception {
@@ -131,7 +131,7 @@ class MemeControllerTest {
         // uploads are validated by the optimizer, so bytes that no longer decode AFTER storage
         // are the server's data gone bad — the thumbnail must answer 500 (our fault, generic
         // body), never the 400 the same decoder failure earns a broken UPLOAD
-        memes.save(new com.jrobertgardzinski.memes.domain.Meme(
+        memes.save(new com.jrobertgardzinski.memes.domain.core.Meme(
                 "rotten", SOMEBODY, "png", "these were pixels once".getBytes()));
 
         mockMvc.perform(get("/memes/{id}/thumbnail", "rotten"))

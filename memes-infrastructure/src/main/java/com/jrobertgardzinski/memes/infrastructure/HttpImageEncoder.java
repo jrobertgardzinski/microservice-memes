@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.ImageEncoder;
+import com.jrobertgardzinski.memes.domain.core.ImageEncoder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +13,7 @@ import java.util.Optional;
 
 /**
  * Calls the image-encoder microservice (POST /encode?format=webp). Unconfigured, unreachable, or a
- * non-200 all collapse to {@code empty} — {@link com.jrobertgardzinski.memes.application.ServeMeme}
+ * non-200 all collapse to {@code empty} — {@link com.jrobertgardzinski.memes.system.core.ServeMeme}
  * then serves the PNG, so the gallery never depends on the encoder being up.
  */
 @Component

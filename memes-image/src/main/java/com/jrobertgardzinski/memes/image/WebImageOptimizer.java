@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.image;
 
-import com.jrobertgardzinski.memes.config.ImageLimits;
+import com.jrobertgardzinski.memes.config.image.ImageLimits;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;

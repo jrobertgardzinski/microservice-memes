@@ -5,9 +5,9 @@ import java.util.Optional;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.jrobertgardzinski.memes.domain.MemeErasure;
-import com.jrobertgardzinski.memes.domain.MemeMetadata;
-import com.jrobertgardzinski.memes.domain.MemeStatus;
+import com.jrobertgardzinski.memes.domain.erasure.MemeErasure;
+import com.jrobertgardzinski.memes.domain.core.MemeMetadata;
+import com.jrobertgardzinski.memes.domain.core.MemeStatus;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
@@ -75,8 +75,8 @@ class StuckErasureWatchTest {
         // the real chain, not a stand-in: the use case decides, the adapter names the gauge, and
         // this class only runs them on a schedule. Assembled here because that is what a
         // composition root does, and the assertions below are about the three working together
-        return new StuckErasureWatch(new com.jrobertgardzinski.memes.system.WatchErasureBacklog(
-                backlog, new com.jrobertgardzinski.memes.config.ErasureTolerance(Duration.ofMinutes(30)),
+        return new StuckErasureWatch(new com.jrobertgardzinski.memes.system.erasure.WatchErasureBacklog(
+                backlog, new com.jrobertgardzinski.memes.config.erasure.ErasureTolerance(Duration.ofMinutes(30)),
                 new MicrometerObservations(meters), Clock.fixed(now, ZoneOffset.UTC)));
     }
 

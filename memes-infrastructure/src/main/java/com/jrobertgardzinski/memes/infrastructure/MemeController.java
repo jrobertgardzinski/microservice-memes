@@ -1,8 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.ListMemes;
-import com.jrobertgardzinski.memes.application.MakeThumbnail;
-import com.jrobertgardzinski.memes.application.PublishMeme;
+import com.jrobertgardzinski.memes.application.core.MemeService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,41 +37,11 @@ class MemeController {
     private static final int MAX_PAGE_SIZE = 100;
     private static final int DEFAULT_PAGE_SIZE = 50;
 
-    private final PublishMeme publishMeme;
-    private final MakeThumbnail makeThumbnail;
-    private final ListMemes listMemes;
-    private final com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag;
-    private final com.jrobertgardzinski.memes.application.ServeMeme serveMeme;
-    private final com.jrobertgardzinski.memes.application.ViewMeme viewMeme;
-    private final com.jrobertgardzinski.memes.system.DeleteMeme deleteMeme;
-    private final com.jrobertgardzinski.memes.application.FlagMeme flagMeme;
-    private final com.jrobertgardzinski.memes.application.ContentFlags contentFlags;
-    private final com.jrobertgardzinski.memes.config.RateLimit uploadRate;
-    private final UploadAdmission uploadAdmission;
+    private final MemeService memes;
     private final com.jrobertgardzinski.authors.AuthorDirectory authors;
 
-    MemeController(PublishMeme publishMeme, MakeThumbnail makeThumbnail,
-                   ListMemes listMemes,
-                   com.jrobertgardzinski.memes.application.SearchMemesByTag searchMemesByTag,
-                   com.jrobertgardzinski.memes.application.ServeMeme serveMeme,
-                   com.jrobertgardzinski.memes.application.ViewMeme viewMeme,
-                   com.jrobertgardzinski.memes.system.DeleteMeme deleteMeme,
-                   com.jrobertgardzinski.memes.application.FlagMeme flagMeme,
-                   com.jrobertgardzinski.memes.application.ContentFlags contentFlags,
-                   com.jrobertgardzinski.memes.config.RateLimit uploadRate,
-                   UploadAdmission uploadAdmission,
-                   com.jrobertgardzinski.authors.AuthorDirectory authors) {
-        this.publishMeme = publishMeme;
-        this.makeThumbnail = makeThumbnail;
-        this.listMemes = listMemes;
-        this.searchMemesByTag = searchMemesByTag;
-        this.serveMeme = serveMeme;
-        this.viewMeme = viewMeme;
-        this.deleteMeme = deleteMeme;
-        this.flagMeme = flagMeme;
-        this.contentFlags = contentFlags;
-        this.uploadRate = uploadRate;
-        this.uploadAdmission = uploadAdmission;
+    MemeController(MemeService memes, com.jrobertgardzinski.authors.AuthorDirectory authors) {
+        this.memes = memes;
         this.authors = authors;
     }
 
@@ -82,22 +50,22 @@ class MemeController {
                                                @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
                                                com.jrobertgardzinski.identity.UserId uploaderId)
             throws IOException {
-        if (!uploadRate.tryAcquire(uploaderId.toString())) {
-            return ResponseEntity.status(429).header("Retry-After", "60")
-                    .body(Map.of("status", "RATE_LIMITED", "detail", "you are uploading too fast"));
-        }
         // getBytes() is where the heap is spent — up to spring.servlet.multipart.max-file-size per
-        // request — and until now nothing bounded how many requests could stand here at once. The
-        // permit is held across execute() as well, because the bytes stay reachable for its whole
-        // duration; releasing before that would bound nothing.
-        String id = uploadAdmission.admit(() -> {
+        // request — so it is read only behind the service's upload gate, which holds its permit
+        // across the publish as well: the bytes stay reachable for its whole duration.
+        var outcome = memes.publish(uploaderId, () -> {
             try {
-                return publishMeme.execute(file.getBytes(), uploaderId);
+                return file.getBytes();
             } catch (IOException unreadableUpload) {
                 throw new UncheckedIOException(unreadableUpload);
             }
         });
-        return ResponseEntity.created(URI.create("/memes/" + id)).body(Map.of("id", id));
+        return switch (outcome) {
+            case MemeService.Upload.RateLimited limited -> ResponseEntity.status(429).header("Retry-After", "60")
+                    .body(Map.of("status", "RATE_LIMITED", "detail", "you are uploading too fast"));
+            case MemeService.Upload.Published published -> ResponseEntity
+                    .created(URI.create("/memes/" + published.id())).body(Map.of("id", published.id()));
+        };
     }
 
     @GetMapping
@@ -109,18 +77,12 @@ class MemeController {
         // and a NEGATIVE offset reaches the database as a broken statement (a bare 500) instead
         // of the empty page an out-of-range page honestly is
         long offset = (long) Math.max(0, page) * limit;
-        java.util.Set<String> nsfw = contentFlags.nsfwIds();
-        if (tag == null || tag.isBlank()) {
-            return ResponseEntity.ok(listMemes.execute(offset, limit).stream()
-                    .map(id -> Map.of("id", id, "nsfw", nsfw.contains(id))).toList());
-        }
-        try {
-            return ResponseEntity.ok(searchMemesByTag
-                    .execute(com.jrobertgardzinski.memes.tags.Tag.of(tag), offset, limit)
-                    .stream().map(id -> Map.of("id", id, "nsfw", nsfw.contains(id))).toList());
-        } catch (IllegalArgumentException illegalTag) {
-            return ResponseEntity.badRequest().body(Map.of("status", "INVALID_TAG"));
-        }
+        return switch (memes.list(tag, offset, limit)) {
+            case MemeService.Listing.Page listed -> ResponseEntity.ok(listed.memes().stream()
+                    .map(meme -> Map.of("id", meme.id(), "nsfw", meme.nsfw())).toList());
+            case MemeService.Listing.InvalidTag invalid ->
+                    ResponseEntity.badRequest().body(Map.of("status", "INVALID_TAG"));
+        };
     }
 
     @GetMapping("/{id}")
@@ -128,7 +90,7 @@ class MemeController {
                                 @org.springframework.web.bind.annotation.RequestHeader(
                                         name = "Accept", required = false) String accept) {
         boolean wantsWebp = accept != null && accept.contains("image/webp");
-        return serveMeme.execute(id, wantsWebp)
+        return memes.serve(id, wantsWebp)
                 .map(image -> ResponseEntity.ok()
                         .header("Content-Type", image.contentType())
                         .header("Vary", "Accept")
@@ -178,7 +140,7 @@ class MemeController {
     ResponseEntity<byte[]> thumbnail(@PathVariable("id") String id,
                                      @RequestParam(name = "wall", required = false) String wall) {
         boolean mustAsk = FAVOURITES_WALL.equals(wall);
-        return makeThumbnail.execute(id)
+        return memes.thumbnail(id)
                 .map(bytes -> ResponseEntity.ok()
                         .contentType(MediaType.IMAGE_PNG)
                         // a thumbnail is immutable per id (ids never return to circulation), so
@@ -242,20 +204,20 @@ class MemeController {
                                              @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID,
                                                      required = false)
                                              com.jrobertgardzinski.identity.UserId viewerId) {
-        return viewMeme.execute(id)
+        return memes.view(id, viewerId)
                 .map(meme -> ResponseEntity.ok(Map.<String, Object>of(
                         "id", meme.id(),
-                        "author", nameOf(meme),
+                        "author", nameOf(meme.authorId()),
                         // the full author never leaves the service, so the UI cannot compare it
                         // against the signed-in user any more — "own" carries that answer instead
-                        "own", viewerId != null && meme.isOwnedBy(viewerId),
-                        "nsfw", contentFlags.isNsfw(id))))
+                        "own", meme.own(),
+                        "nsfw", meme.nsfw())))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /** The name security shows for the author's id; a row without one, or with one security no longer knows, is a deleted account. */
-    private String nameOf(com.jrobertgardzinski.memes.domain.MemeMetadata meme) {
-        return meme.authorId()
+    private String nameOf(Optional<com.jrobertgardzinski.identity.UserId> author) {
+        return author
                 .map(id -> authors.namesOf(java.util.List.of(id)).getOrDefault(id,
                         new com.jrobertgardzinski.authors.AuthorName(DELETED_ACCOUNT)).display())
                 .orElse(DELETED_ACCOUNT);
@@ -271,23 +233,13 @@ class MemeController {
                                @org.springframework.web.bind.annotation.RequestBody Map<String, Boolean> body,
                                @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
                                        required = false) java.util.Set<String> roles) {
-        boolean moderator = roles != null && (roles.contains("MODERATOR") || roles.contains("ADMIN"));
-        Boolean stated = body.get("nsfw");
-        if (stated == null) {
-            // NOT STATED is not the same as false. A missing key, an explicit null or a misspelled
-            // one used to fold into the unflag command, whose adapter runs an unconditional DELETE
-            // FROM meme_flags — so a flag-ON that lost its field in transit was answered 200
-            // {"nsfw": false}, the blur came off the tile, and the moderator read the 200 as
-            // "marked". The two sibling map-bodied endpoints here already refuse the unstated
-            // field (AdminController's MISSING_RULE, VoteController's INVALID_DIRECTION).
-            return ResponseEntity.badRequest().body(Map.of("status", "MISSING_FLAG",
+        return switch (memes.flag(id, body.get("nsfw"), roles)) {
+            case MemeService.Flagging.Flagged flagged -> ResponseEntity.ok(Map.of("id", id, "nsfw", flagged.nsfw()));
+            case MemeService.Flagging.MissingFlag missing -> ResponseEntity.badRequest().body(Map.of("status", "MISSING_FLAG",
                     "detail", "expected {\"nsfw\": true|false}"));
-        }
-        boolean nsfw = stated;
-        return switch (flagMeme.execute(id, nsfw, moderator)) {
-            case FLAGGED -> ResponseEntity.ok(Map.of("id", id, "nsfw", nsfw));
-            case NOT_A_MODERATOR -> ResponseEntity.status(403).body(Map.of("status", "NOT_A_MODERATOR"));
-            case NO_SUCH_MEME -> ResponseEntity.notFound().build();
+            case MemeService.Flagging.NotAModerator notAModerator ->
+                    ResponseEntity.status(403).body(Map.of("status", "NOT_A_MODERATOR"));
+            case MemeService.Flagging.NoSuchMeme none -> ResponseEntity.notFound().build();
         };
     }
 
@@ -298,18 +250,12 @@ class MemeController {
                              com.jrobertgardzinski.identity.UserId callerId,
                              @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
                                      required = false) java.util.Set<String> roles) {
-        boolean moderator = roles != null && (roles.contains("MODERATOR") || roles.contains("ADMIN"));
-        var meme = viewMeme.execute(id);
-        if (meme.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        boolean own = meme.get().isOwnedBy(callerId);
-        if (!moderator && !own) {
-            return ResponseEntity.status(403).body(Map.of("status", "NOT_YOURS",
+        return switch (memes.delete(id, callerId, roles)) {
+            case MemeService.Deletion.Deleted deleted -> ResponseEntity.ok(Map.of("status", "DELETED", "id", id,
+                    "by", deleted.byModerator() ? "MODERATOR" : "AUTHOR"));
+            case MemeService.Deletion.NotYours notYours -> ResponseEntity.status(403).body(Map.of("status", "NOT_YOURS",
                     "detail", "only the author or a moderator can delete this meme"));
-        }
-        deleteMeme.execute(id);
-        return ResponseEntity.ok(Map.of("status", "DELETED", "id", id,
-                "by", moderator && !own ? "MODERATOR" : "AUTHOR"));
+            case MemeService.Deletion.NoSuchMeme none -> ResponseEntity.notFound().build();
+        };
     }
 }

@@ -15,6 +15,18 @@
          their own module — below the use cases that put content up, and reachable without them. -->
     <dependencies>
         <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>voting</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>memes-tags</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.jrobertgardzinski</groupId>
+            <artifactId>memes-image</artifactId>
+        </dependency>
+        <dependency>
             <!-- the three words that say what becomes of a leaver's content -->
             <groupId>com.jrobertgardzinski</groupId>
             <artifactId>purge-rule</artifactId>

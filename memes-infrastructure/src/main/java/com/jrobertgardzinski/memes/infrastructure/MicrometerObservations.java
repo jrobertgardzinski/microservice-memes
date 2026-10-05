@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.observation.Observations;
-import com.jrobertgardzinski.memes.domain.Observation;
+import com.jrobertgardzinski.memes.domain.erasure.Observation;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;

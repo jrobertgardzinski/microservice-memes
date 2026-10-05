@@ -1,27 +1,27 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.observation.Observations;
-import com.jrobertgardzinski.memes.application.CastVote;
-import com.jrobertgardzinski.memes.application.ListMemes;
-import com.jrobertgardzinski.memes.application.MakeThumbnail;
-import com.jrobertgardzinski.memes.domain.MemeContentIndex;
-import com.jrobertgardzinski.memes.domain.MemeRepository;
-import com.jrobertgardzinski.memes.domain.MemeEvents;
-import com.jrobertgardzinski.memes.application.PublishMeme;
-import com.jrobertgardzinski.memes.system.PurgeUserContent;
-import com.jrobertgardzinski.memes.application.RankMemes;
-import com.jrobertgardzinski.memes.application.SearchMemesByTag;
-import com.jrobertgardzinski.memes.application.TagMeme;
-import com.jrobertgardzinski.memes.domain.TagRepository;
-import com.jrobertgardzinski.memes.application.ShowMemeScores;
-import com.jrobertgardzinski.memes.application.ShowMemeVote;
-import com.jrobertgardzinski.memes.application.ViewMeme;
-import com.jrobertgardzinski.memes.domain.VoteRepository;
-import com.jrobertgardzinski.memes.config.ImageLimits;
+import com.jrobertgardzinski.memes.system.votes.CastVote;
+import com.jrobertgardzinski.memes.system.core.ListMemes;
+import com.jrobertgardzinski.memes.system.core.MakeThumbnail;
+import com.jrobertgardzinski.memes.domain.core.MemeContentIndex;
+import com.jrobertgardzinski.memes.domain.core.MemeRepository;
+import com.jrobertgardzinski.memes.domain.core.MemeEvents;
+import com.jrobertgardzinski.memes.system.core.PublishMeme;
+import com.jrobertgardzinski.memes.system.erasure.PurgeUserContent;
+import com.jrobertgardzinski.memes.system.votes.RankMemes;
+import com.jrobertgardzinski.memes.system.tags.SearchMemesByTag;
+import com.jrobertgardzinski.memes.system.tags.TagMeme;
+import com.jrobertgardzinski.memes.domain.tags.TagRepository;
+import com.jrobertgardzinski.memes.system.votes.ShowMemeScores;
+import com.jrobertgardzinski.memes.system.votes.ShowMemeVote;
+import com.jrobertgardzinski.memes.system.core.ViewMeme;
+import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
+import com.jrobertgardzinski.memes.config.image.ImageLimits;
 import com.jrobertgardzinski.purge.PurgeRule;
-import com.jrobertgardzinski.memes.config.RateLimit;
-import com.jrobertgardzinski.memes.config.TagLimits;
-import com.jrobertgardzinski.memes.config.ThumbnailSize;
+import com.jrobertgardzinski.memes.config.core.RateLimit;
+import com.jrobertgardzinski.memes.config.tags.TagLimits;
+import com.jrobertgardzinski.memes.config.image.ThumbnailSize;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -65,14 +65,14 @@ class MemesConfig {
 
     @Bean
     MakeThumbnail makeThumbnail(MemeRepository repository,
-                                com.jrobertgardzinski.memes.application.ObjectStore objectStore,
+                                com.jrobertgardzinski.memes.domain.core.ObjectStore objectStore,
                                 WebImageOptimizer optimizer, ThumbnailSize thumbnailSize) {
         return new MakeThumbnail(repository, objectStore, optimizer, thumbnailSize);
     }
 
     @Bean
     PublishMeme publishMeme(WebImageOptimizer optimizer, MemeRepository repository, MemeContentIndex contentIndex,
-                            com.jrobertgardzinski.memes.application.ObjectStore objectStore) {
+                            com.jrobertgardzinski.memes.domain.core.ObjectStore objectStore) {
         return new PublishMeme(optimizer, repository, contentIndex, objectStore);
     }
 
@@ -93,11 +93,11 @@ class MemesConfig {
     }
 
     @Bean
-    com.jrobertgardzinski.memes.application.ServeMeme serveMeme(
+    com.jrobertgardzinski.memes.system.core.ServeMeme serveMeme(
             MemeRepository repository,
-            com.jrobertgardzinski.memes.application.ObjectStore objectStore,
-            com.jrobertgardzinski.memes.application.ImageEncoder imageEncoder) {
-        return new com.jrobertgardzinski.memes.application.ServeMeme(repository, objectStore, imageEncoder);
+            com.jrobertgardzinski.memes.domain.core.ObjectStore objectStore,
+            com.jrobertgardzinski.memes.domain.core.ImageEncoder imageEncoder) {
+        return new com.jrobertgardzinski.memes.system.core.ServeMeme(repository, objectStore, imageEncoder);
     }
 
     @Bean
@@ -107,15 +107,15 @@ class MemesConfig {
     }
 
     @Bean
-    com.jrobertgardzinski.memes.application.FlagMeme flagMeme(
-            MemeRepository memeRepository, com.jrobertgardzinski.memes.application.ContentFlags contentFlags) {
-        return new com.jrobertgardzinski.memes.application.FlagMeme(memeRepository, contentFlags);
+    com.jrobertgardzinski.memes.system.core.FlagMeme flagMeme(
+            MemeRepository memeRepository, com.jrobertgardzinski.memes.domain.core.ContentFlags contentFlags) {
+        return new com.jrobertgardzinski.memes.system.core.FlagMeme(memeRepository, contentFlags);
     }
 
     @Bean
-    com.jrobertgardzinski.memes.system.DeleteMeme deleteMeme(
+    com.jrobertgardzinski.memes.system.core.DeleteMeme deleteMeme(
             MemeRepository memeRepository, VoteRepository voteRepository, MemeContentIndex contentIndex,
-            TagRepository tagRepository, com.jrobertgardzinski.memes.domain.MemeEvents memeEvents,
+            TagRepository tagRepository, com.jrobertgardzinski.memes.domain.core.MemeEvents memeEvents,
             org.springframework.transaction.support.TransactionTemplate tx) {
         // the transactional decorator, not the plain use case: the DB part of a teardown is atomic
         // (the use case itself stays framework-free — the seam lives here, in infrastructure)
@@ -159,19 +159,19 @@ class MemesConfig {
     }
 
     @Bean
-    com.jrobertgardzinski.memes.config.ErasureTolerance erasureTolerance(
+    com.jrobertgardzinski.memes.config.erasure.ErasureTolerance erasureTolerance(
             @Value("${memes.erasure.stuck-after-seconds:1800}") long stuckAfterSeconds) {
-        return new com.jrobertgardzinski.memes.config.ErasureTolerance(
+        return new com.jrobertgardzinski.memes.config.erasure.ErasureTolerance(
                 java.time.Duration.ofSeconds(stuckAfterSeconds));
     }
 
     @Bean
-    com.jrobertgardzinski.memes.system.WatchErasureBacklog watchErasureBacklog(
-            com.jrobertgardzinski.memes.domain.MemeErasure erasure,
-            com.jrobertgardzinski.memes.config.ErasureTolerance tolerance,
-            com.jrobertgardzinski.observation.Observations<com.jrobertgardzinski.memes.domain.Observation> observations,
+    com.jrobertgardzinski.memes.system.erasure.WatchErasureBacklog watchErasureBacklog(
+            com.jrobertgardzinski.memes.domain.erasure.MemeErasure erasure,
+            com.jrobertgardzinski.memes.config.erasure.ErasureTolerance tolerance,
+            com.jrobertgardzinski.observation.Observations<com.jrobertgardzinski.memes.domain.erasure.Observation> observations,
             java.time.Clock clock) {
-        return new com.jrobertgardzinski.memes.system.WatchErasureBacklog(
+        return new com.jrobertgardzinski.memes.system.erasure.WatchErasureBacklog(
                 erasure, tolerance, observations, clock);
     }
 
@@ -182,11 +182,11 @@ class MemesConfig {
 
     @Bean
     PurgeUserContent purgeUserContent(MemeRepository memeRepository,
-                                      com.jrobertgardzinski.memes.domain.MemeErasure erasure,
+                                      com.jrobertgardzinski.memes.domain.erasure.MemeErasure erasure,
                                       VoteRepository voteRepository,
                                       MemeContentIndex contentIndex, TagRepository tagRepository,
                                       MemeEvents memeEvents,
-                                      com.jrobertgardzinski.memes.domain.PurgePolicyOverride override,
+                                      com.jrobertgardzinski.memes.domain.erasure.PurgePolicyOverride override,
                                       PurgeRule defaultMemesPurgeRule,
                                       org.springframework.transaction.support.TransactionTemplate tx) {
         // transactional decorator — a purge that dies halfway must not strand half the leaver's memes
@@ -201,15 +201,15 @@ class MemesConfig {
      * a second template inside it would only nest a participation in the same transaction.
      */
     @Bean
-    com.jrobertgardzinski.memes.system.MarkUserContentForErasure markUserContentForErasure(
-            com.jrobertgardzinski.memes.domain.MemeErasure erasure, java.time.Clock clock) {
-        return new com.jrobertgardzinski.memes.system.MarkUserContentForErasure(erasure, clock);
+    com.jrobertgardzinski.memes.system.erasure.MarkUserContentForErasure markUserContentForErasure(
+            com.jrobertgardzinski.memes.domain.erasure.MemeErasure erasure, java.time.Clock clock) {
+        return new com.jrobertgardzinski.memes.system.erasure.MarkUserContentForErasure(erasure, clock);
     }
 
     @Bean
-    com.jrobertgardzinski.memes.system.RestoreUserContent restoreUserContent(
-            com.jrobertgardzinski.memes.domain.MemeErasure erasure) {
-        return new com.jrobertgardzinski.memes.system.RestoreUserContent(erasure);
+    com.jrobertgardzinski.memes.system.erasure.RestoreUserContent restoreUserContent(
+            com.jrobertgardzinski.memes.domain.erasure.MemeErasure erasure) {
+        return new com.jrobertgardzinski.memes.system.erasure.RestoreUserContent(erasure);
     }
 
 
@@ -222,5 +222,37 @@ class MemesConfig {
     java.time.Clock clock() {
         return java.time.Clock.systemUTC();
     }
-}
 
+    // ---- the application services: the bridge each controller calls, mapped onto beans ----
+
+    @Bean
+    com.jrobertgardzinski.memes.application.core.MemeService memeService(
+            PublishMeme publishMeme, ListMemes listMemes, SearchMemesByTag searchMemesByTag,
+            com.jrobertgardzinski.memes.system.core.ServeMeme serveMeme, MakeThumbnail makeThumbnail,
+            ViewMeme viewMeme, com.jrobertgardzinski.memes.system.core.FlagMeme flagMeme,
+            com.jrobertgardzinski.memes.system.core.DeleteMeme deleteMeme,
+            com.jrobertgardzinski.memes.domain.core.ContentFlags contentFlags, RateLimit uploadRate,
+            UploadAdmission uploadAdmission) {
+        return new com.jrobertgardzinski.memes.application.core.MemeService(publishMeme, listMemes,
+                searchMemesByTag, serveMeme, makeThumbnail, viewMeme, flagMeme, deleteMeme, contentFlags,
+                uploadRate, uploadAdmission);
+    }
+
+    @Bean
+    com.jrobertgardzinski.memes.application.votes.VoteService voteService(CastVote castVote,
+            ShowMemeVote showMemeVote, RankMemes rankMemes, ShowMemeScores showMemeScores) {
+        return new com.jrobertgardzinski.memes.application.votes.VoteService(castVote, showMemeVote, rankMemes,
+                showMemeScores);
+    }
+
+    @Bean
+    com.jrobertgardzinski.memes.application.tags.TagService tagService(TagMeme tagMeme, TagRepository tagRepository) {
+        return new com.jrobertgardzinski.memes.application.tags.TagService(tagMeme, tagRepository);
+    }
+
+    @Bean
+    com.jrobertgardzinski.memes.application.erasure.PurgePolicyService purgePolicyService(
+            com.jrobertgardzinski.memes.domain.erasure.PurgePolicyOverride override, PurgeRule defaultMemesPurgeRule) {
+        return new com.jrobertgardzinski.memes.application.erasure.PurgePolicyService(override, defaultMemesPurgeRule);
+    }
+}

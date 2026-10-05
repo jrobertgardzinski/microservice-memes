@@ -1,8 +1,8 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jrobertgardzinski.memes.application.ObjectStore;
-import com.jrobertgardzinski.memes.config.ImageLimits;
+import com.jrobertgardzinski.memes.domain.core.ObjectStore;
+import com.jrobertgardzinski.memes.config.image.ImageLimits;
 import com.jrobertgardzinski.memes.image.OptimizedImage;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import io.qameta.allure.Epic;

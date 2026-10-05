@@ -1,10 +1,10 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.system.DeleteMeme;
-import com.jrobertgardzinski.memes.domain.Meme;
-import com.jrobertgardzinski.memes.domain.MemeRepository;
-import com.jrobertgardzinski.memes.domain.TagRepository;
+import com.jrobertgardzinski.memes.system.core.DeleteMeme;
+import com.jrobertgardzinski.memes.domain.core.Meme;
+import com.jrobertgardzinski.memes.domain.core.MemeRepository;
+import com.jrobertgardzinski.memes.domain.tags.TagRepository;
 import com.jrobertgardzinski.memes.tags.Tag;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;

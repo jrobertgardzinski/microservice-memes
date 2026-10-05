@@ -1,7 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.domain.PurgePolicyOverride;
-import com.jrobertgardzinski.purge.PurgeRule;
+import com.jrobertgardzinski.memes.application.erasure.PurgePolicyService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,26 +28,23 @@ import java.util.Set;
 @RequestMapping("/admin/purge-policy")
 class AdminController {
 
-    private final PurgePolicyOverride override;
-    private final PurgeRule envDefault;
+    private final PurgePolicyService policy;
 
-    AdminController(PurgePolicyOverride override, PurgeRule envDefault) {
-        this.override = override;
-        this.envDefault = envDefault;
+    AdminController(PurgePolicyService policy) {
+        this.policy = policy;
     }
 
     @GetMapping
     ResponseEntity<?> current(@RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
             required = false) Set<String> roles) {
-        if (notAdmin(roles)) {
-            return refused();
-        }
-        var overridden = override.current();
-        return ResponseEntity.ok(Map.of(
-                "axis", "memes",
-                "effective", overridden.orElse(envDefault).asText(),
-                "source", overridden.isPresent() ? "DB" : "ENV",
-                "envDefault", envDefault.asText()));
+        return switch (policy.current(roles)) {
+            case PurgePolicyService.Reading.NotAnAdmin notAnAdmin -> refused();
+            case PurgePolicyService.Reading.InForce inForce -> ResponseEntity.ok(Map.of(
+                    "axis", "memes",
+                    "effective", inForce.effective().asText(),
+                    "source", inForce.overridden() ? "DB" : "ENV",
+                    "envDefault", inForce.envDefault().asText()));
+        };
     }
 
     @PutMapping
@@ -56,38 +52,28 @@ class AdminController {
                           @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String caller,
                           @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
                                   required = false) Set<String> roles) {
-        if (notAdmin(roles)) {
-            return refused();
-        }
-        String text = body.get("memes");
-        if (text == null || text.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("status", "MISSING_RULE",
-                    "detail", "expected {\"memes\": \"DELETE|ANONYMIZE_AUTHOR|KEEP_POPULAR_ANONYMIZED:n\"}"));
-        }
-        PurgeRule rule;
-        try {
-            rule = PurgeRule.parse(text);
-        } catch (IllegalArgumentException invalid) {
-            return ResponseEntity.badRequest().body(Map.of("status", "INVALID_RULE",
-                    "detail", invalid.getMessage()));
-        }
-        override.set(rule, caller);
-        return ResponseEntity.ok(Map.of("status", "OVERRIDDEN", "memes", rule.asText()));
+        return answer(policy.set(body.get("memes"), caller, roles));
     }
 
     @DeleteMapping
     ResponseEntity<?> clear(@RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER) String caller,
                             @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_ROLES,
                                     required = false) Set<String> roles) {
-        if (notAdmin(roles)) {
-            return refused();
-        }
-        override.clear(caller);
-        return ResponseEntity.ok(Map.of("status", "ENV_DEFAULT_RESTORED", "memes", envDefault.asText()));
+        return answer(policy.clear(caller, roles));
     }
 
-    private static boolean notAdmin(Set<String> roles) {
-        return roles == null || !roles.contains("ADMIN");
+    private static ResponseEntity<?> answer(PurgePolicyService.Change change) {
+        return switch (change) {
+            case PurgePolicyService.Change.NotAnAdmin notAnAdmin -> refused();
+            case PurgePolicyService.Change.MissingRule missing -> ResponseEntity.badRequest().body(Map.of("status", "MISSING_RULE",
+                    "detail", "expected {\"memes\": \"DELETE|ANONYMIZE_AUTHOR|KEEP_POPULAR_ANONYMIZED:n\"}"));
+            case PurgePolicyService.Change.InvalidRule invalid -> ResponseEntity.badRequest().body(Map.of("status", "INVALID_RULE",
+                    "detail", invalid.detail()));
+            case PurgePolicyService.Change.Overridden overridden ->
+                    ResponseEntity.ok(Map.of("status", "OVERRIDDEN", "memes", overridden.rule().asText()));
+            case PurgePolicyService.Change.Restored restored ->
+                    ResponseEntity.ok(Map.of("status", "ENV_DEFAULT_RESTORED", "memes", restored.envDefault().asText()));
+        };
     }
 
     private static ResponseEntity<?> refused() {

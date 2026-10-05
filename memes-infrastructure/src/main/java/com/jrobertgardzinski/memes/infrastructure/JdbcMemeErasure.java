@@ -1,9 +1,9 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.domain.MemeErasure;
-import com.jrobertgardzinski.memes.domain.MemeMetadata;
-import com.jrobertgardzinski.memes.domain.MemeStatus;
+import com.jrobertgardzinski.memes.domain.erasure.MemeErasure;
+import com.jrobertgardzinski.memes.domain.core.MemeMetadata;
+import com.jrobertgardzinski.memes.domain.core.MemeStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 

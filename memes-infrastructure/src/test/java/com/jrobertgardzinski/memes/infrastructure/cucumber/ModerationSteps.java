@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure.cucumber;
 
-import com.jrobertgardzinski.memes.application.ObjectStore;
+import com.jrobertgardzinski.memes.domain.core.ObjectStore;
 import com.jrobertgardzinski.memes.infrastructure.TestAuthConfig;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;

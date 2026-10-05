@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The filesystem {@link com.jrobertgardzinski.memes.application.ObjectStore} — the stepping stone
+ * The filesystem {@link com.jrobertgardzinski.memes.domain.core.ObjectStore} — the stepping stone
  * to S3/MinIO — round-trips bytes and refuses keys that could escape its root.
  *
  * <p>{@link PendingBlobDeletes#none()}: the durability of a DEFERRED delete is

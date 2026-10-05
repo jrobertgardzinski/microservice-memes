@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.domain.MemeEvents;
+import com.jrobertgardzinski.memes.domain.core.MemeEvents;
 import com.jrobertgardzinski.outbox.OutboxDials;
 import com.jrobertgardzinski.outbox.OutboxRepublisher;
 import com.jrobertgardzinski.outbox.OutboxTable;

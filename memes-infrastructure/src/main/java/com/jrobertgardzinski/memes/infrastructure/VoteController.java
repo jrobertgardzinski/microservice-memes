@@ -1,10 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.CastVote;
-import com.jrobertgardzinski.memes.application.RankMemes;
-import com.jrobertgardzinski.memes.application.ShowMemeScores;
-import com.jrobertgardzinski.memes.application.ShowMemeVote;
-import com.jrobertgardzinski.voting.VoteDirection;
+import com.jrobertgardzinski.memes.application.votes.VoteService;
 import com.jrobertgardzinski.voting.VoteTally;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,19 +36,10 @@ class VoteController {
      * unauthenticated, so the query string must not be a lever for turning one call into an
      * arbitrarily large read.
      */
-    private static final int MAX_IDS = 100;
+    private final VoteService votes;
 
-    private final CastVote castVote;
-    private final ShowMemeVote showMemeVote;
-    private final RankMemes rankMemes;
-    private final ShowMemeScores showMemeScores;
-
-    VoteController(CastVote castVote, ShowMemeVote showMemeVote, RankMemes rankMemes,
-                   ShowMemeScores showMemeScores) {
-        this.castVote = castVote;
-        this.showMemeVote = showMemeVote;
-        this.rankMemes = rankMemes;
-        this.showMemeScores = showMemeScores;
+    VoteController(VoteService votes) {
+        this.votes = votes;
     }
 
     @PostMapping("/{memeId}/votes")
@@ -60,19 +47,19 @@ class VoteController {
                                  @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
                                  com.jrobertgardzinski.identity.UserId voter,
                                  @RequestBody VoteRequest request) {
-        Optional<VoteDirection> direction = parseDirection(request);
-        if (direction.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
-        }
-        // the ballot is keyed by the voter's id, in its wire form
-        return toResponse(castVote.execute(memeId, voter.toString(), direction.get()));
+        return switch (votes.vote(memeId, voter, request.direction())) {
+            case VoteService.Vote.Counted counted -> toResponse(Optional.of(counted.tally()));
+            case VoteService.Vote.NoSuchMeme none -> toResponse(Optional.empty());
+            case VoteService.Vote.InvalidDirection invalid ->
+                    ResponseEntity.badRequest().body(Map.of("status", "INVALID_DIRECTION"));
+        };
     }
 
     @GetMapping("/{memeId}/votes")
     ResponseEntity<?> memeTally(@PathVariable("memeId") String memeId,
                                 @RequestAttribute(name = RequireSignInFilter.AUTHENTICATED_USER_ID, required = false)
                                 com.jrobertgardzinski.identity.UserId viewer) {
-        return toResponse(showMemeVote.execute(memeId, Optional.ofNullable(viewer).map(Object::toString)));
+        return toResponse(votes.tally(memeId, viewer));
     }
 
     /**
@@ -83,7 +70,7 @@ class VoteController {
      */
     @GetMapping("/hot")
     List<Map<String, Object>> hot() {
-        return rankMemes.execute().stream()
+        return votes.hot().stream()
                 .map(ranked -> Map.<String, Object>of("memeId", ranked.memeId(), "score", ranked.score()))
                 .toList();
     }
@@ -100,24 +87,15 @@ class VoteController {
      */
     @GetMapping("/scores")
     ResponseEntity<?> scores(@RequestParam(name = "ids", required = false) List<String> ids) {
-        List<String> asked = (ids == null ? List.<String>of() : ids).stream()
-                .filter(id -> !id.isBlank()).toList();
-        if (asked.size() > MAX_IDS) {
-            return ResponseEntity.badRequest().body(Map.of("status", "TOO_MANY_IDS",
-                    "detail", "ask about at most " + MAX_IDS + " memes per call"));
-        }
-        return ResponseEntity.ok(showMemeScores.execute(asked).entrySet().stream()
-                .map(scored -> Map.<String, Object>of("memeId", scored.getKey(), "score", scored.getValue()))
-                .toList());
+        return switch (votes.scores(ids)) {
+            case VoteService.Scores.TooManyIds tooMany -> ResponseEntity.badRequest().body(Map.of("status", "TOO_MANY_IDS",
+                    "detail", "ask about at most " + tooMany.max() + " memes per call"));
+            case VoteService.Scores.Scored scored -> ResponseEntity.ok(scored.scores().entrySet().stream()
+                    .map(score -> Map.<String, Object>of("memeId", score.getKey(), "score", score.getValue()))
+                    .toList());
+        };
     }
 
-    private static Optional<VoteDirection> parseDirection(VoteRequest request) {
-        try {
-            return Optional.of(VoteDirection.valueOf(String.valueOf(request.direction()).trim().toUpperCase()));
-        } catch (IllegalArgumentException invalid) {
-            return Optional.empty();
-        }
-    }
 
     private static ResponseEntity<?> toResponse(Optional<VoteTally> tally) {
         if (tally.isEmpty()) {

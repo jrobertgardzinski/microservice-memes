@@ -1,8 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.application.TagMeme;
-import com.jrobertgardzinski.memes.domain.TagRepository;
-import com.jrobertgardzinski.memes.tags.Tag;
+import com.jrobertgardzinski.memes.application.tags.TagService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,12 +23,10 @@ class TagController {
 
     record TagsRequest(List<String> tags) {}
 
-    private final TagMeme tagMeme;
-    private final TagRepository tagRepository;
+    private final TagService tags;
 
-    TagController(TagMeme tagMeme, TagRepository tagRepository) {
-        this.tagMeme = tagMeme;
-        this.tagRepository = tagRepository;
+    TagController(TagService tags) {
+        this.tags = tags;
     }
 
     @PostMapping
@@ -38,28 +34,22 @@ class TagController {
                           @RequestAttribute(RequireSignInFilter.AUTHENTICATED_USER_ID)
                           com.jrobertgardzinski.identity.UserId caller,
                           @RequestBody TagsRequest request) {
-        if (request.tags() == null) {
-            return ResponseEntity.badRequest().body(Map.of("status", "TAGS_REQUIRED"));
-        }
-        TagMeme.Result result;
-        try {
-            result = tagMeme.execute(memeId, caller, request.tags());
-        } catch (IllegalArgumentException illegalTag) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("status", "INVALID_TAG", "detail", illegalTag.getMessage()));
-        }
-        return switch (result.status()) {
-            case TAGGED -> ResponseEntity.ok(Map.of("tags",
-                    result.tags().stream().map(Tag::value).sorted().toList()));
-            case NO_SUCH_MEME -> ResponseEntity.notFound().build();
-            case NOT_THE_AUTHOR -> ResponseEntity.status(403).body(Map.of("status", "NOT_THE_AUTHOR",
+        return switch (tags.tag(memeId, caller, request.tags())) {
+            case TagService.Tagging.Tagged tagged -> ResponseEntity.ok(Map.of("tags", tagged.tags()));
+            case TagService.Tagging.TagsRequired required ->
+                    ResponseEntity.badRequest().body(Map.of("status", "TAGS_REQUIRED"));
+            case TagService.Tagging.InvalidTag invalid -> ResponseEntity.badRequest()
+                    .body(Map.of("status", "INVALID_TAG", "detail", invalid.detail()));
+            case TagService.Tagging.NoSuchMeme none -> ResponseEntity.notFound().build();
+            case TagService.Tagging.NotTheAuthor notTheAuthor -> ResponseEntity.status(403).body(Map.of("status", "NOT_THE_AUTHOR",
                     "detail", "the uploader curates the tags of their own meme"));
-            case TOO_MANY_TAGS -> ResponseEntity.badRequest().body(Map.of("status", "TOO_MANY_TAGS"));
+            case TagService.Tagging.TooManyTags tooMany ->
+                    ResponseEntity.badRequest().body(Map.of("status", "TOO_MANY_TAGS"));
         };
     }
 
     @GetMapping
     List<String> tags(@PathVariable("memeId") String memeId) {
-        return tagRepository.tagsOf(memeId).stream().map(Tag::value).sorted().toList();
+        return tags.tags(memeId);
     }
 }

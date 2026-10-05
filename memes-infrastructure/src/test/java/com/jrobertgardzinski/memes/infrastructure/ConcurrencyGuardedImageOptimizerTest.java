@@ -1,6 +1,6 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.config.ImageLimits;
+import com.jrobertgardzinski.memes.config.image.ImageLimits;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;

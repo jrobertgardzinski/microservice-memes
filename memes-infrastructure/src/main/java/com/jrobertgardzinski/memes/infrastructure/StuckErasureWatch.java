@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.system.WatchErasureBacklog;
-import com.jrobertgardzinski.memes.domain.Observation;
+import com.jrobertgardzinski.memes.system.erasure.WatchErasureBacklog;
+import com.jrobertgardzinski.memes.domain.erasure.Observation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;

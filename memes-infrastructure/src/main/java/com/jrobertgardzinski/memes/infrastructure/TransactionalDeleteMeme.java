@@ -1,11 +1,11 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.system.DeleteMeme;
-import com.jrobertgardzinski.memes.domain.MemeContentIndex;
-import com.jrobertgardzinski.memes.domain.MemeEvents;
-import com.jrobertgardzinski.memes.domain.MemeRepository;
-import com.jrobertgardzinski.memes.domain.TagRepository;
-import com.jrobertgardzinski.memes.domain.VoteRepository;
+import com.jrobertgardzinski.memes.system.core.DeleteMeme;
+import com.jrobertgardzinski.memes.domain.core.MemeContentIndex;
+import com.jrobertgardzinski.memes.domain.core.MemeEvents;
+import com.jrobertgardzinski.memes.domain.core.MemeRepository;
+import com.jrobertgardzinski.memes.domain.tags.TagRepository;
+import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
