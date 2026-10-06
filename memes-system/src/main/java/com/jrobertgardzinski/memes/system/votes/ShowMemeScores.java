@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.system.votes;
 
 import com.jrobertgardzinski.memes.domain.core.MemeRepository;
-import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
+import com.jrobertgardzinski.memes.domain.core.VoteRepository;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;

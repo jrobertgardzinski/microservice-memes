@@ -1,8 +1,8 @@
 package com.jrobertgardzinski.memes.system.votes;
 
 import com.jrobertgardzinski.memes.domain.votes.RankedMeme;
-import com.jrobertgardzinski.memes.domain.votes.ScoredMeme;
-import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
+import com.jrobertgardzinski.memes.domain.core.ScoredMeme;
+import com.jrobertgardzinski.memes.domain.core.VoteRepository;
 
 import java.time.Clock;
 import java.time.Duration;

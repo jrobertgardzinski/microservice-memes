@@ -3,7 +3,7 @@ package com.jrobertgardzinski.memes.system.core;
 import com.jrobertgardzinski.memes.domain.core.ObjectStore;
 
 import com.jrobertgardzinski.memes.domain.core.MemeRepository;
-import com.jrobertgardzinski.memes.config.image.ThumbnailSize;
+import com.jrobertgardzinski.memes.config.core.ThumbnailSize;
 import com.jrobertgardzinski.memes.image.InvalidImageException;
 import com.jrobertgardzinski.memes.image.OptimizedImage;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;

@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.infrastructure;
 
-import com.jrobertgardzinski.memes.domain.votes.ScoredMeme;
-import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
+import com.jrobertgardzinski.memes.domain.core.ScoredMeme;
+import com.jrobertgardzinski.memes.domain.core.VoteRepository;
 import com.jrobertgardzinski.voting.VoteDirection;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;

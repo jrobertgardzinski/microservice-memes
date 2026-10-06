@@ -4,8 +4,8 @@ import com.jrobertgardzinski.memes.system.core.DeleteMeme;
 import com.jrobertgardzinski.memes.domain.core.MemeContentIndex;
 import com.jrobertgardzinski.memes.domain.core.MemeEvents;
 import com.jrobertgardzinski.memes.domain.core.MemeRepository;
-import com.jrobertgardzinski.memes.domain.tags.TagRepository;
-import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
+import com.jrobertgardzinski.memes.domain.core.TagRepository;
+import com.jrobertgardzinski.memes.domain.core.VoteRepository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**

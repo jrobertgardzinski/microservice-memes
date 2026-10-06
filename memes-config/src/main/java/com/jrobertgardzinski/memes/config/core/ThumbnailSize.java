@@ -1,4 +1,4 @@
-package com.jrobertgardzinski.memes.config.image;
+package com.jrobertgardzinski.memes.config.core;
 
 /**
  * Configuration for meme thumbnails: the largest dimension (px) a generated thumbnail may have.

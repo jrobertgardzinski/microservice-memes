@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.system.votes;
 
 import com.jrobertgardzinski.memes.domain.core.MemeRepository;
-import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
+import com.jrobertgardzinski.memes.domain.core.VoteRepository;
 import com.jrobertgardzinski.voting.VoteTally;
 import com.jrobertgardzinski.voting.Voting;
 

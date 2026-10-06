@@ -1,4 +1,4 @@
-package com.jrobertgardzinski.memes.domain.tags;
+package com.jrobertgardzinski.memes.domain.core;
 
 import com.jrobertgardzinski.memes.tags.Tag;
 

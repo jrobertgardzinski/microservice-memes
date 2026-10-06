@@ -3,7 +3,7 @@ package com.jrobertgardzinski.memes.infrastructure;
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.core.Meme;
 import com.jrobertgardzinski.memes.domain.core.MemeRepository;
-import com.jrobertgardzinski.memes.domain.votes.VoteRepository;
+import com.jrobertgardzinski.memes.domain.core.VoteRepository;
 import com.jrobertgardzinski.voting.VoteDirection;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;

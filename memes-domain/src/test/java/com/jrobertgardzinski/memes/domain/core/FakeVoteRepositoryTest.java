@@ -1,4 +1,4 @@
-package com.jrobertgardzinski.memes.domain.votes;
+package com.jrobertgardzinski.memes.domain.core;
 
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;

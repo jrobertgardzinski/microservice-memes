@@ -54,9 +54,10 @@ and Quarkus (`microservice-email`, BCE).
 
 ## Modules
 
-Inside every layer the classes sit in one package per area — **core** (the meme itself),
-**votes**, **tags**, **image** (config only) and **erasure** (what a leaver's content goes through)
-— and `AreaBoundariesTest` holds the graph of which area may import which. Since 2026-10-05 the
+Inside every layer the classes sit in one package per area — **core** (the meme itself, with
+every repository of it), **votes**, **tags**, **image** (config only) and **erasure** (what a
+leaver's content goes through). An area sees only itself and **core**, and the layers point down;
+`AreaIsolationTest` (ArchUnit) checks both on the compiled classes. Since 2026-10-05 the
 layers mean what they mean in `microservice-security`: use cases in system, the bridge in
 application.
 

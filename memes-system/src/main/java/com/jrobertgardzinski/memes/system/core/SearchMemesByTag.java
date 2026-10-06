@@ -1,7 +1,7 @@
-package com.jrobertgardzinski.memes.system.tags;
+package com.jrobertgardzinski.memes.system.core;
 
 import com.jrobertgardzinski.memes.domain.core.MemeRepository;
-import com.jrobertgardzinski.memes.domain.tags.TagRepository;
+import com.jrobertgardzinski.memes.domain.core.TagRepository;
 import com.jrobertgardzinski.memes.tags.Tag;
 
 import java.util.List;

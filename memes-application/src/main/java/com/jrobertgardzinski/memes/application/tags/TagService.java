@@ -1,7 +1,7 @@
 package com.jrobertgardzinski.memes.application.tags;
 
 import com.jrobertgardzinski.identity.UserId;
-import com.jrobertgardzinski.memes.domain.tags.TagRepository;
+import com.jrobertgardzinski.memes.domain.core.TagRepository;
 import com.jrobertgardzinski.memes.system.tags.TagMeme;
 import com.jrobertgardzinski.memes.tags.Tag;
 

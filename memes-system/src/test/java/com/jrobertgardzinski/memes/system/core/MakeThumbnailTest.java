@@ -4,7 +4,7 @@ import com.jrobertgardzinski.memes.domain.core.ObjectStore;
 
 import com.jrobertgardzinski.memes.domain.core.MemeRepository;
 import com.jrobertgardzinski.memes.config.image.ImageLimits;
-import com.jrobertgardzinski.memes.config.image.ThumbnailSize;
+import com.jrobertgardzinski.memes.config.core.ThumbnailSize;
 import com.jrobertgardzinski.identity.UserId;
 import com.jrobertgardzinski.memes.domain.core.Meme;
 import com.jrobertgardzinski.memes.image.WebImageOptimizer;

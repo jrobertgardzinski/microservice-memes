@@ -11,7 +11,7 @@ import com.jrobertgardzinski.memes.system.core.MakeThumbnail;
 import com.jrobertgardzinski.memes.system.core.PublishMeme;
 import com.jrobertgardzinski.memes.system.core.ServeMeme;
 import com.jrobertgardzinski.memes.system.core.ViewMeme;
-import com.jrobertgardzinski.memes.system.tags.SearchMemesByTag;
+import com.jrobertgardzinski.memes.system.core.SearchMemesByTag;
 import com.jrobertgardzinski.memes.tags.Tag;
 
 import java.util.List;
